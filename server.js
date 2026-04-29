@@ -9,7 +9,6 @@ app.use(express.json());
 const DHAN_CLIENT_ID = process.env.DHAN_CLIENT_ID;
 const DHAN_TOKEN = process.env.DHAN_TOKEN;
 
-// NSE Security IDs as NUMBERS (Dhan ko integer chahiye!)
 const SECURITY_MAP = {
   'RELIANCE':    2885,
   'TCS':         11536,
@@ -44,17 +43,9 @@ const SECURITY_MAP = {
   'NESTLEIND':   17963,
 };
 
-// Dhan API se quotes fetch karo
 async function fetchQuotes(symbolList) {
   const ids = symbolList.map(s => SECURITY_MAP[s]).filter(Boolean);
-
-  const body = {
-    "NSE_EQ": ids
-  };
-
-  console.log('Fetching:', JSON.stringify(body));
-
-  const r = await axios.post('https://api.dhan.co/v2/marketfeed/quote', body, {
+  const r = await axios.post('https://api.dhan.co/v2/marketfeed/quote', { "NSE_EQ": ids }, {
     headers: {
       'access-token': DHAN_TOKEN,
       'client-id': DHAN_CLIENT_ID,
@@ -62,21 +53,24 @@ async function fetchQuotes(symbolList) {
       'Accept': 'application/json'
     }
   });
-
   return r.data;
 }
 
-// ID se symbol name dhundho
 function idToSymbol(id) {
   const numId = parseInt(id);
   return Object.keys(SECURITY_MAP).find(k => SECURITY_MAP[k] === numId) || id;
+}
+
+// Percent change calculate karo prev close se
+function calcPct(lastPrice, prevClose) {
+  if (!prevClose || prevClose === 0) return 0;
+  return parseFloat(((lastPrice - prevClose) / prevClose * 100).toFixed(2));
 }
 
 app.get('/', (req, res) => {
   res.json({ status: 'NiftyRadar Backend Running!', time: new Date() });
 });
 
-// /api/movers
 app.get('/api/movers', async (req, res) => {
   try {
     const stocks = [
@@ -85,19 +79,24 @@ app.get('/api/movers', async (req, res) => {
     ];
 
     const raw = await fetchQuotes(stocks);
-    console.log('Movers raw:', JSON.stringify(raw).substring(0, 300));
-
     const nseData = raw?.data?.NSE_EQ || {};
 
-    const results = Object.entries(nseData).map(([id, d]) => ({
-      symbol: idToSymbol(id),
-      price: d.last_price || 0,
-      change: d.net_change || 0,
-      pct: d.percent_change || 0,
-      open: d.ohlc?.open || 0,
-      high: d.ohlc?.high || 0,
-      low: d.ohlc?.low || 0,
-    }));
+    const results = Object.entries(nseData).map(([id, d]) => {
+      const lastPrice = d.last_price || 0;
+      const prevClose = d.ohlc?.close || 0;
+      const change = d.net_change || (lastPrice - prevClose);
+      const pct = d.percent_change || calcPct(lastPrice, prevClose);
+
+      return {
+        symbol: idToSymbol(id),
+        price: lastPrice,
+        change: parseFloat(change.toFixed(2)),
+        pct: parseFloat(pct.toFixed(2)),
+        open: d.ohlc?.open || 0,
+        high: d.ohlc?.high || 0,
+        low: d.ohlc?.low || 0,
+      };
+    });
 
     results.sort((a, b) => b.pct - a.pct);
 
@@ -112,7 +111,6 @@ app.get('/api/movers', async (req, res) => {
   }
 });
 
-// /api/sectors
 app.get('/api/sectors', async (req, res) => {
   const sectors = {
     'IT':      ['TCS','INFY','WIPRO','HCLTECH','TECHM'],
@@ -141,12 +139,16 @@ app.get('/api/sectors', async (req, res) => {
         const id = SECURITY_MAP[stock];
         const d = nseData[id] || nseData[String(id)];
         if (d) {
-          const pct = d.percent_change || 0;
+          const lastPrice = d.last_price || 0;
+          const prevClose = d.ohlc?.close || 0;
+          const pct = d.percent_change || calcPct(lastPrice, prevClose);
+          const change = d.net_change || parseFloat((lastPrice - prevClose).toFixed(2));
+
           result[sector].stocks.push({
             symbol: stock,
-            price: d.last_price || 0,
-            change: d.net_change || 0,
-            pct
+            price: lastPrice,
+            change: parseFloat(change.toFixed(2)),
+            pct: parseFloat(pct.toFixed(2))
           });
           total += pct;
           count++;
@@ -162,7 +164,6 @@ app.get('/api/sectors', async (req, res) => {
   }
 });
 
-// /api/debug - raw response dekho
 app.get('/api/debug', async (req, res) => {
   try {
     const raw = await fetchQuotes(['RELIANCE', 'TCS', 'INFY']);
