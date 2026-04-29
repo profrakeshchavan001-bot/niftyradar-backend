@@ -43,28 +43,32 @@ const SECURITY_MAP = {
   'NESTLEIND':   17963,
 };
 
-async function fetchQuotes(symbolList) {
-  const ids = symbolList.map(s => SECURITY_MAP[s]).filter(Boolean);
-  const r = await axios.post('https://api.dhan.co/v2/marketfeed/quote', { "NSE_EQ": ids }, {
-    headers: {
-      'access-token': DHAN_TOKEN,
-      'client-id': DHAN_CLIENT_ID,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  });
-  return r.data;
-}
-
 function idToSymbol(id) {
   const numId = parseInt(id);
   return Object.keys(SECURITY_MAP).find(k => SECURITY_MAP[k] === numId) || id;
 }
 
-// Percent change calculate karo prev close se
 function calcPct(lastPrice, prevClose) {
   if (!prevClose || prevClose === 0) return 0;
   return parseFloat(((lastPrice - prevClose) / prevClose * 100).toFixed(2));
+}
+
+// Batch mein fetch karo - max 20 stocks at a time
+async function fetchQuotesBatch(symbolList) {
+  const ids = symbolList.map(s => SECURITY_MAP[s]).filter(Boolean);
+  const r = await axios.post('https://api.dhan.co/v2/marketfeed/quote', 
+    { "NSE_EQ": ids },
+    {
+      headers: {
+        'access-token': DHAN_TOKEN,
+        'client-id': DHAN_CLIENT_ID,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      timeout: 10000
+    }
+  );
+  return r.data?.data?.NSE_EQ || {};
 }
 
 app.get('/', (req, res) => {
@@ -78,19 +82,17 @@ app.get('/api/movers', async (req, res) => {
       'SBIN','WIPRO','TATAMOTORS','BAJFINANCE','HINDUNILVR'
     ];
 
-    const raw = await fetchQuotes(stocks);
-    const nseData = raw?.data?.NSE_EQ || {};
+    const nseData = await fetchQuotesBatch(stocks);
 
     const results = Object.entries(nseData).map(([id, d]) => {
       const lastPrice = d.last_price || 0;
       const prevClose = d.ohlc?.close || 0;
-      const change = d.net_change || (lastPrice - prevClose);
+      const change = parseFloat((d.net_change || (lastPrice - prevClose)).toFixed(2));
       const pct = d.percent_change || calcPct(lastPrice, prevClose);
-
       return {
         symbol: idToSymbol(id),
         price: lastPrice,
-        change: parseFloat(change.toFixed(2)),
+        change,
         pct: parseFloat(pct.toFixed(2)),
         open: d.ohlc?.open || 0,
         high: d.ohlc?.high || 0,
@@ -99,14 +101,13 @@ app.get('/api/movers', async (req, res) => {
     });
 
     results.sort((a, b) => b.pct - a.pct);
-
     res.json({
       gainers: results.slice(0, 5),
       losers: results.slice(-5).reverse(),
       total: results.length
     });
   } catch (e) {
-    console.error('Movers error:', e.message, JSON.stringify(e.response?.data));
+    console.error('Movers error:', e.message);
     res.status(500).json({ error: e.message, details: e.response?.data });
   }
 });
@@ -117,7 +118,7 @@ app.get('/api/sectors', async (req, res) => {
     'Banking': ['HDFCBANK','ICICIBANK','SBIN','AXISBANK','KOTAKBANK'],
     'Pharma':  ['SUNPHARMA','DRREDDY','CIPLA'],
     'Auto':    ['TATAMOTORS','MARUTI'],
-    'FMCG':   ['HINDUNILVR','ITC','NESTLEIND'],
+    'FMCG':    ['HINDUNILVR','ITC','NESTLEIND'],
     'Metal':   ['TATASTEEL','HINDALCO','JSWSTEEL'],
     'Energy':  ['RELIANCE','ONGC','NTPC'],
     'Realty':  ['DLF','GODREJPROP'],
@@ -126,9 +127,17 @@ app.get('/api/sectors', async (req, res) => {
   };
 
   try {
-    const allStocks = [...new Set(Object.values(sectors).flat())];
-    const raw = await fetchQuotes(allStocks);
-    const nseData = raw?.data?.NSE_EQ || {};
+    // Pehle batch: IT + Banking (10 stocks)
+    const batch1 = ['TCS','INFY','WIPRO','HCLTECH','TECHM','HDFCBANK','ICICIBANK','SBIN','AXISBANK','KOTAKBANK'];
+    // Doosra batch: baaki sab (15 stocks)
+    const batch2 = ['SUNPHARMA','DRREDDY','CIPLA','TATAMOTORS','MARUTI','HINDUNILVR','ITC','NESTLEIND','TATASTEEL','HINDALCO','JSWSTEEL','RELIANCE','ONGC','NTPC','DLF','GODREJPROP','LT','ULTRACEMCO','ZEEL','SUNTV'];
+
+    const [data1, data2] = await Promise.all([
+      fetchQuotesBatch(batch1),
+      fetchQuotesBatch(batch2)
+    ]);
+
+    const nseData = { ...data1, ...data2 };
 
     const result = {};
     for (const [sector, stocks] of Object.entries(sectors)) {
@@ -142,15 +151,9 @@ app.get('/api/sectors', async (req, res) => {
           const lastPrice = d.last_price || 0;
           const prevClose = d.ohlc?.close || 0;
           const pct = d.percent_change || calcPct(lastPrice, prevClose);
-          const change = d.net_change || parseFloat((lastPrice - prevClose).toFixed(2));
-
-          result[sector].stocks.push({
-            symbol: stock,
-            price: lastPrice,
-            change: parseFloat(change.toFixed(2)),
-            pct: parseFloat(pct.toFixed(2))
-          });
-          total += pct;
+          const change = parseFloat((d.net_change || (lastPrice - prevClose)).toFixed(2));
+          result[sector].stocks.push({ symbol: stock, price: lastPrice, change, pct: parseFloat(pct.toFixed(2)) });
+          total += parseFloat(pct);
           count++;
         }
       }
@@ -159,15 +162,15 @@ app.get('/api/sectors', async (req, res) => {
 
     res.json(result);
   } catch (e) {
-    console.error('Sectors error:', e.message, JSON.stringify(e.response?.data));
+    console.error('Sectors error:', e.message);
     res.status(500).json({ error: e.message, details: e.response?.data });
   }
 });
 
 app.get('/api/debug', async (req, res) => {
   try {
-    const raw = await fetchQuotes(['RELIANCE', 'TCS', 'INFY']);
-    res.json({ success: true, raw });
+    const data = await fetchQuotesBatch(['RELIANCE', 'TCS']);
+    res.json({ success: true, data });
   } catch (e) {
     res.status(500).json({ error: e.message, details: e.response?.data });
   }
