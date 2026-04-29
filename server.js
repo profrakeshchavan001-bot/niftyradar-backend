@@ -9,48 +9,50 @@ app.use(express.json());
 const DHAN_CLIENT_ID = process.env.DHAN_CLIENT_ID;
 const DHAN_TOKEN = process.env.DHAN_TOKEN;
 
-// NSE Security IDs (Dhan ko stock name nahi, ID chahiye!)
+// NSE Security IDs as NUMBERS (Dhan ko integer chahiye!)
 const SECURITY_MAP = {
-  'RELIANCE':    '2885',
-  'TCS':         '11536',
-  'HDFCBANK':    '1333',
-  'INFY':        '1594',
-  'ICICIBANK':   '4963',
-  'SBIN':        '3045',
-  'WIPRO':       '3787',
-  'TATAMOTORS':  '3456',
-  'BAJFINANCE':  '317',
-  'HINDUNILVR':  '1394',
-  'HCLTECH':     '7229',
-  'TECHM':       '13538',
-  'AXISBANK':    '5900',
-  'KOTAKBANK':   '1922',
-  'SUNPHARMA':   '3351',
-  'DRREDDY':     '881',
-  'CIPLA':       '694',
-  'MARUTI':      '10999',
-  'TATASTEEL':   '3499',
-  'HINDALCO':    '1363',
-  'JSWSTEEL':    '11723',
-  'ONGC':        '2475',
-  'NTPC':        '11630',
-  'DLF':         '14732',
-  'GODREJPROP':  '14417',
-  'LT':          '11483',
-  'ULTRACEMCO':  '11532',
-  'ZEEL':        '975',
-  'SUNTV':       '3290',
-  'ITC':         '1660',
-  'NESTLEIND':   '17963',
+  'RELIANCE':    2885,
+  'TCS':         11536,
+  'HDFCBANK':    1333,
+  'INFY':        1594,
+  'ICICIBANK':   4963,
+  'SBIN':        3045,
+  'WIPRO':       3787,
+  'TATAMOTORS':  3456,
+  'BAJFINANCE':  317,
+  'HINDUNILVR':  1394,
+  'HCLTECH':     7229,
+  'TECHM':       13538,
+  'AXISBANK':    5900,
+  'KOTAKBANK':   1922,
+  'SUNPHARMA':   3351,
+  'DRREDDY':     881,
+  'CIPLA':       694,
+  'MARUTI':      10999,
+  'TATASTEEL':   3499,
+  'HINDALCO':    1363,
+  'JSWSTEEL':    11723,
+  'ONGC':        2475,
+  'NTPC':        11630,
+  'DLF':         14732,
+  'GODREJPROP':  14417,
+  'LT':          11483,
+  'ULTRACEMCO':  11532,
+  'ZEEL':        975,
+  'SUNTV':       3290,
+  'ITC':         1660,
+  'NESTLEIND':   17963,
 };
 
-// Dhan API se quote fetch karo (POST method, Security IDs ke saath)
+// Dhan API se quotes fetch karo
 async function fetchQuotes(symbolList) {
   const ids = symbolList.map(s => SECURITY_MAP[s]).filter(Boolean);
-  
+
   const body = {
-    NSE_EQ: ids
+    "NSE_EQ": ids
   };
+
+  console.log('Fetching:', JSON.stringify(body));
 
   const r = await axios.post('https://api.dhan.co/v2/marketfeed/quote', body, {
     headers: {
@@ -64,16 +66,17 @@ async function fetchQuotes(symbolList) {
   return r.data;
 }
 
-// Security ID se symbol name dhundho
+// ID se symbol name dhundho
 function idToSymbol(id) {
-  return Object.keys(SECURITY_MAP).find(k => SECURITY_MAP[k] === id) || id;
+  const numId = parseInt(id);
+  return Object.keys(SECURITY_MAP).find(k => SECURITY_MAP[k] === numId) || id;
 }
 
 app.get('/', (req, res) => {
   res.json({ status: 'NiftyRadar Backend Running!', time: new Date() });
 });
 
-// /api/movers - Top gainers & losers
+// /api/movers
 app.get('/api/movers', async (req, res) => {
   try {
     const stocks = [
@@ -82,6 +85,8 @@ app.get('/api/movers', async (req, res) => {
     ];
 
     const raw = await fetchQuotes(stocks);
+    console.log('Movers raw:', JSON.stringify(raw).substring(0, 300));
+
     const nseData = raw?.data?.NSE_EQ || {};
 
     const results = Object.entries(nseData).map(([id, d]) => ({
@@ -102,12 +107,12 @@ app.get('/api/movers', async (req, res) => {
       total: results.length
     });
   } catch (e) {
-    console.error('Movers error:', e.message, e.response?.data);
+    console.error('Movers error:', e.message, JSON.stringify(e.response?.data));
     res.status(500).json({ error: e.message, details: e.response?.data });
   }
 });
 
-// /api/sectors - Sector wise performance
+// /api/sectors
 app.get('/api/sectors', async (req, res) => {
   const sectors = {
     'IT':      ['TCS','INFY','WIPRO','HCLTECH','TECHM'],
@@ -128,14 +133,13 @@ app.get('/api/sectors', async (req, res) => {
     const nseData = raw?.data?.NSE_EQ || {};
 
     const result = {};
-
     for (const [sector, stocks] of Object.entries(sectors)) {
       result[sector] = { stocks: [], avgChange: 0 };
       let total = 0, count = 0;
 
       for (const stock of stocks) {
         const id = SECURITY_MAP[stock];
-        const d = nseData[id];
+        const d = nseData[id] || nseData[String(id)];
         if (d) {
           const pct = d.percent_change || 0;
           result[sector].stocks.push({
@@ -148,22 +152,21 @@ app.get('/api/sectors', async (req, res) => {
           count++;
         }
       }
-
       result[sector].avgChange = count > 0 ? parseFloat((total / count).toFixed(2)) : 0;
     }
 
     res.json(result);
   } catch (e) {
-    console.error('Sectors error:', e.message, e.response?.data);
+    console.error('Sectors error:', e.message, JSON.stringify(e.response?.data));
     res.status(500).json({ error: e.message, details: e.response?.data });
   }
 });
 
-// /api/debug - Raw Dhan API response dekho
+// /api/debug - raw response dekho
 app.get('/api/debug', async (req, res) => {
   try {
     const raw = await fetchQuotes(['RELIANCE', 'TCS', 'INFY']);
-    res.json({ raw, securityMap: { RELIANCE: '2885', TCS: '11536', INFY: '1594' } });
+    res.json({ success: true, raw });
   } catch (e) {
     res.status(500).json({ error: e.message, details: e.response?.data });
   }
