@@ -9,70 +9,71 @@ app.use(express.json());
 const DHAN_CLIENT_ID = process.env.DHAN_CLIENT_ID;
 const DHAN_TOKEN = process.env.DHAN_TOKEN;
 
+// NSE Security IDs (Dhan ko stock name nahi, ID chahiye!)
+const SECURITY_MAP = {
+  'RELIANCE':    '2885',
+  'TCS':         '11536',
+  'HDFCBANK':    '1333',
+  'INFY':        '1594',
+  'ICICIBANK':   '4963',
+  'SBIN':        '3045',
+  'WIPRO':       '3787',
+  'TATAMOTORS':  '3456',
+  'BAJFINANCE':  '317',
+  'HINDUNILVR':  '1394',
+  'HCLTECH':     '7229',
+  'TECHM':       '13538',
+  'AXISBANK':    '5900',
+  'KOTAKBANK':   '1922',
+  'SUNPHARMA':   '3351',
+  'DRREDDY':     '881',
+  'CIPLA':       '694',
+  'MARUTI':      '10999',
+  'TATASTEEL':   '3499',
+  'HINDALCO':    '1363',
+  'JSWSTEEL':    '11723',
+  'ONGC':        '2475',
+  'NTPC':        '11630',
+  'DLF':         '14732',
+  'GODREJPROP':  '14417',
+  'LT':          '11483',
+  'ULTRACEMCO':  '11532',
+  'ZEEL':        '975',
+  'SUNTV':       '3290',
+  'ITC':         '1660',
+  'NESTLEIND':   '17963',
+};
+
+// Dhan API se quote fetch karo (POST method, Security IDs ke saath)
+async function fetchQuotes(symbolList) {
+  const ids = symbolList.map(s => SECURITY_MAP[s]).filter(Boolean);
+  
+  const body = {
+    NSE_EQ: ids
+  };
+
+  const r = await axios.post('https://api.dhan.co/v2/marketfeed/quote', body, {
+    headers: {
+      'access-token': DHAN_TOKEN,
+      'client-id': DHAN_CLIENT_ID,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  });
+
+  return r.data;
+}
+
+// Security ID se symbol name dhundho
+function idToSymbol(id) {
+  return Object.keys(SECURITY_MAP).find(k => SECURITY_MAP[k] === id) || id;
+}
+
 app.get('/', (req, res) => {
   res.json({ status: 'NiftyRadar Backend Running!', time: new Date() });
 });
 
-// Helper: Dhan API se ek stock ka data fetch karo
-async function fetchStockData(stock) {
-  try {
-    const r = await axios.get('https://api.dhan.co/v2/marketfeed/quote', {
-      headers: {
-        'access-token': DHAN_TOKEN,
-        'client-id': DHAN_CLIENT_ID,
-        'Content-Type': 'application/json'
-      },
-      params: { NSE: stock }
-    });
-
-    const raw = r.data;
-
-    // Dhan API possible response formats:
-    // Format 1: { "NSE:RELIANCE": { ltp, netChange, percentChange } }
-    // Format 2: { data: { "NSE:RELIANCE": { ... } } }
-    // Format 3: { ltp, netChange, percentChange } (direct)
-
-    let d = null;
-
-    // Format 1 check
-    const key1 = `NSE:${stock}`;
-    if (raw[key1]) {
-      d = raw[key1];
-    }
-    // Format 2 check
-    else if (raw.data && raw.data[key1]) {
-      d = raw.data[key1];
-    }
-    // Format 2 with plain stock name
-    else if (raw.data && raw.data[stock]) {
-      d = raw.data[stock];
-    }
-    // Format 3 - direct object
-    else if (raw.ltp || raw.last_price) {
-      d = raw;
-    }
-    // Last resort - first key ki value le lo
-    else {
-      const keys = Object.keys(raw);
-      if (keys.length > 0) {
-        d = raw[keys[0]];
-      }
-    }
-
-    if (!d) return null;
-
-    // Different field names handle karo
-    const price = d.ltp || d.last_price || d.lastPrice || 0;
-    const change = d.netChange || d.net_change || d.change || 0;
-    const pct = d.percentChange || d.percent_change || d.pctChange || 0;
-
-    return { symbol: stock, price, change, pct };
-  } catch (err) {
-    console.error(`Error fetching ${stock}:`, err.message);
-    return null;
-  }
-}
-
+// /api/movers - Top gainers & losers
 app.get('/api/movers', async (req, res) => {
   try {
     const stocks = [
@@ -80,11 +81,18 @@ app.get('/api/movers', async (req, res) => {
       'SBIN','WIPRO','TATAMOTORS','BAJFINANCE','HINDUNILVR'
     ];
 
-    const results = [];
-    for (const stock of stocks) {
-      const data = await fetchStockData(stock);
-      if (data) results.push(data);
-    }
+    const raw = await fetchQuotes(stocks);
+    const nseData = raw?.data?.NSE_EQ || {};
+
+    const results = Object.entries(nseData).map(([id, d]) => ({
+      symbol: idToSymbol(id),
+      price: d.last_price || 0,
+      change: d.net_change || 0,
+      pct: d.percent_change || 0,
+      open: d.ohlc?.open || 0,
+      high: d.ohlc?.high || 0,
+      low: d.ohlc?.low || 0,
+    }));
 
     results.sort((a, b) => b.pct - a.pct);
 
@@ -94,58 +102,68 @@ app.get('/api/movers', async (req, res) => {
       total: results.length
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('Movers error:', e.message, e.response?.data);
+    res.status(500).json({ error: e.message, details: e.response?.data });
   }
 });
 
+// /api/sectors - Sector wise performance
 app.get('/api/sectors', async (req, res) => {
   const sectors = {
-    'IT': ['TCS','INFY','WIPRO','HCLTECH','TECHM'],
+    'IT':      ['TCS','INFY','WIPRO','HCLTECH','TECHM'],
     'Banking': ['HDFCBANK','ICICIBANK','SBIN','AXISBANK','KOTAKBANK'],
-    'Pharma': ['SUNPHARMA','DRREDDY','CIPLA'],
-    'Auto': ['TATAMOTORS','MARUTI'],
-    'FMCG': ['HINDUNILVR','ITC','NESTLEIND'],
-    'Metal': ['TATASTEEL','HINDALCO','JSWSTEEL'],
-    'Energy': ['RELIANCE','ONGC','NTPC'],
-    'Realty': ['DLF','GODREJPROP'],
-    'Infra': ['LT','ULTRACEMCO'],
-    'Media': ['ZEEL','SUNTV']
+    'Pharma':  ['SUNPHARMA','DRREDDY','CIPLA'],
+    'Auto':    ['TATAMOTORS','MARUTI'],
+    'FMCG':   ['HINDUNILVR','ITC','NESTLEIND'],
+    'Metal':   ['TATASTEEL','HINDALCO','JSWSTEEL'],
+    'Energy':  ['RELIANCE','ONGC','NTPC'],
+    'Realty':  ['DLF','GODREJPROP'],
+    'Infra':   ['LT','ULTRACEMCO'],
+    'Media':   ['ZEEL','SUNTV'],
   };
 
-  const result = {};
+  try {
+    const allStocks = [...new Set(Object.values(sectors).flat())];
+    const raw = await fetchQuotes(allStocks);
+    const nseData = raw?.data?.NSE_EQ || {};
 
-  for (const [sector, stocks] of Object.entries(sectors)) {
-    result[sector] = { stocks: [], avgChange: 0 };
-    let total = 0, count = 0;
+    const result = {};
 
-    for (const stock of stocks) {
-      const data = await fetchStockData(stock);
-      if (data) {
-        result[sector].stocks.push(data);
-        total += data.pct;
-        count++;
+    for (const [sector, stocks] of Object.entries(sectors)) {
+      result[sector] = { stocks: [], avgChange: 0 };
+      let total = 0, count = 0;
+
+      for (const stock of stocks) {
+        const id = SECURITY_MAP[stock];
+        const d = nseData[id];
+        if (d) {
+          const pct = d.percent_change || 0;
+          result[sector].stocks.push({
+            symbol: stock,
+            price: d.last_price || 0,
+            change: d.net_change || 0,
+            pct
+          });
+          total += pct;
+          count++;
+        }
       }
+
+      result[sector].avgChange = count > 0 ? parseFloat((total / count).toFixed(2)) : 0;
     }
 
-    result[sector].avgChange = count > 0 ? parseFloat((total / count).toFixed(2)) : 0;
+    res.json(result);
+  } catch (e) {
+    console.error('Sectors error:', e.message, e.response?.data);
+    res.status(500).json({ error: e.message, details: e.response?.data });
   }
-
-  res.json(result);
 });
 
-// Debug route - Dhan API raw response dekho
-app.get('/api/debug/:stock', async (req, res) => {
+// /api/debug - Raw Dhan API response dekho
+app.get('/api/debug', async (req, res) => {
   try {
-    const stock = req.params.stock.toUpperCase();
-    const r = await axios.get('https://api.dhan.co/v2/marketfeed/quote', {
-      headers: {
-        'access-token': DHAN_TOKEN,
-        'client-id': DHAN_CLIENT_ID,
-        'Content-Type': 'application/json'
-      },
-      params: { NSE: stock }
-    });
-    res.json({ stock, rawResponse: r.data });
+    const raw = await fetchQuotes(['RELIANCE', 'TCS', 'INFY']);
+    res.json({ raw, securityMap: { RELIANCE: '2885', TCS: '11536', INFY: '1594' } });
   } catch (e) {
     res.status(500).json({ error: e.message, details: e.response?.data });
   }
