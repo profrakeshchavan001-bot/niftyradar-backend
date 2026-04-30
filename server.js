@@ -270,13 +270,27 @@ server.listen(PORT, () => console.log(`NiftyRadar NSE Backend running on port ${
 app.get('/api/options/:symbol', async (req, res) => {
   try {
     const symbol = req.params.symbol || 'NIFTY';
+    
+    // Force fresh cookie for options
+    nseCookie = '';
+    cookieTime = 0;
     const cookie = await getNSECookie();
+    
+    // First visit options page to get proper session
+    await axios.get('https://www.nseindia.com/option-chain', {
+      headers: { ...NSE_HEADERS, 'Cookie': cookie },
+      timeout: 10000
+    }).catch(() => {});
+    
+    await new Promise(r => setTimeout(r, 1000));
+    
+    const freshCookie = await getNSECookie();
     const url = symbol === 'BANKNIFTY' 
       ? 'https://www.nseindia.com/api/option-chain-indices?symbol=BANKNIFTY'
       : 'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY';
     
     const response = await axios.get(url, {
-      headers: { ...NSE_HEADERS, 'Cookie': cookie },
+      headers: { ...NSE_HEADERS, 'Cookie': freshCookie },
       timeout: 15000
     });
 
