@@ -23,12 +23,12 @@ const SECURITY_MAP = {
   'NESTLEIND':  17963,
 };
 
-// CACHE - Dhan ko kam requests jayengi!
+// CACHE - 15 seconds TTL
 const cache = {
   movers: { data: null, time: 0 },
   sectors: { data: null, time: 0 },
 };
-const CACHE_TTL = 60000; // 60 seconds cache
+const CACHE_TTL = 15000; // 15 seconds
 
 function idToSymbol(id) {
   const numId = parseInt(id);
@@ -65,6 +65,34 @@ function parseStock(id, d) {
   return { symbol: idToSymbol(id), price: lastPrice, change, pct, open: d.ohlc?.open || 0, high: d.ohlc?.high || 0, low: d.ohlc?.low || 0 };
 }
 
+// ✅ AUTO-REFRESH MOVERS EVERY 10 SECONDS
+async function refreshMovers() {
+  try {
+    const stocks = ['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','SBIN','WIPRO','TATAMOTORS','BAJFINANCE','HINDUNILVR'];
+    const nseData = await fetchQuotesBatch(stocks);
+    const results = Object.entries(nseData).map(([id, d]) => parseStock(id, d));
+    results.sort((a, b) => b.pct - a.pct);
+    cache.movers = {
+      data: {
+        gainers: results.slice(0, 5),
+        losers: results.slice(-5).reverse(),
+        total: results.length,
+        updatedAt: new Date().toISOString()
+      },
+      time: Date.now()
+    };
+    console.log('✅ Movers refreshed at', new Date().toISOString());
+  } catch (e) {
+    console.error('❌ Auto-refresh failed:', e.message);
+  }
+}
+
+// Start auto-refresh after 5 seconds (server startup ke baad)
+setTimeout(() => {
+  refreshMovers(); // pehli baar turant
+  setInterval(refreshMovers, 10000); // phir har 10 seconds
+}, 5000);
+
 app.get('/', (req, res) => {
   res.json({ status: 'NiftyRadar Backend Running!', time: new Date() });
 });
@@ -76,13 +104,16 @@ app.get('/api/movers', async (req, res) => {
     if (cache.movers.data && (now - cache.movers.time) < CACHE_TTL) {
       return res.json(cache.movers.data);
     }
-
     const stocks = ['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','SBIN','WIPRO','TATAMOTORS','BAJFINANCE','HINDUNILVR'];
     const nseData = await fetchQuotesBatch(stocks);
     const results = Object.entries(nseData).map(([id, d]) => parseStock(id, d));
     results.sort((a, b) => b.pct - a.pct);
-
-    const response = { gainers: results.slice(0, 5), losers: results.slice(-5).reverse(), total: results.length, updatedAt: new Date().toISOString() };
+    const response = {
+      gainers: results.slice(0, 5),
+      losers: results.slice(-5).reverse(),
+      total: results.length,
+      updatedAt: new Date().toISOString()
+    };
     cache.movers = { data: response, time: now };
     res.json(response);
   } catch (e) {
@@ -116,7 +147,6 @@ app.get('/api/sectors', async (req, res) => {
     const batch1 = ['TCS','INFY','WIPRO','HCLTECH','TECHM','HDFCBANK','ICICIBANK','SBIN','AXISBANK','KOTAKBANK'];
     const batch2 = ['SUNPHARMA','DRREDDY','CIPLA','TATAMOTORS','MARUTI','HINDUNILVR','ITC','NESTLEIND','TATASTEEL','HINDALCO','JSWSTEEL','RELIANCE','ONGC','NTPC','DLF','GODREJPROP','LT','ULTRACEMCO','ZEEL','SUNTV'];
 
-    // 2 sec gap daal ke fetch karo — rate limit se bachne ke liye
     const data1 = await fetchQuotesBatch(batch1);
     await new Promise(r => setTimeout(r, 2000));
     const data2 = await fetchQuotesBatch(batch2);
