@@ -265,3 +265,84 @@ app.get('/api/debug', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`NiftyRadar NSE Backend running on port ${PORT}`));
+
+// ✅ REAL OPTIONS CHAIN - NSE India Free API
+app.get('/api/options/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol || 'NIFTY';
+    const cookie = await getNSECookie();
+    const url = symbol === 'BANKNIFTY' 
+      ? 'https://www.nseindia.com/api/option-chain-indices?symbol=BANKNIFTY'
+      : 'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY';
+    
+    const response = await axios.get(url, {
+      headers: { ...NSE_HEADERS, 'Cookie': cookie },
+      timeout: 15000
+    });
+
+    const data = response.data;
+    const spot = data?.records?.underlyingValue || 0;
+    const expDates = data?.records?.expiryDates || [];
+    const allData = data?.records?.data || [];
+
+    // Get nearest expiry
+    const nearExpiry = expDates[0];
+    
+    // Filter by nearest expiry
+    const filtered = allData.filter(d => d.expiryDate === nearExpiry);
+
+    // Process strikes
+    const strikes = {};
+    filtered.forEach(item => {
+      const strike = item.strikePrice;
+      if (!strikes[strike]) strikes[strike] = { strike, callOI: 0, putOI: 0, callChgOI: 0, putChgOI: 0, callLTP: 0, putLTP: 0, callIV: 0, putIV: 0, callVol: 0, putVol: 0 };
+      if (item.CE) {
+        strikes[strike].callOI = item.CE.openInterest || 0;
+        strikes[strike].callChgOI = item.CE.changeinOpenInterest || 0;
+        strikes[strike].callLTP = item.CE.lastPrice || 0;
+        strikes[strike].callIV = item.CE.impliedVolatility || 0;
+        strikes[strike].callVol = item.CE.totalTradedVolume || 0;
+      }
+      if (item.PE) {
+        strikes[strike].putOI = item.PE.openInterest || 0;
+        strikes[strike].putChgOI = item.PE.changeinOpenInterest || 0;
+        strikes[strike].putLTP = item.PE.lastPrice || 0;
+        strikes[strike].putIV = item.PE.impliedVolatility || 0;
+        strikes[strike].putVol = item.PE.totalTradedVolume || 0;
+      }
+    });
+
+    // Get ATM strikes (10 above, 10 below spot)
+    const allStrikes = Object.values(strikes).sort((a, b) => a.strike - b.strike);
+    const atmIdx = allStrikes.findIndex(s => s.strike >= spot);
+    const start = Math.max(0, atmIdx - 8);
+    const end = Math.min(allStrikes.length, atmIdx + 8);
+    const nearStrikes = allStrikes.slice(start, end);
+
+    // PCR
+    const totalCallOI = nearStrikes.reduce((s, x) => s + x.callOI, 0);
+    const totalPutOI = nearStrikes.reduce((s, x) => s + x.putOI, 0);
+    const pcr = totalCallOI > 0 ? (totalPutOI / totalCallOI).toFixed(2) : 0;
+
+    // Max Pain
+    const maxPain = nearStrikes.reduce((best, s) => {
+      const pain = nearStrikes.reduce((t, x) => t + Math.max(0, x.callOI * (x.strike - s.strike)) + Math.max(0, x.putOI * (s.strike - x.strike)), 0);
+      return pain < best.pain ? { strike: s.strike, pain } : best;
+    }, { strike: nearStrikes[0]?.strike || 0, pain: Infinity });
+
+    res.json({
+      symbol,
+      spot,
+      expiry: nearExpiry,
+      expiries: expDates.slice(0, 4),
+      pcr,
+      maxPain: maxPain.strike,
+      strikes: nearStrikes,
+      updatedAt: new Date().toISOString()
+    });
+
+  } catch (e) {
+    console.error('Options error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
