@@ -136,7 +136,7 @@ const cache = {
   sectors: { data: null, time: 0 },
   indices: { data: null, time: 0 },
 };
-const CACHE_TTL = 30000; // 30 seconds
+const CACHE_TTL = 5000; // 5 seconds - near-live
 
 // Market hours check
 function isMarketOpen() {
@@ -236,7 +236,7 @@ async function refreshData() {
   }
 }
 
-setInterval(refreshData, 30000);
+setInterval(refreshData, 5000); // 5s refresh - within Dhan's 1 req/sec rate limit
 // Refresh instrument master every 12 hours
 setInterval(loadInstrumentMaster, 12 * 60 * 60 * 1000);
 
