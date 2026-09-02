@@ -11,45 +11,130 @@ const wss = new WebSocketServer({ server });
 app.use(cors());
 app.use(express.json());
 
-// NSE India headers - required for NSE API
-const NSE_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Accept': '*/*',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Referer': 'https://www.nseindia.com/',
-  'Connection': 'keep-alive',
+// ============================================
+// DHAN API CONFIG
+// Set these as Environment Variables on Render:
+//   DHAN_CLIENT_ID    -> your Dhan client id
+//   DHAN_ACCESS_TOKEN -> your Dhan API access token (JWT)
+// ============================================
+const DHAN_CLIENT_ID = process.env.DHAN_CLIENT_ID || '';
+const DHAN_ACCESS_TOKEN = process.env.DHAN_ACCESS_TOKEN || '';
+const DHAN_BASE = 'https://api.dhan.co/v2';
+
+const DHAN_HEADERS = {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+  'access-token': DHAN_ACCESS_TOKEN,
+  'client-id': DHAN_CLIENT_ID,
 };
 
-// NSE session cookie - refresh every 30 min
-let nseCookie = '';
-let cookieTime = 0;
+// Known index Security IDs (segment: IDX_I)
+const INDEX_IDS = {
+  NIFTY50: 13,
+  BANKNIFTY: 25,
+  SENSEX: 51,
+};
 
-async function getNSECookie() {
-  const now = Date.now();
-  if (nseCookie && (now - cookieTime) < 1800000) return nseCookie; // 30 min cache
-  try {
-    const res = await axios.get('https://www.nseindia.com', {
-      headers: NSE_HEADERS,
-      timeout: 10000
-    });
-    const cookies = res.headers['set-cookie'];
-    if (cookies) {
-      nseCookie = cookies.map(c => c.split(';')[0]).join('; ');
-      cookieTime = now;
-      console.log('✅ NSE cookie refreshed');
+// Nifty 50 constituent symbols (as they appear in Dhan's scrip master SEM_TRADING_SYMBOL)
+const NIFTY50_SYMBOLS = [
+  'RELIANCE','TCS','HDFCBANK','ICICIBANK','INFY','ITC','SBIN','BHARTIARTL','LT','HINDUNILVR',
+  'KOTAKBANK','AXISBANK','BAJFINANCE','ASIANPAINT','MARUTI','SUNPHARMA','TITAN','ULTRACEMCO',
+  'TATAMOTORS','WIPRO','NESTLEIND','ONGC','NTPC','ADANIENT','ADANIPORTS','POWERGRID','M&M',
+  'HCLTECH','TATASTEEL','JSWSTEEL','TECHM','GRASIM','DRREDDY','CIPLA','COALINDIA','BAJAJFINSV',
+  'BRITANNIA','EICHERMOT','HEROMOTOCO','DIVISLAB','APOLLOHOSP','BPCL','HINDALCO','INDUSINDBK',
+  'SBILIFE','HDFCLIFE','TATACONSUM','BAJAJ-AUTO','UPL','SHRIRAMFIN',
+];
+
+// Sector map (same categorisation as before)
+const SECTOR_MAP = {
+  'IT':      ['TCS','INFY','WIPRO','HCLTECH','TECHM'],
+  'Banking': ['HDFCBANK','ICICIBANK','SBIN','AXISBANK','KOTAKBANK'],
+  'Pharma':  ['SUNPHARMA','DRREDDY','CIPLA'],
+  'Auto':    ['TATAMOTORS','MARUTI'],
+  'FMCG':    ['HINDUNILVR','ITC','NESTLEIND'],
+  'Metal':   ['TATASTEEL','HINDALCO','JSWSTEEL'],
+  'Energy':  ['RELIANCE','ONGC','NTPC'],
+  'Realty':  ['DLF','GODREJPROP'],
+  'Infra':   ['LT','ULTRACEMCO'],
+  'Media':   ['ZEEL','SUNTV'],
+};
+
+// ============================================
+// INSTRUMENT MASTER (symbol -> security id) for NSE_EQ
+// Downloaded once at startup, refreshed every 12h
+// ============================================
+let symbolToId = {};
+let instrumentsLoadedAt = 0;
+
+function parseCsvLine(line) {
+  // simple CSV parser that handles quoted fields with commas inside
+  const out = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      out.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
     }
-  } catch (e) {
-    console.error('❌ Cookie fetch failed:', e.message);
   }
-  return nseCookie;
+  out.push(cur);
+  return out;
 }
 
+async function loadInstrumentMaster() {
+  try {
+    console.log('⏳ Downloading Dhan instrument master...');
+    const res = await axios.get('https://images.dhan.co/api-data/api-scrip-master.csv', {
+      timeout: 30000,
+      responseType: 'text',
+    });
+    const lines = res.data.split('\n');
+    const header = parseCsvLine(lines[0]).map(h => h.trim());
+
+    const idxExch = header.indexOf('SEM_EXM_EXCH_ID');
+    const idxSegment = header.indexOf('SEM_SEGMENT');
+    const idxInstrument = header.indexOf('SEM_INSTRUMENT_NAME');
+    const idxSymbol = header.indexOf('SEM_TRADING_SYMBOL');
+    const idxSecId = header.indexOf('SEM_SMST_SECURITY_ID');
+
+    const map = {};
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i]) continue;
+      const cols = parseCsvLine(lines[i]);
+      const exch = cols[idxExch];
+      const instrument = cols[idxInstrument];
+      const symbol = (cols[idxSymbol] || '').trim();
+      const secId = cols[idxSecId];
+
+      if (exch === 'NSE' && instrument === 'EQUITY' && symbol && secId) {
+        // keep first match only (avoid overwriting with duplicate/less relevant rows)
+        if (!map[symbol]) map[symbol] = parseInt(secId, 10);
+      }
+    }
+    symbolToId = map;
+    instrumentsLoadedAt = Date.now();
+    console.log(`✅ Instrument master loaded: ${Object.keys(symbolToId).length} NSE equities`);
+  } catch (e) {
+    console.error('❌ Instrument master load failed:', e.message);
+  }
+}
+
+function getSecurityId(symbol) {
+  return symbolToId[symbol];
+}
+
+// ============================================
 // Cache
+// ============================================
 const cache = {
   movers: { data: null, time: 0 },
   sectors: { data: null, time: 0 },
-  nifty: { data: null, time: 0 },
+  indices: { data: null, time: 0 },
 };
 const CACHE_TTL = 30000; // 30 seconds
 
@@ -65,54 +150,70 @@ function isMarketOpen() {
   return timeInMin >= 555 && timeInMin <= 930;
 }
 
-// Fetch Nifty 50 stocks from NSE
-async function fetchNifty50() {
-  const cookie = await getNSECookie();
-  const res = await axios.get('https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050', {
-    headers: { ...NSE_HEADERS, 'Cookie': cookie },
-    timeout: 15000
+// ============================================
+// Dhan API helpers
+// ============================================
+async function dhanQuote(segmentIdMap) {
+  // segmentIdMap e.g. { NSE_EQ: [11536, 1333], IDX_I: [13,25] }
+  const res = await axios.post(`${DHAN_BASE}/marketfeed/quote`, segmentIdMap, {
+    headers: DHAN_HEADERS,
+    timeout: 15000,
   });
-  return res.data?.data || [];
+  return res.data?.data || {};
 }
 
-// Fetch Nifty/Sensex index prices
-async function fetchIndexData() {
-  const cookie = await getNSECookie();
-  const res = await axios.get('https://www.nseindia.com/api/allIndices', {
-    headers: { ...NSE_HEADERS, 'Cookie': cookie },
-    timeout: 15000
+async function dhanOHLC(segmentIdMap) {
+  const res = await axios.post(`${DHAN_BASE}/marketfeed/ohlc`, segmentIdMap, {
+    headers: DHAN_HEADERS,
+    timeout: 15000,
   });
-  return res.data?.data || [];
+  return res.data?.data || {};
 }
 
-// Process movers from NSE data
+// Fetch quote data for the Nifty50 basket (NSE_EQ)
+async function fetchNifty50Quotes() {
+  const ids = NIFTY50_SYMBOLS.map(s => getSecurityId(s)).filter(Boolean);
+  const idToSymbol = {};
+  NIFTY50_SYMBOLS.forEach(s => {
+    const id = getSecurityId(s);
+    if (id) idToSymbol[id] = s;
+  });
+  const data = await dhanQuote({ NSE_EQ: ids });
+  const eqData = data.NSE_EQ || {};
+
+  const stocks = [];
+  for (const [id, row] of Object.entries(eqData)) {
+    const symbol = idToSymbol[id];
+    if (!symbol) continue;
+    const lastPrice = row.last_price || 0;
+    const prevClose = row.ohlc?.close || lastPrice;
+    const change = parseFloat((lastPrice - prevClose).toFixed(2));
+    const pct = prevClose ? parseFloat(((change / prevClose) * 100).toFixed(2)) : 0;
+    stocks.push({
+      symbol,
+      price: lastPrice,
+      change,
+      pct,
+      open: row.ohlc?.open || 0,
+      high: row.ohlc?.high || 0,
+      low: row.ohlc?.low || 0,
+      volume: row.volume || 0,
+    });
+  }
+  return stocks;
+}
+
 function processMovers(stocks) {
-  // Remove index entry (first item is usually NIFTY 50 index itself)
-  const filtered = stocks.filter(s => s.symbol && s.symbol !== 'NIFTY 50');
-  
-  const processed = filtered.map(s => ({
-    symbol: s.symbol,
-    price: s.lastPrice || 0,
-    change: parseFloat((s.change || 0).toFixed(2)),
-    pct: parseFloat((s.pChange || 0).toFixed(2)),
-    open: s.open || 0,
-    high: s.dayHigh || 0,
-    low: s.dayLow || 0,
-    volume: s.totalTradedVolume || 0,
-  }));
-
-  processed.sort((a, b) => b.pct - a.pct);
-  
+  const sorted = [...stocks].sort((a, b) => b.pct - a.pct);
   return {
-    gainers: processed.slice(0, 5),
-    losers: processed.slice(-5).reverse(),
-    all: processed,
-    total: processed.length,
-    updatedAt: new Date().toISOString()
+    gainers: sorted.slice(0, 5),
+    losers: sorted.slice(-5).reverse(),
+    all: sorted,
+    total: sorted.length,
+    updatedAt: new Date().toISOString(),
   };
 }
 
-// Broadcast to WebSocket clients
 function broadcastToClients(data) {
   wss.clients.forEach(client => {
     if (client.readyState === 1) {
@@ -121,24 +222,24 @@ function broadcastToClients(data) {
   });
 }
 
-// Smart auto-refresh
 async function refreshData() {
   if (!isMarketOpen()) return;
+  if (Object.keys(symbolToId).length === 0) return; // instruments not loaded yet
   try {
-    const stocks = await fetchNifty50();
+    const stocks = await fetchNifty50Quotes();
     const moversData = processMovers(stocks);
     cache.movers = { data: moversData, time: Date.now() };
     broadcastToClients({ type: 'movers', data: moversData });
-    console.log('✅ NSE data refreshed at', new Date().toISOString());
+    console.log('✅ Dhan data refreshed at', new Date().toISOString());
   } catch (e) {
-    console.error('❌ Refresh failed:', e.message);
+    console.error('❌ Refresh failed:', e.response?.data || e.message);
   }
 }
 
-// Refresh every 30 seconds during market hours
 setInterval(refreshData, 30000);
+// Refresh instrument master every 12 hours
+setInterval(loadInstrumentMaster, 12 * 60 * 60 * 1000);
 
-// WebSocket
 wss.on('connection', (ws) => {
   console.log('🔌 Client connected. Total:', wss.clients.size);
   if (cache.movers.data) {
@@ -147,14 +248,18 @@ wss.on('connection', (ws) => {
   ws.on('close', () => console.log('🔌 Disconnected. Total:', wss.clients.size));
 });
 
-// ROOT
+// ============================================
+// ROUTES
+// ============================================
 app.get('/', (req, res) => {
   res.json({
-    status: 'NiftyRadar Backend - NSE Edition!',
+    status: 'NiftyRadar Backend - Dhan Edition!',
     time: new Date(),
     marketOpen: isMarketOpen(),
     connectedClients: wss.clients.size,
-    dataSource: 'NSE India (Free - No Limits!)'
+    dataSource: 'Dhan API',
+    instrumentsLoaded: Object.keys(symbolToId).length,
+    instrumentsLoadedAt: instrumentsLoadedAt ? new Date(instrumentsLoadedAt).toISOString() : null,
   });
 });
 
@@ -165,12 +270,12 @@ app.get('/api/movers', async (req, res) => {
     if (cache.movers.data && (now - cache.movers.time) < CACHE_TTL) {
       return res.json(cache.movers.data);
     }
-    const stocks = await fetchNifty50();
+    const stocks = await fetchNifty50Quotes();
     const data = processMovers(stocks);
     cache.movers = { data, time: now };
     res.json(data);
   } catch (e) {
-    console.error('Movers error:', e.message);
+    console.error('Movers error:', e.response?.data || e.message);
     if (cache.movers.data) return res.json({ ...cache.movers.data, cached: true });
     res.status(500).json({ error: e.message });
   }
@@ -184,36 +289,38 @@ app.get('/api/sectors', async (req, res) => {
       return res.json(cache.sectors.data);
     }
 
-    const stocks = await fetchNifty50();
-    const filtered = stocks.filter(s => s.symbol && s.symbol !== 'NIFTY 50');
+    // gather all unique symbols across sectors
+    const allSymbols = [...new Set(Object.values(SECTOR_MAP).flat())];
+    const ids = allSymbols.map(s => getSecurityId(s)).filter(Boolean);
+    const idToSymbol = {};
+    allSymbols.forEach(s => {
+      const id = getSecurityId(s);
+      if (id) idToSymbol[id] = s;
+    });
 
-    const sectorMap = {
-      'IT':      ['TCS','INFY','WIPRO','HCLTECH','TECHM'],
-      'Banking': ['HDFCBANK','ICICIBANK','SBIN','AXISBANK','KOTAKBANK'],
-      'Pharma':  ['SUNPHARMA','DRREDDY','CIPLA'],
-      'Auto':    ['TATAMOTORS','MARUTI'],
-      'FMCG':    ['HINDUNILVR','ITC','NESTLEIND'],
-      'Metal':   ['TATASTEEL','HINDALCO','JSWSTEEL'],
-      'Energy':  ['RELIANCE','ONGC','NTPC'],
-      'Realty':  ['DLF','GODREJPROP'],
-      'Infra':   ['LT','ULTRACEMCO'],
-      'Media':   ['ZEEL','SUNTV'],
-    };
+    const data = await dhanQuote({ NSE_EQ: ids });
+    const eqData = data.NSE_EQ || {};
 
     const stockMap = {};
-    filtered.forEach(s => { stockMap[s.symbol] = s; });
+    for (const [id, row] of Object.entries(eqData)) {
+      const symbol = idToSymbol[id];
+      if (!symbol) continue;
+      const lastPrice = row.last_price || 0;
+      const prevClose = row.ohlc?.close || lastPrice;
+      const change = parseFloat((lastPrice - prevClose).toFixed(2));
+      const pct = prevClose ? parseFloat(((change / prevClose) * 100).toFixed(2)) : 0;
+      stockMap[symbol] = { price: lastPrice, change, pct };
+    }
 
     const result = {};
-    for (const [sector, symbols] of Object.entries(sectorMap)) {
+    for (const [sector, symbols] of Object.entries(SECTOR_MAP)) {
       result[sector] = { stocks: [], avgChange: 0 };
       let total = 0, count = 0;
       for (const sym of symbols) {
         const s = stockMap[sym];
         if (s) {
-          const pct = parseFloat((s.pChange || 0).toFixed(2));
-          const change = parseFloat((s.change || 0).toFixed(2));
-          result[sector].stocks.push({ symbol: sym, price: s.lastPrice || 0, change, pct });
-          total += pct; count++;
+          result[sector].stocks.push({ symbol: sym, price: s.price, change: s.change, pct: s.pct });
+          total += s.pct; count++;
         }
       }
       result[sector].avgChange = count > 0 ? parseFloat((total / count).toFixed(2)) : 0;
@@ -222,33 +329,42 @@ app.get('/api/sectors', async (req, res) => {
     cache.sectors = { data: result, time: now };
     res.json(result);
   } catch (e) {
-    console.error('Sectors error:', e.message);
+    console.error('Sectors error:', e.response?.data || e.message);
     if (cache.sectors.data) return res.json(cache.sectors.data);
     res.status(500).json({ error: e.message });
   }
 });
 
-// NIFTY/SENSEX INDEX
+// NIFTY/BANKNIFTY/SENSEX INDEX
 app.get('/api/indices', async (req, res) => {
   try {
     const now = Date.now();
-    if (cache.nifty.data && (now - cache.nifty.time) < CACHE_TTL) {
-      return res.json(cache.nifty.data);
+    if (cache.indices.data && (now - cache.indices.time) < CACHE_TTL) {
+      return res.json(cache.indices.data);
     }
-    const indices = await fetchIndexData();
-    const nifty = indices.find(i => i.index === 'NIFTY 50');
-    const banknifty = indices.find(i => i.index === 'NIFTY BANK');
-    const sensex = indices.find(i => i.index === 'SENSEX');
-    const data = {
-      nifty50: nifty ? { price: nifty.last, change: nifty.variation, pct: nifty.percentChange } : null,
-      bankNifty: banknifty ? { price: banknifty.last, change: banknifty.variation, pct: banknifty.percentChange } : null,
-      sensex: sensex ? { price: sensex.last, change: sensex.variation, pct: sensex.percentChange } : null,
-      updatedAt: new Date().toISOString()
+    const data = await dhanOHLC({ IDX_I: [INDEX_IDS.NIFTY50, INDEX_IDS.BANKNIFTY, INDEX_IDS.SENSEX] });
+    const idxData = data.IDX_I || {};
+
+    function build(id) {
+      const row = idxData[id];
+      if (!row) return null;
+      const lastPrice = row.last_price || 0;
+      const prevClose = row.ohlc?.close || lastPrice;
+      const change = parseFloat((lastPrice - prevClose).toFixed(2));
+      const pct = prevClose ? parseFloat(((change / prevClose) * 100).toFixed(2)) : 0;
+      return { price: lastPrice, change, pct };
+    }
+
+    const result = {
+      nifty50: build(INDEX_IDS.NIFTY50),
+      bankNifty: build(INDEX_IDS.BANKNIFTY),
+      sensex: build(INDEX_IDS.SENSEX),
+      updatedAt: new Date().toISOString(),
     };
-    cache.nifty = { data, time: now };
-    res.json(data);
+    cache.indices = { data: result, time: now };
+    res.json(result);
   } catch (e) {
-    console.error('Indices error:', e.message);
+    console.error('Indices error:', e.response?.data || e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -256,91 +372,80 @@ app.get('/api/indices', async (req, res) => {
 // DEBUG
 app.get('/api/debug', async (req, res) => {
   try {
-    const stocks = await fetchNifty50();
-    res.json({ success: true, count: stocks.length, sample: stocks.slice(0, 3) });
+    const stocks = await fetchNifty50Quotes();
+    res.json({
+      success: true,
+      instrumentsLoaded: Object.keys(symbolToId).length,
+      count: stocks.length,
+      sample: stocks.slice(0, 3),
+    });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message, detail: e.response?.data });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`NiftyRadar NSE Backend running on port ${PORT}`));
-
-// ✅ REAL OPTIONS CHAIN - NSE India Free API
+// ============================================
+// OPTIONS CHAIN (NIFTY / BANKNIFTY) - Dhan Option Chain API
+// ============================================
 app.get('/api/options/:symbol', async (req, res) => {
   try {
-    const symbol = req.params.symbol || 'NIFTY';
-    
-    // Force fresh cookie for options
-    nseCookie = '';
-    cookieTime = 0;
-    const cookie = await getNSECookie();
-    
-    // First visit options page to get proper session
-    await axios.get('https://www.nseindia.com/option-chain', {
-      headers: { ...NSE_HEADERS, 'Cookie': cookie },
-      timeout: 10000
-    }).catch(() => {});
-    
-    await new Promise(r => setTimeout(r, 1000));
-    
-    const freshCookie = await getNSECookie();
-    const url = symbol === 'BANKNIFTY' 
-      ? 'https://www.nseindia.com/api/option-chain-indices?symbol=BANKNIFTY'
-      : 'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY';
-    
-    const response = await axios.get(url, {
-      headers: { ...NSE_HEADERS, 'Cookie': freshCookie },
-      timeout: 15000
-    });
+    const symbol = (req.params.symbol || 'NIFTY').toUpperCase();
+    const underlyingScrip = symbol === 'BANKNIFTY' ? INDEX_IDS.BANKNIFTY : INDEX_IDS.NIFTY50;
+    const underlyingSeg = 'IDX_I';
 
-    const data = response.data;
-    const spot = data?.records?.underlyingValue || 0;
-    const expDates = data?.records?.expiryDates || [];
-    const allData = data?.records?.data || [];
+    // Step 1: get nearest expiry
+    const expiryRes = await axios.post(`${DHAN_BASE}/optionchain/expirylist`, {
+      UnderlyingScrip: underlyingScrip,
+      UnderlyingSeg: underlyingSeg,
+    }, { headers: DHAN_HEADERS, timeout: 15000 });
 
-    // Get nearest expiry
-    const nearExpiry = expDates[0];
-    
-    // Filter by nearest expiry
-    const filtered = allData.filter(d => d.expiryDate === nearExpiry);
+    const expiries = expiryRes.data?.data || [];
+    const nearExpiry = expiries[0];
+    if (!nearExpiry) throw new Error('No expiry found for ' + symbol);
 
-    // Process strikes
-    const strikes = {};
-    filtered.forEach(item => {
-      const strike = item.strikePrice;
-      if (!strikes[strike]) strikes[strike] = { strike, callOI: 0, putOI: 0, callChgOI: 0, putChgOI: 0, callLTP: 0, putLTP: 0, callIV: 0, putIV: 0, callVol: 0, putVol: 0 };
-      if (item.CE) {
-        strikes[strike].callOI = item.CE.openInterest || 0;
-        strikes[strike].callChgOI = item.CE.changeinOpenInterest || 0;
-        strikes[strike].callLTP = item.CE.lastPrice || 0;
-        strikes[strike].callIV = item.CE.impliedVolatility || 0;
-        strikes[strike].callVol = item.CE.totalTradedVolume || 0;
-      }
-      if (item.PE) {
-        strikes[strike].putOI = item.PE.openInterest || 0;
-        strikes[strike].putChgOI = item.PE.changeinOpenInterest || 0;
-        strikes[strike].putLTP = item.PE.lastPrice || 0;
-        strikes[strike].putIV = item.PE.impliedVolatility || 0;
-        strikes[strike].putVol = item.PE.totalTradedVolume || 0;
-      }
-    });
+    // Step 2: get option chain for nearest expiry
+    const chainRes = await axios.post(`${DHAN_BASE}/optionchain`, {
+      UnderlyingScrip: underlyingScrip,
+      UnderlyingSeg: underlyingSeg,
+      Expiry: nearExpiry,
+    }, { headers: DHAN_HEADERS, timeout: 15000 });
 
-    // Get ATM strikes (10 above, 10 below spot)
-    const allStrikes = Object.values(strikes).sort((a, b) => a.strike - b.strike);
-    const atmIdx = allStrikes.findIndex(s => s.strike >= spot);
+    const chainData = chainRes.data?.data || {};
+    const spot = chainData.last_price || 0;
+    const oc = chainData.oc || {};
+
+    const strikes = Object.entries(oc).map(([strikeStr, val]) => {
+      const strike = parseFloat(strikeStr);
+      const ce = val.ce || {};
+      const pe = val.pe || {};
+      return {
+        strike,
+        callOI: ce.oi || 0,
+        callChgOI: (ce.oi || 0) - (ce.previous_oi || 0),
+        callLTP: ce.last_price || 0,
+        callIV: ce.implied_volatility || 0,
+        callVol: ce.volume || 0,
+        putOI: pe.oi || 0,
+        putChgOI: (pe.oi || 0) - (pe.previous_oi || 0),
+        putLTP: pe.last_price || 0,
+        putIV: pe.implied_volatility || 0,
+        putVol: pe.volume || 0,
+      };
+    }).sort((a, b) => a.strike - b.strike);
+
+    // near ATM strikes only (8 above/below)
+    const atmIdx = strikes.findIndex(s => s.strike >= spot);
     const start = Math.max(0, atmIdx - 8);
-    const end = Math.min(allStrikes.length, atmIdx + 8);
-    const nearStrikes = allStrikes.slice(start, end);
+    const end = Math.min(strikes.length, atmIdx + 8);
+    const nearStrikes = strikes.slice(start, end);
 
-    // PCR
     const totalCallOI = nearStrikes.reduce((s, x) => s + x.callOI, 0);
     const totalPutOI = nearStrikes.reduce((s, x) => s + x.putOI, 0);
     const pcr = totalCallOI > 0 ? (totalPutOI / totalCallOI).toFixed(2) : 0;
 
-    // Max Pain
     const maxPain = nearStrikes.reduce((best, s) => {
-      const pain = nearStrikes.reduce((t, x) => t + Math.max(0, x.callOI * (x.strike - s.strike)) + Math.max(0, x.putOI * (s.strike - x.strike)), 0);
+      const pain = nearStrikes.reduce((t, x) =>
+        t + Math.max(0, x.callOI * (x.strike - s.strike)) + Math.max(0, x.putOI * (s.strike - x.strike)), 0);
       return pain < best.pain ? { strike: s.strike, pain } : best;
     }, { strike: nearStrikes[0]?.strike || 0, pain: Infinity });
 
@@ -348,15 +453,26 @@ app.get('/api/options/:symbol', async (req, res) => {
       symbol,
       spot,
       expiry: nearExpiry,
-      expiries: expDates.slice(0, 4),
+      expiries: expiries.slice(0, 4),
       pcr,
       maxPain: maxPain.strike,
       strikes: nearStrikes,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     });
-
   } catch (e) {
-    console.error('Options error:', e.message);
-    res.status(500).json({ error: e.message });
+    console.error('Options error:', e.response?.data || e.message);
+    res.status(500).json({ error: e.message, detail: e.response?.data });
   }
+});
+
+// ============================================
+// START
+// ============================================
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, async () => {
+  console.log(`NiftyRadar Dhan Backend running on port ${PORT}`);
+  if (!DHAN_CLIENT_ID || !DHAN_ACCESS_TOKEN) {
+    console.error('⚠️  DHAN_CLIENT_ID / DHAN_ACCESS_TOKEN not set in environment variables!');
+  }
+  await loadInstrumentMaster();
 });
