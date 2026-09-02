@@ -47,16 +47,22 @@ const NIFTY50_SYMBOLS = [
 
 // Sector map (same categorisation as before)
 const SECTOR_MAP = {
-  'IT':      ['TCS','INFY','WIPRO','HCLTECH','TECHM'],
-  'Banking': ['HDFCBANK','ICICIBANK','SBIN','AXISBANK','KOTAKBANK'],
-  'Pharma':  ['SUNPHARMA','DRREDDY','CIPLA'],
-  'Auto':    ['TATAMOTORS','MARUTI'],
-  'FMCG':    ['HINDUNILVR','ITC','NESTLEIND'],
-  'Metal':   ['TATASTEEL','HINDALCO','JSWSTEEL'],
-  'Energy':  ['RELIANCE','ONGC','NTPC'],
-  'Realty':  ['DLF','GODREJPROP'],
-  'Infra':   ['LT','ULTRACEMCO'],
-  'Media':   ['ZEEL','SUNTV'],
+  'IT':          ['TCS','INFY','WIPRO','HCLTECH','TECHM','LTIM'],
+  'Pvt Banks':   ['HDFCBANK','ICICIBANK','AXISBANK','KOTAKBANK','INDUSINDBK'],
+  'PSU Banks':   ['SBIN','BANKBARODA','PNB','CANBK'],
+  'Pharma':      ['SUNPHARMA','DRREDDY','CIPLA','DIVISLAB','LUPIN'],
+  'Auto':        ['TATAMOTORS','MARUTI','M&M','BAJAJ-AUTO','HEROMOTOCO','EICHERMOT'],
+  'FMCG':        ['HINDUNILVR','ITC','NESTLEIND','BRITANNIA','TATACONSUM','DABUR'],
+  'Metal':       ['TATASTEEL','HINDALCO','JSWSTEEL','VEDL','SAIL'],
+  'Energy':      ['RELIANCE','ONGC','BPCL','IOC','GAIL'],
+  'Power':       ['NTPC','POWERGRID','TATAPOWER','ADANIPOWER'],
+  'Realty':      ['DLF','GODREJPROP','OBEROIRLTY','PRESTIGE'],
+  'Infra/Cement':['LT','ULTRACEMCO','GRASIM','AMBUJACEM','SHREECEM'],
+  'Media':       ['ZEEL','SUNTV','PVRINOX'],
+  'Telecom':     ['BHARTIARTL','IDEA','INDUSTOWER'],
+  'Insurance':   ['SBILIFE','HDFCLIFE','ICICIPRULI','ICICIGI'],
+  'NBFC':        ['BAJFINANCE','BAJAJFINSV','CHOLAFIN','MUTHOOTFIN','SHRIRAMFIN'],
+  'Consumer':    ['TITAN','HAVELLS','VOLTAS','CROMPTON'],
 };
 
 // ============================================
@@ -67,7 +73,6 @@ let symbolToId = {};
 let instrumentsLoadedAt = 0;
 
 function parseCsvLine(line) {
-  // simple CSV parser that handles quoted fields with commas inside
   const out = [];
   let cur = '';
   let inQuotes = false;
@@ -112,7 +117,6 @@ async function loadInstrumentMaster() {
       const secId = cols[idxSecId];
 
       if (exch === 'NSE' && instrument === 'EQUITY' && symbol && secId) {
-        // keep first match only (avoid overwriting with duplicate/less relevant rows)
         if (!map[symbol]) map[symbol] = parseInt(secId, 10);
       }
     }
@@ -138,6 +142,9 @@ const cache = {
 };
 const CACHE_TTL = 5000; // 5 seconds - near-live
 
+const newsCache = { data: null, time: 0 };
+const NEWS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes - news doesn't change that fast
+
 // Market hours check
 function isMarketOpen() {
   const now = new Date();
@@ -154,7 +161,6 @@ function isMarketOpen() {
 // Dhan API helpers
 // ============================================
 async function dhanQuote(segmentIdMap) {
-  // segmentIdMap e.g. { NSE_EQ: [11536, 1333], IDX_I: [13,25] }
   const res = await axios.post(`${DHAN_BASE}/marketfeed/quote`, segmentIdMap, {
     headers: DHAN_HEADERS,
     timeout: 15000,
@@ -224,7 +230,7 @@ function broadcastToClients(data) {
 
 async function refreshData() {
   if (!isMarketOpen()) return;
-  if (Object.keys(symbolToId).length === 0) return; // instruments not loaded yet
+  if (Object.keys(symbolToId).length === 0) return;
   try {
     const stocks = await fetchNifty50Quotes();
     const moversData = processMovers(stocks);
@@ -236,8 +242,7 @@ async function refreshData() {
   }
 }
 
-setInterval(refreshData, 5000); // 5s refresh - within Dhan's 1 req/sec rate limit
-// Refresh instrument master every 12 hours
+setInterval(refreshData, 5000);
 setInterval(loadInstrumentMaster, 12 * 60 * 60 * 1000);
 
 wss.on('connection', (ws) => {
@@ -288,8 +293,6 @@ app.get('/api/sectors', async (req, res) => {
     if (cache.sectors.data && (now - cache.sectors.time) < CACHE_TTL) {
       return res.json(cache.sectors.data);
     }
-
-    // gather all unique symbols across sectors
     const allSymbols = [...new Set(Object.values(SECTOR_MAP).flat())];
     const ids = allSymbols.map(s => getSecurityId(s)).filter(Boolean);
     const idToSymbol = {};
@@ -369,6 +372,52 @@ app.get('/api/indices', async (req, res) => {
   }
 });
 
+// ============================================
+// LIVE NEWS - Economic Times Markets RSS feed
+// Simple regex-based RSS parsing, no extra npm dependency needed
+// ============================================
+async function fetchMarketNews() {
+  const res = await axios.get('https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms', {
+    timeout: 15000,
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NiftyRadarBot/1.0)' },
+  });
+  const xml = res.data;
+  const items = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let m;
+  while ((m = itemRegex.exec(xml)) !== null && items.length < 15) {
+    const block = m[1];
+    const titleMatch = block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
+    const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/);
+    const pubMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+    if (titleMatch) {
+      items.push({
+        title: titleMatch[1].trim(),
+        link: linkMatch ? linkMatch[1].trim() : '',
+        pubDate: pubMatch ? pubMatch[1].trim() : '',
+      });
+    }
+  }
+  return items;
+}
+
+app.get('/api/news', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (newsCache.data && (now - newsCache.time) < NEWS_CACHE_TTL) {
+      return res.json(newsCache.data);
+    }
+    const items = await fetchMarketNews();
+    newsCache.data = items;
+    newsCache.time = now;
+    res.json(items);
+  } catch (e) {
+    console.error('News error:', e.response?.status || e.message);
+    if (newsCache.data) return res.json(newsCache.data);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // DEBUG
 app.get('/api/debug', async (req, res) => {
   try {
@@ -393,7 +442,6 @@ app.get('/api/options/:symbol', async (req, res) => {
     const underlyingScrip = symbol === 'BANKNIFTY' ? INDEX_IDS.BANKNIFTY : INDEX_IDS.NIFTY50;
     const underlyingSeg = 'IDX_I';
 
-    // Step 1: get nearest expiry
     const expiryRes = await axios.post(`${DHAN_BASE}/optionchain/expirylist`, {
       UnderlyingScrip: underlyingScrip,
       UnderlyingSeg: underlyingSeg,
@@ -403,7 +451,6 @@ app.get('/api/options/:symbol', async (req, res) => {
     const nearExpiry = expiries[0];
     if (!nearExpiry) throw new Error('No expiry found for ' + symbol);
 
-    // Step 2: get option chain for nearest expiry
     const chainRes = await axios.post(`${DHAN_BASE}/optionchain`, {
       UnderlyingScrip: underlyingScrip,
       UnderlyingSeg: underlyingSeg,
@@ -433,7 +480,6 @@ app.get('/api/options/:symbol', async (req, res) => {
       };
     }).sort((a, b) => a.strike - b.strike);
 
-    // near ATM strikes only (8 above/below)
     const atmIdx = strikes.findIndex(s => s.strike >= spot);
     const start = Math.max(0, atmIdx - 8);
     const end = Math.min(strikes.length, atmIdx + 8);
