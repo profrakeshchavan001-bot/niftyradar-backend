@@ -464,6 +464,48 @@ app.get('/api/debug', async (req, res) => {
 });
 
 // ============================================
+// CRYPTO - CoinGecko API
+// ============================================
+const cryptoCache = { data: null, time: 0 };
+const CRYPTO_CACHE_TTL = 30000; // 30 seconds
+
+app.get('/api/crypto', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (cryptoCache.data && (now - cryptoCache.time) < CRYPTO_CACHE_TTL) {
+      return res.json(cryptoCache.data);
+    }
+    const response = await axios.get('https://api.coingecko.com/api/v3/coins/markets', {
+      params: {
+        vs_currency: 'inr',
+        order: 'market_cap_desc',
+        per_page: 20,
+        page: 1,
+        price_change_percentage: '24h',
+      },
+      timeout: 15000,
+    });
+    const data = response.data.map(coin => ({
+      id: coin.id,
+      symbol: coin.symbol.toUpperCase(),
+      name: coin.name,
+      image: coin.image,
+      price: coin.current_price,
+      change24h: coin.price_change_percentage_24h,
+      marketCap: coin.market_cap,
+      volume: coin.total_volume,
+    }));
+    cryptoCache.data = data;
+    cryptoCache.time = now;
+    res.json(data);
+  } catch (e) {
+    console.error('Crypto error:', e.response?.data || e.message);
+    if (cryptoCache.data) return res.json(cryptoCache.data);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============================================
 // OPTIONS CHAIN (NIFTY / BANKNIFTY) - Dhan Option Chain API
 // ============================================
 app.get('/api/options/:symbol', async (req, res) => {
