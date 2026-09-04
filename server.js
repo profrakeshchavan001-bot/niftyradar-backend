@@ -3,6 +3,7 @@ const axios = require('axios');
 const cors = require('cors');
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const cron = require('node-cron');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,6 +28,35 @@ const DHAN_HEADERS = {
   'access-token': DHAN_ACCESS_TOKEN,
   'client-id': DHAN_CLIENT_ID,
 };
+
+// ============================================
+// AUTO TOKEN RENEWAL - runs daily, keeps DHAN_HEADERS fresh
+// ============================================
+async function renewDhanToken() {
+  try {
+    const res = await axios.post(`${DHAN_BASE}/RenewToken`, {}, {
+      headers: {
+        'access-token': DHAN_HEADERS['access-token'],
+        'dhanClientId': DHAN_HEADERS['client-id'],
+      },
+      timeout: 15000,
+    });
+    const data = res.data;
+    if (data && data.accessToken) {
+      DHAN_HEADERS['access-token'] = data.accessToken;
+      console.log('✅ Dhan token renewed. New expiry:', data.expiryTime);
+    } else {
+      console.error('❌ Renew failed, unexpected response:', data);
+    }
+  } catch (err) {
+    console.error('❌ Renew error:', err.response?.data || err.message);
+  }
+}
+
+// Roz raat 2 AM IST pe chalega (market band, safe time)
+cron.schedule('0 2 * * *', renewDhanToken, {
+  timezone: 'Asia/Kolkata',
+});
 
 // Known index Security IDs (segment: IDX_I)
 const INDEX_IDS = {
