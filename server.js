@@ -42,8 +42,8 @@ async function renewDhanToken() {
       timeout: 15000,
     });
     const data = res.data;
-    if (data && data.accessToken) {
-      DHAN_HEADERS['access-token'] = data.accessToken;
+    if (data && data.token) {
+      DHAN_HEADERS['access-token'] = data.token;
       console.log('✅ Dhan token renewed. New expiry:', data.expiryTime);
     } else {
       console.error('❌ Renew failed, unexpected response:', data);
@@ -53,8 +53,8 @@ async function renewDhanToken() {
   }
 }
 
-// TEST TIME - 2:12 AM IST
-cron.schedule('12 2 * * *', renewDhanToken, {
+// TEST TIME - 2:17 AM IST
+cron.schedule('17 2 * * *', renewDhanToken, {
   timezone: 'Asia/Kolkata',
 });
 
