@@ -34,7 +34,7 @@ const DHAN_HEADERS = {
 // ============================================
 async function renewDhanToken() {
   try {
-    const res = await axios.post(`${DHAN_BASE}/RenewToken`, {}, {
+    const res = await axios.get(`${DHAN_BASE}/RenewToken`, {
       headers: {
         'access-token': DHAN_HEADERS['access-token'],
         'dhanClientId': DHAN_HEADERS['client-id'],
@@ -53,8 +53,8 @@ async function renewDhanToken() {
   }
 }
 
-// Roz raat 2 AM IST pe chalega (market band, safe time)
-cron.schedule('0 2 * * *', renewDhanToken, {
+// TEST TIME - 2:12 AM IST
+cron.schedule('12 2 * * *', renewDhanToken, {
   timezone: 'Asia/Kolkata',
 });
 
