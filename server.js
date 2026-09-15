@@ -188,13 +188,15 @@ async function loadInstrumentMaster() {
       // contract on the same underlying shares one lot size, so grabbing
       // it from the futures row (one per underlying) is enough - options
       // on that underlying use the identical lot size.
-      // Dhan's SEM_TRADING_SYMBOL for these is formatted "SYMBOL MON FUT"
-      // (e.g. "RELIANCE OCT FUT", "NIFTY OCT FUT") - the part before the
-      // first space is the clean underlying symbol.
+      // Dhan's SEM_TRADING_SYMBOL for these is "SYMBOL-MON2026-FUT" - drop
+      // the last two hyphen-separated tokens (month-year, FUT) to recover
+      // the underlying. Works even for symbols that themselves contain a
+      // hyphen, e.g. "BAJAJ-AUTO-OCT2026-FUT" -> "BAJAJ-AUTO".
       if (exch === 'NSE' && (instrument === 'FUTSTK' || instrument === 'FUTIDX') && idxLotUnits !== -1) {
         const lotUnits = parseInt(cols[idxLotUnits], 10);
         if (!lotUnits || !symbol) continue;
-        const underlying = symbol.split(' ')[0].trim().toUpperCase();
+        const parts = symbol.split('-');
+        const underlying = parts.length > 2 ? parts.slice(0, -2).join('-').trim().toUpperCase() : symbol.trim().toUpperCase();
         if (underlying && !lots[underlying]) lots[underlying] = lotUnits;
       }
     }
