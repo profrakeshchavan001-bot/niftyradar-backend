@@ -31,6 +31,10 @@ const DHAN_HEADERS = {
 
 // ============================================
 // AUTO TOKEN RENEWAL - runs daily, keeps DHAN_HEADERS fresh
+// FIX: Dhan's RenewToken response field is `accessToken`, NOT `token`.
+// The old code checked `data.token` (always undefined), so renewal
+// silently failed every single day and the token was never refreshed
+// in memory - hence needing a manual token paste every ~8-24h.
 // ============================================
 async function renewDhanToken() {
   try {
@@ -42,8 +46,8 @@ async function renewDhanToken() {
       timeout: 15000,
     });
     const data = res.data;
-    if (data && data.token) {
-      DHAN_HEADERS['access-token'] = data.token;
+    if (data && data.accessToken) {
+      DHAN_HEADERS['access-token'] = data.accessToken;
       console.log('✅ Dhan token renewed. New expiry:', data.expiryTime);
     } else {
       console.error('❌ Renew failed, unexpected response:', data);
@@ -53,9 +57,15 @@ async function renewDhanToken() {
   }
 }
 
-// TEST TIME - 2:17 AM IST
+// Runs daily at 2:17 AM IST - well within the 24h renewal window
 cron.schedule('17 2 * * *', renewDhanToken, {
   timezone: 'Asia/Kolkata',
+});
+
+// Manual trigger route for testing renewal without waiting for the cron
+app.get('/api/renew-token', async (req, res) => {
+  await renewDhanToken();
+  res.json({ ok: true, message: 'Renewal attempted - check server logs for result.' });
 });
 
 // Known index Security IDs (segment: IDX_I)
@@ -594,3 +604,27 @@ server.listen(PORT, async () => {
   }
   await loadInstrumentMaster();
 });
+
+// ============================================
+// GRACEFUL SHUTDOWN
+// FIX: On Render redeploy, the OLD process was staying alive for a few
+// seconds alongside the NEW process (visible as two different process IDs
+// in the logs, e.g. v9kqk and j8mjg, both hitting Dhan at the same time).
+// That double-hit is what was triggering the "805: Too many requests"
+// error on top of the real "808: Authentication Failed" issue.
+// This handler tells the old process to close its server + websocket
+// connections and exit immediately when Render sends the shutdown signal.
+// ============================================
+function shutdown(signal) {
+  console.log(`\n${signal} received - shutting down old instance gracefully...`);
+  wss.clients.forEach(client => client.terminate());
+  server.close(() => {
+    console.log('✅ Old instance closed cleanly.');
+    process.exit(0);
+  });
+  // Safety net in case something hangs
+  setTimeout(() => process.exit(1), 5000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
