@@ -234,20 +234,44 @@ function isMarketOpen() {
 // ============================================
 // Dhan API helpers
 // ============================================
-async function dhanQuote(segmentIdMap) {
-  const res = await axios.post(`${DHAN_BASE}/marketfeed/quote`, segmentIdMap, {
-    headers: DHAN_HEADERS,
-    timeout: 15000,
+// FIX: Even with per-endpoint dedup, Movers + Sectors + Indices + Options
+// could still each fire their OWN Dhan call in the same instant when a
+// page loads - 4 parallel calls in one second was enough to trip Dhan's
+// account-level rate limit (805). This queue forces ALL Dhan calls,
+// across every endpoint, to run one at a time with a minimum gap.
+let dhanQueue = Promise.resolve();
+let lastDhanCallTime = 0;
+const DHAN_MIN_GAP_MS = 400;
+
+function queueDhanCall(fn) {
+  const run = dhanQueue.then(async () => {
+    const wait = Math.max(0, lastDhanCallTime + DHAN_MIN_GAP_MS - Date.now());
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    lastDhanCallTime = Date.now();
+    return fn();
   });
-  return res.data?.data || {};
+  dhanQueue = run.catch(() => {}); // keep the chain alive even if one call fails
+  return run;
+}
+
+async function dhanQuote(segmentIdMap) {
+  return queueDhanCall(async () => {
+    const res = await axios.post(`${DHAN_BASE}/marketfeed/quote`, segmentIdMap, {
+      headers: DHAN_HEADERS,
+      timeout: 15000,
+    });
+    return res.data?.data || {};
+  });
 }
 
 async function dhanOHLC(segmentIdMap) {
-  const res = await axios.post(`${DHAN_BASE}/marketfeed/ohlc`, segmentIdMap, {
-    headers: DHAN_HEADERS,
-    timeout: 15000,
+  return queueDhanCall(async () => {
+    const res = await axios.post(`${DHAN_BASE}/marketfeed/ohlc`, segmentIdMap, {
+      headers: DHAN_HEADERS,
+      timeout: 15000,
+    });
+    return res.data?.data || {};
   });
-  return res.data?.data || {};
 }
 
 // Fetch quote data for the Nifty50 basket (NSE_EQ)
@@ -573,20 +597,20 @@ app.get('/api/options/:symbol', async (req, res) => {
       const underlyingScrip = symbol === 'BANKNIFTY' ? INDEX_IDS.BANKNIFTY : INDEX_IDS.NIFTY50;
       const underlyingSeg = 'IDX_I';
 
-      const expiryRes = await axios.post(`${DHAN_BASE}/optionchain/expirylist`, {
+      const expiryRes = await queueDhanCall(() => axios.post(`${DHAN_BASE}/optionchain/expirylist`, {
         UnderlyingScrip: underlyingScrip,
         UnderlyingSeg: underlyingSeg,
-      }, { headers: DHAN_HEADERS, timeout: 15000 });
+      }, { headers: DHAN_HEADERS, timeout: 15000 }));
 
       const expiries = expiryRes.data?.data || [];
       const nearExpiry = expiries[0];
       if (!nearExpiry) throw new Error('No expiry found for ' + symbol);
 
-      const chainRes = await axios.post(`${DHAN_BASE}/optionchain`, {
+      const chainRes = await queueDhanCall(() => axios.post(`${DHAN_BASE}/optionchain`, {
         UnderlyingScrip: underlyingScrip,
         UnderlyingSeg: underlyingSeg,
         Expiry: nearExpiry,
-      }, { headers: DHAN_HEADERS, timeout: 15000 });
+      }, { headers: DHAN_HEADERS, timeout: 15000 }));
 
       const chainData = chainRes.data?.data || {};
       const spot = chainData.last_price || 0;
