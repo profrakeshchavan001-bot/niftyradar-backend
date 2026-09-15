@@ -234,14 +234,13 @@ function isMarketOpen() {
 // ============================================
 // Dhan API helpers
 // ============================================
-// FIX: Even with per-endpoint dedup, Movers + Sectors + Indices + Options
-// could still each fire their OWN Dhan call in the same instant when a
-// page loads - 4 parallel calls in one second was enough to trip Dhan's
-// account-level rate limit (805). This queue forces ALL Dhan calls,
-// across every endpoint, to run one at a time with a minimum gap.
+// FIX: Dhan's documented limit for marketfeed/quote and marketfeed/ohlc is
+// exactly 1 request PER SECOND. A 400ms gap allowed ~2.5 req/sec, which was
+// still exceeding the limit even from a single browser tab. Bumped to
+// 1100ms to stay safely under 1 req/sec.
 let dhanQueue = Promise.resolve();
 let lastDhanCallTime = 0;
-const DHAN_MIN_GAP_MS = 400;
+const DHAN_MIN_GAP_MS = 1100;
 
 function queueDhanCall(fn) {
   const run = dhanQueue.then(async () => {
