@@ -593,8 +593,25 @@ app.get('/api/options/:symbol', async (req, res) => {
       return res.json(cached.data);
     }
     const result = await getOrFetch(`options_${symbol}`, async () => {
-      const underlyingScrip = symbol === 'BANKNIFTY' ? INDEX_IDS.BANKNIFTY : INDEX_IDS.NIFTY50;
-      const underlyingSeg = 'IDX_I';
+      // FIX: Now supports ANY stock symbol, not just NIFTY/BANKNIFTY.
+      // Dhan's Option Chain API works for any underlying - for indices it's
+      // UnderlyingSeg 'IDX_I', for individual stocks it's 'NSE_EQ' with the
+      // same Security ID our instrument master already loads for equities.
+      // Not every stock has listed F&O options - if none exist, this throws
+      // a clear "No expiry found" error below instead of crashing.
+      let underlyingScrip, underlyingSeg;
+      if (symbol === 'NIFTY') {
+        underlyingScrip = INDEX_IDS.NIFTY50;
+        underlyingSeg = 'IDX_I';
+      } else if (symbol === 'BANKNIFTY') {
+        underlyingScrip = INDEX_IDS.BANKNIFTY;
+        underlyingSeg = 'IDX_I';
+      } else {
+        const stockId = getSecurityId(symbol);
+        if (!stockId) throw new Error(`Unknown symbol: ${symbol}`);
+        underlyingScrip = stockId;
+        underlyingSeg = 'NSE_EQ';
+      }
 
       const expiryRes = await queueDhanCall(() => axios.post(`${DHAN_BASE}/optionchain/expirylist`, {
         UnderlyingScrip: underlyingScrip,
