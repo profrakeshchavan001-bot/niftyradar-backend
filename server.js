@@ -200,6 +200,19 @@ const cache = {
 };
 const CACHE_TTL = 5000; // 5 seconds - near-live
 
+// FIX: In-flight request tracker to prevent "cache stampede".
+// When multiple browser tabs/clients hit an endpoint at the same moment
+// and the cache is empty/expired, they were EACH firing a separate Dhan
+// API call in parallel - Dhan flags that burst as abuse (805 Too many
+// requests). Now, if a fetch for a given key is already in progress,
+// everyone waits for that SAME promise instead of starting a new one.
+const inFlight = {};
+async function getOrFetch(key, fetchFn) {
+  if (inFlight[key]) return inFlight[key];
+  inFlight[key] = fetchFn().finally(() => { delete inFlight[key]; });
+  return inFlight[key];
+}
+
 const newsCache = { data: null, time: 0 };
 const NEWS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes - news doesn't change that fast
 
@@ -333,9 +346,12 @@ app.get('/api/movers', async (req, res) => {
     if (cache.movers.data && (now - cache.movers.time) < CACHE_TTL) {
       return res.json(cache.movers.data);
     }
-    const stocks = await fetchNifty50Quotes();
-    const data = processMovers(stocks);
-    cache.movers = { data, time: now };
+    const data = await getOrFetch('movers', async () => {
+      const stocks = await fetchNifty50Quotes();
+      const result = processMovers(stocks);
+      cache.movers = { data: result, time: Date.now() };
+      return result;
+    });
     res.json(data);
   } catch (e) {
     console.error('Movers error:', e.response?.data || e.message);
@@ -351,43 +367,46 @@ app.get('/api/sectors', async (req, res) => {
     if (cache.sectors.data && (now - cache.sectors.time) < CACHE_TTL) {
       return res.json(cache.sectors.data);
     }
-    const allSymbols = [...new Set(Object.values(SECTOR_MAP).flat())];
-    const ids = allSymbols.map(s => getSecurityId(s)).filter(Boolean);
-    const idToSymbol = {};
-    allSymbols.forEach(s => {
-      const id = getSecurityId(s);
-      if (id) idToSymbol[id] = s;
-    });
+    const result = await getOrFetch('sectors', async () => {
+      const allSymbols = [...new Set(Object.values(SECTOR_MAP).flat())];
+      const ids = allSymbols.map(s => getSecurityId(s)).filter(Boolean);
+      const idToSymbol = {};
+      allSymbols.forEach(s => {
+        const id = getSecurityId(s);
+        if (id) idToSymbol[id] = s;
+      });
 
-    const data = await dhanQuote({ NSE_EQ: ids });
-    const eqData = data.NSE_EQ || {};
+      const data = await dhanQuote({ NSE_EQ: ids });
+      const eqData = data.NSE_EQ || {};
 
-    const stockMap = {};
-    for (const [id, row] of Object.entries(eqData)) {
-      const symbol = idToSymbol[id];
-      if (!symbol) continue;
-      const lastPrice = row.last_price || 0;
-      const prevClose = row.ohlc?.close || lastPrice;
-      const change = parseFloat((lastPrice - prevClose).toFixed(2));
-      const pct = prevClose ? parseFloat(((change / prevClose) * 100).toFixed(2)) : 0;
-      stockMap[symbol] = { price: lastPrice, change, pct };
-    }
-
-    const result = {};
-    for (const [sector, symbols] of Object.entries(SECTOR_MAP)) {
-      result[sector] = { stocks: [], avgChange: 0 };
-      let total = 0, count = 0;
-      for (const sym of symbols) {
-        const s = stockMap[sym];
-        if (s) {
-          result[sector].stocks.push({ symbol: sym, price: s.price, change: s.change, pct: s.pct });
-          total += s.pct; count++;
-        }
+      const stockMap = {};
+      for (const [id, row] of Object.entries(eqData)) {
+        const symbol = idToSymbol[id];
+        if (!symbol) continue;
+        const lastPrice = row.last_price || 0;
+        const prevClose = row.ohlc?.close || lastPrice;
+        const change = parseFloat((lastPrice - prevClose).toFixed(2));
+        const pct = prevClose ? parseFloat(((change / prevClose) * 100).toFixed(2)) : 0;
+        stockMap[symbol] = { price: lastPrice, change, pct };
       }
-      result[sector].avgChange = count > 0 ? parseFloat((total / count).toFixed(2)) : 0;
-    }
 
-    cache.sectors = { data: result, time: now };
+      const sectorResult = {};
+      for (const [sector, symbols] of Object.entries(SECTOR_MAP)) {
+        sectorResult[sector] = { stocks: [], avgChange: 0 };
+        let total = 0, count = 0;
+        for (const sym of symbols) {
+          const s = stockMap[sym];
+          if (s) {
+            sectorResult[sector].stocks.push({ symbol: sym, price: s.price, change: s.change, pct: s.pct });
+            total += s.pct; count++;
+          }
+        }
+        sectorResult[sector].avgChange = count > 0 ? parseFloat((total / count).toFixed(2)) : 0;
+      }
+
+      cache.sectors = { data: sectorResult, time: Date.now() };
+      return sectorResult;
+    });
     res.json(result);
   } catch (e) {
     console.error('Sectors error:', e.response?.data || e.message);
@@ -403,26 +422,29 @@ app.get('/api/indices', async (req, res) => {
     if (cache.indices.data && (now - cache.indices.time) < CACHE_TTL) {
       return res.json(cache.indices.data);
     }
-    const data = await dhanOHLC({ IDX_I: [INDEX_IDS.NIFTY50, INDEX_IDS.BANKNIFTY, INDEX_IDS.SENSEX] });
-    const idxData = data.IDX_I || {};
+    const result = await getOrFetch('indices', async () => {
+      const data = await dhanOHLC({ IDX_I: [INDEX_IDS.NIFTY50, INDEX_IDS.BANKNIFTY, INDEX_IDS.SENSEX] });
+      const idxData = data.IDX_I || {};
 
-    function build(id) {
-      const row = idxData[id];
-      if (!row) return null;
-      const lastPrice = row.last_price || 0;
-      const prevClose = row.ohlc?.close || lastPrice;
-      const change = parseFloat((lastPrice - prevClose).toFixed(2));
-      const pct = prevClose ? parseFloat(((change / prevClose) * 100).toFixed(2)) : 0;
-      return { price: lastPrice, change, pct };
-    }
+      function build(id) {
+        const row = idxData[id];
+        if (!row) return null;
+        const lastPrice = row.last_price || 0;
+        const prevClose = row.ohlc?.close || lastPrice;
+        const change = parseFloat((lastPrice - prevClose).toFixed(2));
+        const pct = prevClose ? parseFloat(((change / prevClose) * 100).toFixed(2)) : 0;
+        return { price: lastPrice, change, pct };
+      }
 
-    const result = {
-      nifty50: build(INDEX_IDS.NIFTY50),
-      bankNifty: build(INDEX_IDS.BANKNIFTY),
-      sensex: build(INDEX_IDS.SENSEX),
-      updatedAt: new Date().toISOString(),
-    };
-    cache.indices = { data: result, time: now };
+      const idxResult = {
+        nifty50: build(INDEX_IDS.NIFTY50),
+        bankNifty: build(INDEX_IDS.BANKNIFTY),
+        sensex: build(INDEX_IDS.SENSEX),
+        updatedAt: new Date().toISOString(),
+      };
+      cache.indices = { data: idxResult, time: Date.now() };
+      return idxResult;
+    });
     res.json(result);
   } catch (e) {
     console.error('Indices error:', e.response?.data || e.message);
