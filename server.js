@@ -129,6 +129,7 @@ const SECTOR_MAP = {
 // ============================================
 let symbolToId = {};
 let instrumentsLoadedAt = 0;
+let lotSizes = {}; // underlying symbol -> live lot size, built from Dhan's own data
 
 function parseCsvLine(line) {
   const out = [];
@@ -164,8 +165,14 @@ async function loadInstrumentMaster() {
     const idxInstrument = header.indexOf('SEM_INSTRUMENT_NAME');
     const idxSymbol = header.indexOf('SEM_TRADING_SYMBOL');
     const idxSecId = header.indexOf('SEM_SMST_SECURITY_ID');
+    // FIX: extra columns to derive REAL, LIVE lot sizes straight from Dhan's
+    // own instrument master, instead of hardcoding numbers that go stale
+    // whenever NSE revises them.
+    const idxLotUnits = header.indexOf('SEM_LOT_UNITS');
+    const idxCustomSymbol = header.indexOf('SEM_CUSTOM_SYMBOL');
 
     const map = {};
+    const lots = {};
     for (let i = 1; i < lines.length; i++) {
       if (!lines[i]) continue;
       const cols = parseCsvLine(lines[i]);
@@ -177,10 +184,28 @@ async function loadInstrumentMaster() {
       if (exch === 'NSE' && instrument === 'EQUITY' && symbol && secId) {
         if (!map[symbol]) map[symbol] = parseInt(secId, 10);
       }
+
+      // FUTSTK = stock futures, FUTIDX = index futures. Every derivative
+      // contract on the same underlying shares one lot size, so grabbing
+      // it from the futures row (one per underlying) is enough - options
+      // on that underlying use the identical lot size.
+      if (exch === 'NSE' && (instrument === 'FUTSTK' || instrument === 'FUTIDX') && idxLotUnits !== -1) {
+        const lotUnits = parseInt(cols[idxLotUnits], 10);
+        if (!lotUnits) continue;
+        let underlying = null;
+        if (idxCustomSymbol !== -1 && cols[idxCustomSymbol]) {
+          underlying = cols[idxCustomSymbol].split('-')[0].trim().toUpperCase();
+        }
+        if (!underlying && symbol) {
+          underlying = symbol.replace(/[0-9].*$/, '').trim().toUpperCase();
+        }
+        if (underlying && !lots[underlying]) lots[underlying] = lotUnits;
+      }
     }
     symbolToId = map;
+    lotSizes = lots;
     instrumentsLoadedAt = Date.now();
-    console.log(`✅ Instrument master loaded: ${Object.keys(symbolToId).length} NSE equities`);
+    console.log(`✅ Instrument master loaded: ${Object.keys(symbolToId).length} NSE equities, ${Object.keys(lotSizes).length} lot sizes`);
   } catch (e) {
     console.error('❌ Instrument master load failed:', e.message);
   }
@@ -363,6 +388,11 @@ app.get('/', (req, res) => {
     instrumentsLoaded: Object.keys(symbolToId).length,
     instrumentsLoadedAt: instrumentsLoadedAt ? new Date(instrumentsLoadedAt).toISOString() : null,
   });
+});
+
+// LOT SIZES - live, derived from Dhan's own instrument master (see loadInstrumentMaster)
+app.get('/api/lot-sizes', (req, res) => {
+  res.json({ lotSizes, loadedAt: instrumentsLoadedAt ? new Date(instrumentsLoadedAt).toISOString() : null });
 });
 
 // MOVERS
