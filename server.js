@@ -68,6 +68,24 @@ app.get('/api/renew-token', async (req, res) => {
   res.json({ ok: true, message: 'Renewal attempted - check server logs for result.' });
 });
 
+// TEMPORARY DEBUG ROUTE - remove after diagnosing the auth issue.
+// Shows masked info about what env vars the running process actually has,
+// without ever exposing the full token/id in the response.
+app.get('/api/env-check', (req, res) => {
+  const token = DHAN_HEADERS['access-token'] || '';
+  const clientId = DHAN_HEADERS['client-id'] || '';
+  res.json({
+    clientIdLength: clientId.length,
+    clientIdFirst4: clientId.slice(0, 4),
+    clientIdLast4: clientId.slice(-4),
+    tokenLength: token.length,
+    tokenFirst10: token.slice(0, 10),
+    tokenLast10: token.slice(-10),
+    hasLeadingOrTrailingSpaceInToken: token !== token.trim(),
+    hasLeadingOrTrailingSpaceInClientId: clientId !== clientId.trim(),
+  });
+});
+
 // Known index Security IDs (segment: IDX_I)
 const INDEX_IDS = {
   NIFTY50: 13,
