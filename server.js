@@ -216,6 +216,9 @@ async function getOrFetch(key, fetchFn) {
 const newsCache = { data: null, time: 0 };
 const NEWS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes - news doesn't change that fast
 
+const optionsCache = {}; // keyed by symbol
+const OPTIONS_CACHE_TTL = 5000; // 5 seconds
+
 // Market hours check
 function isMarketOpen() {
   const now = new Date();
@@ -559,76 +562,87 @@ app.get('/api/crypto', async (req, res) => {
 // OPTIONS CHAIN (NIFTY / BANKNIFTY) - Dhan Option Chain API
 // ============================================
 app.get('/api/options/:symbol', async (req, res) => {
+  const symbol = (req.params.symbol || 'NIFTY').toUpperCase();
   try {
-    const symbol = (req.params.symbol || 'NIFTY').toUpperCase();
-    const underlyingScrip = symbol === 'BANKNIFTY' ? INDEX_IDS.BANKNIFTY : INDEX_IDS.NIFTY50;
-    const underlyingSeg = 'IDX_I';
+    const now = Date.now();
+    const cached = optionsCache[symbol];
+    if (cached && (now - cached.time) < OPTIONS_CACHE_TTL) {
+      return res.json(cached.data);
+    }
+    const result = await getOrFetch(`options_${symbol}`, async () => {
+      const underlyingScrip = symbol === 'BANKNIFTY' ? INDEX_IDS.BANKNIFTY : INDEX_IDS.NIFTY50;
+      const underlyingSeg = 'IDX_I';
 
-    const expiryRes = await axios.post(`${DHAN_BASE}/optionchain/expirylist`, {
-      UnderlyingScrip: underlyingScrip,
-      UnderlyingSeg: underlyingSeg,
-    }, { headers: DHAN_HEADERS, timeout: 15000 });
+      const expiryRes = await axios.post(`${DHAN_BASE}/optionchain/expirylist`, {
+        UnderlyingScrip: underlyingScrip,
+        UnderlyingSeg: underlyingSeg,
+      }, { headers: DHAN_HEADERS, timeout: 15000 });
 
-    const expiries = expiryRes.data?.data || [];
-    const nearExpiry = expiries[0];
-    if (!nearExpiry) throw new Error('No expiry found for ' + symbol);
+      const expiries = expiryRes.data?.data || [];
+      const nearExpiry = expiries[0];
+      if (!nearExpiry) throw new Error('No expiry found for ' + symbol);
 
-    const chainRes = await axios.post(`${DHAN_BASE}/optionchain`, {
-      UnderlyingScrip: underlyingScrip,
-      UnderlyingSeg: underlyingSeg,
-      Expiry: nearExpiry,
-    }, { headers: DHAN_HEADERS, timeout: 15000 });
+      const chainRes = await axios.post(`${DHAN_BASE}/optionchain`, {
+        UnderlyingScrip: underlyingScrip,
+        UnderlyingSeg: underlyingSeg,
+        Expiry: nearExpiry,
+      }, { headers: DHAN_HEADERS, timeout: 15000 });
 
-    const chainData = chainRes.data?.data || {};
-    const spot = chainData.last_price || 0;
-    const oc = chainData.oc || {};
+      const chainData = chainRes.data?.data || {};
+      const spot = chainData.last_price || 0;
+      const oc = chainData.oc || {};
 
-    const strikes = Object.entries(oc).map(([strikeStr, val]) => {
-      const strike = parseFloat(strikeStr);
-      const ce = val.ce || {};
-      const pe = val.pe || {};
-      return {
-        strike,
-        callOI: ce.oi || 0,
-        callChgOI: (ce.oi || 0) - (ce.previous_oi || 0),
-        callLTP: ce.last_price || 0,
-        callIV: ce.implied_volatility || 0,
-        callVol: ce.volume || 0,
-        putOI: pe.oi || 0,
-        putChgOI: (pe.oi || 0) - (pe.previous_oi || 0),
-        putLTP: pe.last_price || 0,
-        putIV: pe.implied_volatility || 0,
-        putVol: pe.volume || 0,
+      const strikes = Object.entries(oc).map(([strikeStr, val]) => {
+        const strike = parseFloat(strikeStr);
+        const ce = val.ce || {};
+        const pe = val.pe || {};
+        return {
+          strike,
+          callOI: ce.oi || 0,
+          callChgOI: (ce.oi || 0) - (ce.previous_oi || 0),
+          callLTP: ce.last_price || 0,
+          callIV: ce.implied_volatility || 0,
+          callVol: ce.volume || 0,
+          putOI: pe.oi || 0,
+          putChgOI: (pe.oi || 0) - (pe.previous_oi || 0),
+          putLTP: pe.last_price || 0,
+          putIV: pe.implied_volatility || 0,
+          putVol: pe.volume || 0,
+        };
+      }).sort((a, b) => a.strike - b.strike);
+
+      const atmIdx = strikes.findIndex(s => s.strike >= spot);
+      const start = Math.max(0, atmIdx - 8);
+      const end = Math.min(strikes.length, atmIdx + 8);
+      const nearStrikes = strikes.slice(start, end);
+
+      const totalCallOI = nearStrikes.reduce((s, x) => s + x.callOI, 0);
+      const totalPutOI = nearStrikes.reduce((s, x) => s + x.putOI, 0);
+      const pcr = totalCallOI > 0 ? (totalPutOI / totalCallOI).toFixed(2) : 0;
+
+      const maxPain = nearStrikes.reduce((best, s) => {
+        const pain = nearStrikes.reduce((t, x) =>
+          t + Math.max(0, x.callOI * (x.strike - s.strike)) + Math.max(0, x.putOI * (s.strike - x.strike)), 0);
+        return pain < best.pain ? { strike: s.strike, pain } : best;
+      }, { strike: nearStrikes[0]?.strike || 0, pain: Infinity });
+
+      const payload = {
+        symbol,
+        spot,
+        expiry: nearExpiry,
+        expiries: expiries.slice(0, 4),
+        pcr,
+        maxPain: maxPain.strike,
+        strikes: nearStrikes,
+        updatedAt: new Date().toISOString(),
       };
-    }).sort((a, b) => a.strike - b.strike);
-
-    const atmIdx = strikes.findIndex(s => s.strike >= spot);
-    const start = Math.max(0, atmIdx - 8);
-    const end = Math.min(strikes.length, atmIdx + 8);
-    const nearStrikes = strikes.slice(start, end);
-
-    const totalCallOI = nearStrikes.reduce((s, x) => s + x.callOI, 0);
-    const totalPutOI = nearStrikes.reduce((s, x) => s + x.putOI, 0);
-    const pcr = totalCallOI > 0 ? (totalPutOI / totalCallOI).toFixed(2) : 0;
-
-    const maxPain = nearStrikes.reduce((best, s) => {
-      const pain = nearStrikes.reduce((t, x) =>
-        t + Math.max(0, x.callOI * (x.strike - s.strike)) + Math.max(0, x.putOI * (s.strike - x.strike)), 0);
-      return pain < best.pain ? { strike: s.strike, pain } : best;
-    }, { strike: nearStrikes[0]?.strike || 0, pain: Infinity });
-
-    res.json({
-      symbol,
-      spot,
-      expiry: nearExpiry,
-      expiries: expiries.slice(0, 4),
-      pcr,
-      maxPain: maxPain.strike,
-      strikes: nearStrikes,
-      updatedAt: new Date().toISOString(),
+      optionsCache[symbol] = { data: payload, time: Date.now() };
+      return payload;
     });
+    res.json(result);
   } catch (e) {
     console.error('Options error:', e.response?.data || e.message);
+    if (optionsCache[symbol]) return res.json({ ...optionsCache[symbol].data, cached: true });
     res.status(500).json({ error: e.message, detail: e.response?.data });
   }
 });
