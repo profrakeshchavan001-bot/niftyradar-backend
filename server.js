@@ -169,7 +169,6 @@ async function loadInstrumentMaster() {
     // own instrument master, instead of hardcoding numbers that go stale
     // whenever NSE revises them.
     const idxLotUnits = header.indexOf('SEM_LOT_UNITS');
-    const idxCustomSymbol = header.indexOf('SEM_CUSTOM_SYMBOL');
 
     const map = {};
     const lots = {};
@@ -189,16 +188,13 @@ async function loadInstrumentMaster() {
       // contract on the same underlying shares one lot size, so grabbing
       // it from the futures row (one per underlying) is enough - options
       // on that underlying use the identical lot size.
+      // Dhan's SEM_TRADING_SYMBOL for these is formatted "SYMBOL MON FUT"
+      // (e.g. "RELIANCE OCT FUT", "NIFTY OCT FUT") - the part before the
+      // first space is the clean underlying symbol.
       if (exch === 'NSE' && (instrument === 'FUTSTK' || instrument === 'FUTIDX') && idxLotUnits !== -1) {
         const lotUnits = parseInt(cols[idxLotUnits], 10);
-        if (!lotUnits) continue;
-        let underlying = null;
-        if (idxCustomSymbol !== -1 && cols[idxCustomSymbol]) {
-          underlying = cols[idxCustomSymbol].split('-')[0].trim().toUpperCase();
-        }
-        if (!underlying && symbol) {
-          underlying = symbol.replace(/[0-9].*$/, '').trim().toUpperCase();
-        }
+        if (!lotUnits || !symbol) continue;
+        const underlying = symbol.split(' ')[0].trim().toUpperCase();
         if (underlying && !lots[underlying]) lots[underlying] = lotUnits;
       }
     }
