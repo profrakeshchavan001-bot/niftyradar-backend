@@ -127,8 +127,25 @@ cron.schedule('17 */6 * * *', renewDhanToken, {
   timezone: 'Asia/Kolkata',
 });
 
-// Manual trigger route for testing renewal without waiting for the cron
+// Manual trigger route for testing renewal without waiting for the cron.
+// Protected by RENEW_SECRET (env var), sent as the `x-renew-secret` header
+// or `?key=` query param. The route is disabled if RENEW_SECRET is unset.
+const RENEW_SECRET = process.env.RENEW_SECRET || '';
+
+function isValidRenewSecret(provided) {
+  if (!RENEW_SECRET || typeof provided !== 'string') return false;
+  const a = crypto.createHash('sha256').update(provided).digest();
+  const b = crypto.createHash('sha256').update(RENEW_SECRET).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 app.get('/api/renew-token', async (req, res) => {
+  if (!RENEW_SECRET) {
+    return res.status(503).json({ ok: false, error: 'RENEW_SECRET not configured' });
+  }
+  if (!isValidRenewSecret(req.get('x-renew-secret') || req.query.key)) {
+    return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  }
   const result = await renewDhanToken();
   res.status(result.ok ? 200 : 502).json(result);
 });
