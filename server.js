@@ -4,6 +4,9 @@ const cors = require('cors');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -30,12 +33,68 @@ const DHAN_HEADERS = {
 };
 
 // ============================================
-// AUTO TOKEN RENEWAL - runs daily, keeps DHAN_HEADERS fresh
-// FIX: Dhan's RenewToken response field is `accessToken`, NOT `token`.
-// The old code checked `data.token` (always undefined), so renewal
-// silently failed every single day and the token was never refreshed
-// in memory - hence needing a manual token paste every ~8-24h.
+// AUTO TOKEN RENEWAL - keeps DHAN_HEADERS fresh
+// Dhan's RenewToken expires the CURRENT token and returns a new one valid
+// for another 24h. Three things broke the old version:
+//  1. It read `data.token`, but Dhan returns the new token as `accessToken`,
+//     so every renewal was treated as a failure and the new token dropped.
+//  2. It ran once every 24h (02:17) against a token that lives exactly 24h,
+//     so the token was always expiring right as the cron fired.
+//  3. The renewed token lived only in memory. Renewal kills the old token,
+//     so after any restart/redeploy the process fell back to the now-dead
+//     DHAN_ACCESS_TOKEN env var -> "808 Authentication Failed".
+// Now: accept `accessToken`, renew every 6h, and persist the renewed token
+// to DHAN_TOKEN_FILE so a restart picks it up instead of the dead env token.
 // ============================================
+const DHAN_TOKEN_FILE = process.env.DHAN_TOKEN_FILE || path.join(__dirname, '.dhan-token.json');
+
+// Reads `exp` from the JWT payload so we can log/report when the token dies.
+function getTokenExpiry(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
+    return payload.exp ? new Date(payload.exp * 1000) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Fingerprint of the env token, so a stored token is only trusted while the
+// env var is unchanged. Pasting a fresh token into the env var wins over it.
+function envTokenFingerprint() {
+  return crypto.createHash('sha256').update(DHAN_ACCESS_TOKEN).digest('hex').slice(0, 16);
+}
+
+function loadStoredToken() {
+  try {
+    const stored = JSON.parse(fs.readFileSync(DHAN_TOKEN_FILE, 'utf8'));
+    if (stored.envFingerprint !== envTokenFingerprint()) {
+      console.log('ℹ️  DHAN_ACCESS_TOKEN env var changed since last renewal - using env token.');
+      return;
+    }
+    const expiry = getTokenExpiry(stored.accessToken);
+    if (expiry && expiry <= new Date()) {
+      console.error('⚠️  Stored Dhan token already expired at', expiry.toISOString());
+      return;
+    }
+    DHAN_HEADERS['access-token'] = stored.accessToken;
+    console.log('✅ Loaded renewed Dhan token from', DHAN_TOKEN_FILE, '- expires', expiry?.toISOString());
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.error('❌ Could not read stored Dhan token:', e.message);
+  }
+}
+
+function saveStoredToken(accessToken) {
+  try {
+    fs.writeFileSync(DHAN_TOKEN_FILE, JSON.stringify({
+      accessToken,
+      envFingerprint: envTokenFingerprint(),
+      renewedAt: new Date().toISOString(),
+    }));
+  } catch (e) {
+    console.error('❌ Could not persist renewed Dhan token:', e.message);
+  }
+}
+
 async function renewDhanToken() {
   try {
     const res = await axios.get(`${DHAN_BASE}/RenewToken`, {
@@ -45,27 +104,33 @@ async function renewDhanToken() {
       },
       timeout: 15000,
     });
-    const data = res.data;
-    if (data && data.token) {
-      DHAN_HEADERS['access-token'] = data.token;
-      console.log('✅ Dhan token renewed. New expiry:', data.expiryTime);
-    } else {
+    const data = res.data || {};
+    const newToken = data.accessToken || data.token || data.data?.accessToken;
+    if (!newToken) {
       console.error('❌ Renew failed, unexpected response:', data);
+      return { ok: false, error: 'No accessToken in response', response: data };
     }
+    DHAN_HEADERS['access-token'] = newToken;
+    saveStoredToken(newToken);
+    const expiry = data.expiryTime || getTokenExpiry(newToken)?.toISOString();
+    console.log('✅ Dhan token renewed. New expiry:', expiry);
+    return { ok: true, expiry };
   } catch (err) {
-    console.error('❌ Renew error:', err.response?.data || err.message);
+    const detail = err.response?.data || err.message;
+    console.error('❌ Renew error:', detail);
+    return { ok: false, error: detail };
   }
 }
 
-// Runs daily at 2:17 AM IST - well within the 24h renewal window
-cron.schedule('17 2 * * *', renewDhanToken, {
+// Every 6h - leaves 3 more attempts before a 24h token actually expires
+cron.schedule('17 */6 * * *', renewDhanToken, {
   timezone: 'Asia/Kolkata',
 });
 
 // Manual trigger route for testing renewal without waiting for the cron
 app.get('/api/renew-token', async (req, res) => {
-  await renewDhanToken();
-  res.json({ ok: true, message: 'Renewal attempted - check server logs for result.' });
+  const result = await renewDhanToken();
+  res.status(result.ok ? 200 : 502).json(result);
 });
 
 // TEMPORARY DEBUG ROUTE - remove after diagnosing the auth issue.
@@ -83,6 +148,7 @@ app.get('/api/env-check', (req, res) => {
     tokenLast10: token.slice(-10),
     hasLeadingOrTrailingSpaceInToken: token !== token.trim(),
     hasLeadingOrTrailingSpaceInClientId: clientId !== clientId.trim(),
+    tokenExpiry: getTokenExpiry(token)?.toISOString() || null,
   });
 });
 
@@ -724,6 +790,9 @@ server.listen(PORT, async () => {
   if (!DHAN_CLIENT_ID || !DHAN_ACCESS_TOKEN) {
     console.error('⚠️  DHAN_CLIENT_ID / DHAN_ACCESS_TOKEN not set in environment variables!');
   }
+  loadStoredToken();
+  const expiry = getTokenExpiry(DHAN_HEADERS['access-token']);
+  if (expiry) console.log(`🔑 Active Dhan token expires ${expiry.toISOString()}`);
   await loadInstrumentMaster();
 });
 
