@@ -19,6 +19,12 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+try:  # nsearchives omits its intermediate cert; the OS store (AIA fetch) can verify it, certifi can't
+    import truststore
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import DATA_DIR, day_file  # noqa: E402
 
@@ -71,9 +77,9 @@ def parse_fo(raw: bytes, day: pd.Timestamp) -> pd.DataFrame:
         "date": day,
         "instr": df["FinInstrmTp"].values,
         "symbol": df["TckrSymb"].astype(str).str.strip().values,
-        "expiry": df["XpryDt"].astype(str).values,
-        "strike": num("StrkPric").values,
-        "opt_type": df["OptnTp"].astype(str).values,
+        "expiry": _iso_expiry(df["XpryDt"]).values,
+        "strike": num("StrkPric").fillna(0.0).values,
+        "opt_type": df["OptnTp"].fillna("").astype(str).values,
         "close": num("ClsPric").values,
         "oi": num("OpnIntrst").values,
         "chg_oi": num("ChngInOpnIntrst").values,
@@ -102,9 +108,9 @@ def parse_fo_legacy(raw: bytes, day: pd.Timestamp) -> pd.DataFrame:
         "date": day,
         "instr": df["INSTRUMENT"].map({"FUTSTK": "STF", "OPTSTK": "STO"}).values,
         "symbol": df["SYMBOL"].astype(str).str.strip().values,
-        "expiry": df["EXPIRY_DT"].astype(str).values,
+        "expiry": _iso_expiry(df["EXPIRY_DT"]).values,
         "strike": num("STRIKE_PR").values,
-        "opt_type": df["OPTION_TYP"].astype(str).values,
+        "opt_type": df["OPTION_TYP"].astype(str).str.strip().replace("XX", "").values,
         "close": num("CLOSE").values,
         "oi": num("OPEN_INT").values,
         "chg_oi": num("CHG_IN_OI").values,
@@ -112,17 +118,62 @@ def parse_fo_legacy(raw: bytes, day: pd.Timestamp) -> pd.DataFrame:
     }).reset_index(drop=True)
 
 
+def parse_cash_legacy(raw: tuple[bytes, bytes | None], day: pd.Timestamp) -> pd.DataFrame:
+    """Pre-Sep-2019 cash: cm<DD><MON><YYYY>bhav.csv.zip joined with the MTO delivery file."""
+    bhav, mto = raw
+    df = pd.read_csv(io.BytesIO(bhav), compression="zip", skipinitialspace=True)
+    df.columns = [c.strip() for c in df.columns]
+    df = df[df["SERIES"].astype(str).str.strip() == "EQ"].copy()
+    num = lambda c: pd.to_numeric(df[c], errors="coerce")  # noqa: E731
+    out = pd.DataFrame({
+        "date": day,
+        "symbol": df["SYMBOL"].astype(str).str.strip(),
+        "prev_close": num("PREVCLOSE"),
+        "open": num("OPEN"),
+        "high": num("HIGH"),
+        "low": num("LOW"),
+        "close": num("CLOSE"),
+        "volume": num("TOTTRDQTY"),
+    }).reset_index(drop=True)
+    deliv = pd.DataFrame(columns=["symbol", "deliv_qty", "deliv_pct"])
+    if mto:
+        rows = [ln.split(",") for ln in mto.decode("latin-1").splitlines() if ln.startswith("20,")]
+        rows = [r for r in rows if len(r) >= 7 and r[3].strip() == "EQ"]
+        deliv = pd.DataFrame({
+            "symbol": [r[2].strip() for r in rows],
+            "deliv_qty": pd.to_numeric([r[5] for r in rows], errors="coerce"),
+            "deliv_pct": pd.to_numeric([r[6] for r in rows], errors="coerce"),
+        })
+    return out.merge(deliv, on="symbol", how="left")
+
+
+def _iso_expiry(s: pd.Series) -> pd.Series:
+    return pd.to_datetime(s, format="mixed", errors="coerce").dt.strftime("%Y-%m-%d")
+
+
 PARSERS = {"cash": parse_cash, "fo": parse_fo, "idx": parse_idx}
 UDIFF_START = pd.Timestamp("2024-07-08")  # first day of the UDiFF F&O file format
+CASH_FULL_START = pd.Timestamp("2019-09-30")  # first sec_bhavdata_full file on nsearchives
 FO_LEGACY_URL = ("https://nsearchives.nseindia.com/content/historical/DERIVATIVES/"
                  "{yyyy}/{mon}/fo{dd}{mon}{yyyy}bhav.csv.zip")
+CASH_LEGACY_URLS = ("https://nsearchives.nseindia.com/content/historical/EQUITIES/"
+                    "{yyyy}/{mon}/cm{dd}{mon}{yyyy}bhav.csv.zip",
+                    "https://nsearchives.nseindia.com/archives/equities/mto/MTO_{dmy}.DAT")
 
 
 def source_for(name: str, day: pd.Timestamp):
-    """(url template, parser) for one dataset on one day."""
+    """(url template, parser) for one dataset on one day. A tuple of templates means
+    the first file is required and the rest are optional extras passed alongside it."""
     if name == "fo" and day < UDIFF_START:
         return FO_LEGACY_URL, parse_fo_legacy
+    if name == "cash" and day < CASH_FULL_START:
+        return CASH_LEGACY_URLS, parse_cash_legacy
     return URLS[name], PARSERS[name]
+
+
+def format_url(template: str, day: pd.Timestamp) -> str:
+    return template.format(dmy=f"{day:%d%m%Y}", ymd=f"{day:%Y%m%d}", dd=f"{day:%d}",
+                           mon=f"{day:%b}".upper(), yyyy=f"{day:%Y}")
 
 
 # ---------------------------------------------------------------- network
@@ -179,10 +230,13 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
                 continue
             session = session or make_session()
             url_t, parser = source_for(name, day)
-            url = url_t.format(dmy=f"{day:%d%m%Y}", ymd=f"{day:%Y%m%d}", dd=f"{day:%d}",
-                               mon=f"{day:%b}".upper(), yyyy=f"{day:%Y}")
             try:
-                raw = download(session, url)
+                if isinstance(url_t, tuple):
+                    raw = download(session, format_url(url_t[0], day))
+                    if raw is not None:
+                        raw = (raw, *(download(session, format_url(u, day)) for u in url_t[1:]))
+                else:
+                    raw = download(session, format_url(url_t, day))
             except RuntimeError as exc:
                 log(f"FAIL {key}: {exc}")
                 stats["failed"] += 1
@@ -201,6 +255,7 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
                 log(f"FAIL {key}: parse error {exc}")
                 stats["failed"] += 1
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    missing = {**_load_missing(), **missing}  # keep entries written by a concurrent run
     MISSING_FILE.write_text(json.dumps(missing, indent=0))
     return stats
 

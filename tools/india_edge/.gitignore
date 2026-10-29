@@ -6,5 +6,6 @@ out/*
 !out/.gitkeep
 universe.json
 __pycache__/
+.venv/
 backtest/out/*
 !backtest/out/.gitkeep

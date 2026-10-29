@@ -3,3 +3,4 @@ numpy>=1.24
 requests>=2.31
 pyarrow>=14.0
 pyyaml>=6.0
+truststore>=0.9
