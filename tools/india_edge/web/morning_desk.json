@@ -1,9 +1,31 @@
 {
- "schema": 1,
+ "schema": 2,
  "notice": "Paper trading and historical statistics only. Not investment advice.",
+ "data_health": {
+  "status": "ok",
+  "asof": "2026-10-27",
+  "trade_date": "2026-10-28",
+  "source": "fixtures",
+  "missing": [],
+  "warnings": [],
+  "inputs": {
+   "cash_rows": 60,
+   "fo_rows": 120,
+   "nifty_rows": 1,
+   "iv_rows": 60,
+   "events": 2856
+  },
+  "repairs": {
+   "corporate_actions": [],
+   "renames": [],
+   "suspect_jumps": [],
+   "stale_symbols": [],
+   "load_errors": []
+  }
+ },
  "mode": "replay",
  "source": "fixtures",
- "generated_at": "2026-10-29 22:45 UTC",
+ "generated_at": "2026-10-29 23:29 UTC",
  "asof": "2026-10-27",
  "trade_date": "2026-10-28",
  "market": {
@@ -1273,6 +1295,75 @@
      }
     ],
     "markers": []
+   },
+   "cause": {
+    "label": "long_buildup",
+    "confidence": 0.55,
+    "level": "medium",
+    "driver": "sector",
+    "tags": [],
+    "reason": "Long buildup: price +0.9% with futures OI +0.2% (fresh longs being added); sector-driven (sector RS +13.7 vs stock +13.7)."
+   },
+   "early": {
+    "stage": "none",
+    "side": null,
+    "flags": [],
+    "strength": 0.0,
+    "detail": "",
+    "trigger_date": null,
+    "level": null,
+    "levels": null
+   },
+   "option_plan": {
+    "symbol": "ADANIENT",
+    "side": "long",
+    "status": "ok",
+    "notes": [
+     "no expiry 10-15 days out; using 27 days",
+     "lot size unknown; quantity in units",
+     "expiry from the monthly rule (no future expiry in the data)"
+    ],
+    "underlying": {
+     "spot": 713.11,
+     "stop": 692.575,
+     "target": 754.1800000000001
+    },
+    "iv_percentile": 51.98412698412699,
+    "iv_status": "ok",
+    "iv": 0.2215,
+    "type": "CE",
+    "strike": 700.0,
+    "moneyness": "itm1",
+    "expiry": "2026-11-24",
+    "days_to_expiry": 27,
+    "expiry_in_window": false,
+    "premium": 26.59470554504054,
+    "premium_source": "model (iv.parquet)",
+    "premium_stop": 14.852607379372216,
+    "premium_target": 59.68533666953249,
+    "risk_per_unit": 11.742098165668324,
+    "reward_risk": 2.818119100830097,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 851,
+    "cost": 22632.0944188295,
+    "risk_at_stop": 9992.525538983744,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": null,
+    "post_spike": null,
+    "expiry_week": {
+     "n": 79,
+     "avg_abs_move_pct": 1.1592921359249577,
+     "other_abs_move_pct": 1.1475606387495914,
+     "ratio": 1.0102229867243873,
+     "avg_move_pct": 0.13499521257381614
+    },
+    "summary": "expiry-week moves are 1.01x a normal day"
    }
   },
   {
@@ -2538,6 +2629,75 @@
      }
     ],
     "markers": []
+   },
+   "cause": {
+    "label": "fresh_shorts",
+    "confidence": 0.63,
+    "level": "medium",
+    "driver": "stock",
+    "tags": [],
+    "reason": "Fresh shorts: price -2.1% with futures OI +0.7% (fresh shorts being added); stock-specific (stock RS -8.3 vs sector -3.4)."
+   },
+   "early": {
+    "stage": "none",
+    "side": null,
+    "flags": [],
+    "strength": 0.0,
+    "detail": "",
+    "trigger_date": null,
+    "level": null,
+    "levels": null
+   },
+   "option_plan": {
+    "symbol": "ASHOKLEY",
+    "side": "short",
+    "status": "ok",
+    "notes": [
+     "no expiry 10-15 days out; using 27 days",
+     "lot size unknown; quantity in units",
+     "expiry from the monthly rule (no future expiry in the data)"
+    ],
+    "underlying": {
+     "spot": 3341.33,
+     "stop": 3520.685,
+     "target": 2982.62
+    },
+    "iv_percentile": 83.73015873015873,
+    "iv_status": "ok",
+    "iv": 0.4385,
+    "type": "PE",
+    "strike": 3400.0,
+    "moneyness": "itm1",
+    "expiry": "2026-11-24",
+    "days_to_expiry": 27,
+    "expiry_in_window": false,
+    "premium": 181.25388917134956,
+    "premium_source": "model (iv.parquet)",
+    "premium_stop": 104.16158648590181,
+    "premium_target": 428.1910966000023,
+    "risk_per_unit": 77.09230268544775,
+    "reward_risk": 3.2031370036540054,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 129,
+    "cost": 23381.75170310409,
+    "risk_at_stop": 9944.907046422759,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": null,
+    "post_spike": null,
+    "expiry_week": {
+     "n": 79,
+     "avg_abs_move_pct": 1.7187660966526395,
+     "other_abs_move_pct": 1.8005377744022308,
+     "ratio": 0.9545848585283143,
+     "avg_move_pct": 0.22348420013043804
+    },
+    "summary": "expiry-week moves are 0.95x a normal day"
    }
   },
   {
@@ -3803,6 +3963,84 @@
      }
     ],
     "markers": []
+   },
+   "cause": {
+    "label": "long_unwinding",
+    "confidence": 0.55,
+    "level": "medium",
+    "driver": "stock",
+    "tags": [],
+    "reason": "Long unwinding: price -0.4% with futures OI -0.8% (longs closing); stock-specific (stock RS -10.5 vs sector -3.4)."
+   },
+   "early": {
+    "stage": "none",
+    "side": null,
+    "flags": [],
+    "strength": 0.0,
+    "detail": "",
+    "trigger_date": null,
+    "level": null,
+    "levels": null
+   },
+   "option_plan": {
+    "symbol": "TATAMOTORS",
+    "side": "short",
+    "status": "ok",
+    "notes": [
+     "no expiry 10-15 days out; using 27 days",
+     "lot size unknown; quantity in units",
+     "expiry from the monthly rule (no future expiry in the data)"
+    ],
+    "underlying": {
+     "spot": 130.73,
+     "stop": 137.39107142857142,
+     "target": 117.40785714285714
+    },
+    "iv_percentile": 77.77777777777779,
+    "iv_status": "ok",
+    "iv": 0.4274,
+    "type": "PE",
+    "strike": 135.0,
+    "moneyness": "itm1",
+    "expiry": "2026-11-24",
+    "days_to_expiry": 27,
+    "expiry_in_window": false,
+    "premium": 8.092600587167738,
+    "premium_source": "model (iv.parquet)",
+    "premium_stop": 4.872041090941316,
+    "premium_target": 17.788513138724454,
+    "risk_per_unit": 3.2205594962264215,
+    "reward_risk": 3.0106298495393626,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 3105,
+    "cost": 25127.524823155825,
+    "risk_at_stop": 9999.83723578304,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 10,
+     "rate": 0.1,
+     "up_rate": 0.0,
+     "down_rate": 0.16666666666666666
+    },
+    "post_spike": {
+     "n": 7,
+     "avg_drift_pct": -1.0048221891300486,
+     "continuation_rate": 0.2857142857142857
+    },
+    "expiry_week": {
+     "n": 79,
+     "avg_abs_move_pct": 1.6720719918694231,
+     "other_abs_move_pct": 1.6322037724861411,
+     "ratio": 1.02442600614907,
+     "avg_move_pct": 0.061636288131848266
+    },
+    "summary": "10% of gaps fill the same day (n=10); after volume spikes the 5-day drift is -1.0% (29% continue, n=7); expiry-week moves are 1.02x a normal day"
    }
   },
   {
@@ -5068,6 +5306,84 @@
      }
     ],
     "markers": []
+   },
+   "cause": {
+    "label": "fresh_shorts",
+    "confidence": 0.55,
+    "level": "medium",
+    "driver": "sector",
+    "tags": [],
+    "reason": "Fresh shorts: price -0.4% with futures OI +0.6% (fresh shorts being added); sector-driven (sector RS -3.8 vs stock -3.7)."
+   },
+   "early": {
+    "stage": "none",
+    "side": null,
+    "flags": [],
+    "strength": 0.0,
+    "detail": "",
+    "trigger_date": null,
+    "level": null,
+    "levels": null
+   },
+   "option_plan": {
+    "symbol": "COALINDIA",
+    "side": "short",
+    "status": "ok",
+    "notes": [
+     "no expiry 10-15 days out; using 27 days",
+     "lot size unknown; quantity in units",
+     "expiry from the monthly rule (no future expiry in the data)"
+    ],
+    "underlying": {
+     "spot": 131.7,
+     "stop": 137.27142857142857,
+     "target": 120.55714285714284
+    },
+    "iv_percentile": 82.93650793650794,
+    "iv_status": "ok",
+    "iv": 0.4296,
+    "type": "PE",
+    "strike": 135.0,
+    "moneyness": "itm1",
+    "expiry": "2026-11-24",
+    "days_to_expiry": 27,
+    "expiry_in_window": false,
+    "premium": 7.584096909036589,
+    "premium_source": "model (iv.parquet)",
+    "premium_stop": 4.951847460643215,
+    "premium_target": 15.172492365956245,
+    "risk_per_unit": 2.632249448393374,
+    "reward_risk": 2.882855749690185,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 3799,
+    "cost": 28811.98415743,
+    "risk_at_stop": 9999.915654446428,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 11,
+     "rate": 0.0,
+     "up_rate": 0.0,
+     "down_rate": 0.0
+    },
+    "post_spike": {
+     "n": 11,
+     "avg_drift_pct": -1.4426890582641743,
+     "continuation_rate": 0.45454545454545453
+    },
+    "expiry_week": {
+     "n": 79,
+     "avg_abs_move_pct": 1.4564788100264874,
+     "other_abs_move_pct": 1.6021241506191066,
+     "ratio": 0.9090923505919701,
+     "avg_move_pct": 0.21733890788226076
+    },
+    "summary": "0% of gaps fill the same day (n=11); after volume spikes the 5-day drift is -1.4% (45% continue, n=11); expiry-week moves are 0.91x a normal day"
    }
   },
   {
@@ -6347,51 +6663,529 @@
       "reason": "stop"
      }
     ]
+   },
+   "cause": {
+    "label": "fresh_shorts",
+    "confidence": 0.64,
+    "level": "medium",
+    "driver": "stock",
+    "tags": [],
+    "reason": "Fresh shorts: price -2.2% with futures OI +0.8% (fresh shorts being added); stock-specific (stock RS -6.5 vs sector -2.3)."
+   },
+   "early": {
+    "stage": "accumulation",
+    "side": "short",
+    "flags": [
+     "rs_divergence",
+     "squeeze"
+    ],
+    "strength": 1.0,
+    "detail": "Bollinger width in its lowest 20%; stock -4.9% vs Nifty +1.5% over 10 sessions",
+    "trigger_date": null,
+    "level": null,
+    "levels": {
+     "entry_ref": 1742.39,
+     "stop": 1809.3189285714286,
+     "target": 1608.532142857143,
+     "atr14": 44.6192857142857
+    }
+   },
+   "option_plan": {
+    "symbol": "HDFCLIFE",
+    "side": "short",
+    "status": "ok",
+    "notes": [
+     "no expiry 10-15 days out; using 27 days",
+     "lot size unknown; quantity in units",
+     "expiry from the monthly rule (no future expiry in the data)"
+    ],
+    "underlying": {
+     "spot": 1731.1711494000344,
+     "stop": 1739.9722848426602,
+     "target": 1713.568878514783
+    },
+    "iv_percentile": 18.253968253968253,
+    "iv_status": "ok",
+    "iv": 0.2002,
+    "type": "PE",
+    "strike": 1750.0,
+    "moneyness": "atm",
+    "expiry": "2026-11-24",
+    "days_to_expiry": 27,
+    "expiry_in_window": false,
+    "premium": 42.804357013554636,
+    "premium_source": "model (iv.parquet)",
+    "premium_stop": 38.29941215690826,
+    "premium_target": 52.792066183308634,
+    "risk_per_unit": 4.504944856646375,
+    "reward_risk": 2.217054700462897,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 2219,
+    "cost": 94982.86821307773,
+    "risk_at_stop": 9996.472636898307,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 8,
+     "rate": 0.0,
+     "up_rate": 0.0,
+     "down_rate": 0.0
+    },
+    "post_spike": {
+     "n": 7,
+     "avg_drift_pct": 2.4668811606536916,
+     "continuation_rate": 0.8571428571428571
+    },
+    "expiry_week": {
+     "n": 79,
+     "avg_abs_move_pct": 0.9631256067121517,
+     "other_abs_move_pct": 1.1273141460301535,
+     "ratio": 0.8543542277933858,
+     "avg_move_pct": -0.0322364110195926
+    },
+    "summary": "0% of gaps fill the same day (n=8); after volume spikes the 5-day drift is +2.5% (86% continue, n=7); expiry-week moves are 0.85x a normal day"
    }
   }
  ],
  "alerts": [
   {
    "ts": null,
-   "symbol": "",
+   "symbol": "ADANIENT",
    "kind": "alert",
-   "text": "[WATCH] ADANIENT long (grade B, score 65) is on today's desk. Waiting for an OB/FVG pullback. Paper trade only. Statistics, not investment advice."
+   "text": "[WATCH] ADANIENT long (grade B, score 65) is on today's desk. Waiting for an OB/FVG pullback. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Watch",
+    "symbol": "ADANIENT",
+    "side": "long",
+    "grade": "B",
+    "score": 65.0,
+    "reasons": [],
+    "cause": {
+     "label": "long_buildup",
+     "confidence": 0.55,
+     "level": "medium",
+     "driver": "sector",
+     "tags": [],
+     "reason": "Long buildup: price +0.9% with futures OI +0.2% (fresh longs being added); sector-driven (sector RS +13.7 vs stock +13.7)."
+    },
+    "option_plan": {
+     "symbol": "ADANIENT",
+     "side": "long",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 713.11,
+      "stop": 692.575,
+      "target": 754.1800000000001
+     },
+     "iv_percentile": 51.98412698412699,
+     "iv_status": "ok",
+     "iv": 0.2215,
+     "type": "CE",
+     "strike": 700.0,
+     "moneyness": "itm1",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 26.59470554504054,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 14.852607379372216,
+     "premium_target": 59.68533666953249,
+     "risk_per_unit": 11.742098165668324,
+     "reward_risk": 2.818119100830097,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 851,
+     "cost": 22632.0944188295,
+     "risk_at_stop": 9992.525538983744,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   },
   {
    "ts": null,
-   "symbol": "",
+   "symbol": "ASHOKLEY",
    "kind": "alert",
-   "text": "[VETOED] ASHOKLEY short (grade B, score 57): chop regime (ER 0.18 < 0.25); IV percentile 84 > 70. Paper trade only. Statistics, not investment advice."
+   "text": "[VETOED] ASHOKLEY short (grade B, score 57): chop regime (ER 0.18 < 0.25); IV percentile 84 > 70. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Vetoed",
+    "symbol": "ASHOKLEY",
+    "side": "short",
+    "grade": "B",
+    "score": 56.8,
+    "reasons": [
+     "chop regime (ER 0.18 < 0.25)",
+     "IV percentile 84 > 70"
+    ],
+    "cause": {
+     "label": "fresh_shorts",
+     "confidence": 0.63,
+     "level": "medium",
+     "driver": "stock",
+     "tags": [],
+     "reason": "Fresh shorts: price -2.1% with futures OI +0.7% (fresh shorts being added); stock-specific (stock RS -8.3 vs sector -3.4)."
+    },
+    "option_plan": {
+     "symbol": "ASHOKLEY",
+     "side": "short",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 3341.33,
+      "stop": 3520.685,
+      "target": 2982.62
+     },
+     "iv_percentile": 83.73015873015873,
+     "iv_status": "ok",
+     "iv": 0.4385,
+     "type": "PE",
+     "strike": 3400.0,
+     "moneyness": "itm1",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 181.25388917134956,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 104.16158648590181,
+     "premium_target": 428.1910966000023,
+     "risk_per_unit": 77.09230268544775,
+     "reward_risk": 3.2031370036540054,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 129,
+     "cost": 23381.75170310409,
+     "risk_at_stop": 9944.907046422759,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   },
   {
    "ts": null,
-   "symbol": "",
+   "symbol": "TATAMOTORS",
    "kind": "alert",
-   "text": "[VETOED] TATAMOTORS short (grade B, score 51): chop regime (ER 0.22 < 0.25); IV percentile 78 > 70. Paper trade only. Statistics, not investment advice."
+   "text": "[VETOED] TATAMOTORS short (grade B, score 51): chop regime (ER 0.22 < 0.25); IV percentile 78 > 70. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Vetoed",
+    "symbol": "TATAMOTORS",
+    "side": "short",
+    "grade": "B",
+    "score": 51.4,
+    "reasons": [
+     "chop regime (ER 0.22 < 0.25)",
+     "IV percentile 78 > 70"
+    ],
+    "cause": {
+     "label": "long_unwinding",
+     "confidence": 0.55,
+     "level": "medium",
+     "driver": "stock",
+     "tags": [],
+     "reason": "Long unwinding: price -0.4% with futures OI -0.8% (longs closing); stock-specific (stock RS -10.5 vs sector -3.4)."
+    },
+    "option_plan": {
+     "symbol": "TATAMOTORS",
+     "side": "short",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 130.73,
+      "stop": 137.39107142857142,
+      "target": 117.40785714285714
+     },
+     "iv_percentile": 77.77777777777779,
+     "iv_status": "ok",
+     "iv": 0.4274,
+     "type": "PE",
+     "strike": 135.0,
+     "moneyness": "itm1",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 8.092600587167738,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 4.872041090941316,
+     "premium_target": 17.788513138724454,
+     "risk_per_unit": 3.2205594962264215,
+     "reward_risk": 3.0106298495393626,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 3105,
+     "cost": 25127.524823155825,
+     "risk_at_stop": 9999.83723578304,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   },
   {
    "ts": null,
-   "symbol": "",
+   "symbol": "COALINDIA",
    "kind": "alert",
-   "text": "[VETOED] COALINDIA short (grade B, score 51): chop regime (ER 0.06 < 0.25); IV percentile 83 > 70. Paper trade only. Statistics, not investment advice."
+   "text": "[VETOED] COALINDIA short (grade B, score 51): chop regime (ER 0.06 < 0.25); IV percentile 83 > 70. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Vetoed",
+    "symbol": "COALINDIA",
+    "side": "short",
+    "grade": "B",
+    "score": 51.3,
+    "reasons": [
+     "chop regime (ER 0.06 < 0.25)",
+     "IV percentile 83 > 70"
+    ],
+    "cause": {
+     "label": "fresh_shorts",
+     "confidence": 0.55,
+     "level": "medium",
+     "driver": "sector",
+     "tags": [],
+     "reason": "Fresh shorts: price -0.4% with futures OI +0.6% (fresh shorts being added); sector-driven (sector RS -3.8 vs stock -3.7)."
+    },
+    "option_plan": {
+     "symbol": "COALINDIA",
+     "side": "short",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 131.7,
+      "stop": 137.27142857142857,
+      "target": 120.55714285714284
+     },
+     "iv_percentile": 82.93650793650794,
+     "iv_status": "ok",
+     "iv": 0.4296,
+     "type": "PE",
+     "strike": 135.0,
+     "moneyness": "itm1",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 7.584096909036589,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 4.951847460643215,
+     "premium_target": 15.172492365956245,
+     "risk_per_unit": 2.632249448393374,
+     "reward_risk": 2.882855749690185,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 3799,
+     "cost": 28811.98415743,
+     "risk_at_stop": 9999.915654446428,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   },
   {
    "ts": null,
-   "symbol": "",
+   "symbol": "HDFCLIFE",
    "kind": "alert",
-   "text": "[WATCH] HDFCLIFE short (grade B, score 51) is on today's desk. Waiting for an OB/FVG pullback. Paper trade only. Statistics, not investment advice."
+   "text": "[WATCH] HDFCLIFE short (grade B, score 51) is on today's desk. Waiting for an OB/FVG pullback. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Watch",
+    "symbol": "HDFCLIFE",
+    "side": "short",
+    "grade": "B",
+    "score": 50.9,
+    "reasons": [],
+    "cause": {
+     "label": "fresh_shorts",
+     "confidence": 0.64,
+     "level": "medium",
+     "driver": "stock",
+     "tags": [],
+     "reason": "Fresh shorts: price -2.2% with futures OI +0.8% (fresh shorts being added); stock-specific (stock RS -6.5 vs sector -2.3)."
+    },
+    "option_plan": {
+     "symbol": "HDFCLIFE",
+     "side": "short",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 1731.1711494000344,
+      "stop": 1739.9722848426602,
+      "target": 1713.568878514783
+     },
+     "iv_percentile": 18.253968253968253,
+     "iv_status": "ok",
+     "iv": 0.2002,
+     "type": "PE",
+     "strike": 1750.0,
+     "moneyness": "atm",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 42.804357013554636,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 38.29941215690826,
+     "premium_target": 52.792066183308634,
+     "risk_per_unit": 4.504944856646375,
+     "reward_risk": 2.217054700462897,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 2219,
+     "cost": 94982.86821307773,
+     "risk_at_stop": 9996.472636898307,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   },
   {
    "ts": "2026-10-28 12:15",
-   "symbol": "",
+   "symbol": "HDFCLIFE",
    "kind": "alert",
-   "text": "[READY] HDFCLIFE short (grade B, score 51) pulled back into its zone. Waiting for BOS/engulfing and a trade window. Paper trade only. Statistics, not investment advice."
+   "text": "[READY] HDFCLIFE short (grade B, score 51) pulled back into its zone. Waiting for BOS/engulfing and a trade window. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Ready",
+    "symbol": "HDFCLIFE",
+    "side": "short",
+    "grade": "B",
+    "score": 50.9,
+    "reasons": [
+     "entry time 12:30 outside trade windows"
+    ],
+    "cause": {
+     "label": "fresh_shorts",
+     "confidence": 0.64,
+     "level": "medium",
+     "driver": "stock",
+     "tags": [],
+     "reason": "Fresh shorts: price -2.2% with futures OI +0.8% (fresh shorts being added); stock-specific (stock RS -6.5 vs sector -2.3)."
+    },
+    "option_plan": {
+     "symbol": "HDFCLIFE",
+     "side": "short",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 1731.1711494000344,
+      "stop": 1739.9722848426602,
+      "target": 1713.568878514783
+     },
+     "iv_percentile": 18.253968253968253,
+     "iv_status": "ok",
+     "iv": 0.2002,
+     "type": "PE",
+     "strike": 1750.0,
+     "moneyness": "atm",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 42.804357013554636,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 38.29941215690826,
+     "premium_target": 52.792066183308634,
+     "risk_per_unit": 4.504944856646375,
+     "reward_risk": 2.217054700462897,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 2219,
+     "cost": 94982.86821307773,
+     "risk_at_stop": 9996.472636898307,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   },
   {
    "ts": "2026-10-28 13:45",
-   "symbol": "",
+   "symbol": "HDFCLIFE",
    "kind": "alert",
-   "text": "[GO] HDFCLIFE short (grade B, score 51) paper entry 1731.17, SL 1739.97, target 1713.57. Paper trade only. Statistics, not investment advice."
+   "text": "[GO] HDFCLIFE short (grade B, score 51) paper entry 1731.17, SL 1739.97, target 1713.57. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Go",
+    "symbol": "HDFCLIFE",
+    "side": "short",
+    "grade": "B",
+    "score": 50.9,
+    "reasons": [],
+    "entry": 1731.1711494000344,
+    "stop": 1739.9722848426602,
+    "target": 1713.568878514783,
+    "cause": {
+     "label": "fresh_shorts",
+     "confidence": 0.64,
+     "level": "medium",
+     "driver": "stock",
+     "tags": [],
+     "reason": "Fresh shorts: price -2.2% with futures OI +0.8% (fresh shorts being added); stock-specific (stock RS -6.5 vs sector -2.3)."
+    },
+    "option_plan": {
+     "symbol": "HDFCLIFE",
+     "side": "short",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 1731.1711494000344,
+      "stop": 1739.9722848426602,
+      "target": 1713.568878514783
+     },
+     "iv_percentile": 18.253968253968253,
+     "iv_status": "ok",
+     "iv": 0.2002,
+     "type": "PE",
+     "strike": 1750.0,
+     "moneyness": "atm",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 42.804357013554636,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 38.29941215690826,
+     "premium_target": 52.792066183308634,
+     "risk_per_unit": 4.504944856646375,
+     "reward_risk": 2.217054700462897,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 2219,
+     "cost": 94982.86821307773,
+     "risk_at_stop": 9996.472636898307,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   },
   {
    "ts": "2026-10-28 14:00",
@@ -6407,9 +7201,129 @@
   },
   {
    "ts": "2026-10-28 15:00",
-   "symbol": "",
+   "symbol": "ADANIENT",
    "kind": "alert",
-   "text": "[READY] ADANIENT long (grade B, score 65) pulled back into its zone. Waiting for BOS/engulfing and a trade window. Paper trade only. Statistics, not investment advice."
+   "text": "[READY] ADANIENT long (grade B, score 65) pulled back into its zone. Waiting for BOS/engulfing and a trade window. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Ready",
+    "symbol": "ADANIENT",
+    "side": "long",
+    "grade": "B",
+    "score": 65.0,
+    "reasons": [
+     "waiting for BOS/engulfing trigger"
+    ],
+    "cause": {
+     "label": "long_buildup",
+     "confidence": 0.55,
+     "level": "medium",
+     "driver": "sector",
+     "tags": [],
+     "reason": "Long buildup: price +0.9% with futures OI +0.2% (fresh longs being added); sector-driven (sector RS +13.7 vs stock +13.7)."
+    },
+    "option_plan": {
+     "symbol": "ADANIENT",
+     "side": "long",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 713.11,
+      "stop": 692.575,
+      "target": 754.1800000000001
+     },
+     "iv_percentile": 51.98412698412699,
+     "iv_status": "ok",
+     "iv": 0.2215,
+     "type": "CE",
+     "strike": 700.0,
+     "moneyness": "itm1",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 26.59470554504054,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 14.852607379372216,
+     "premium_target": 59.68533666953249,
+     "risk_per_unit": 11.742098165668324,
+     "reward_risk": 2.818119100830097,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 851,
+     "cost": 22632.0944188295,
+     "risk_at_stop": 9992.525538983744,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
+  },
+  {
+   "ts": null,
+   "symbol": "HDFCLIFE",
+   "kind": "alert",
+   "text": "[WATCH] HDFCLIFE short Early accumulation: Bollinger width in its lowest 20%; stock -4.9% vs Nifty +1.5% over 10 sessions. Paper trade only. Statistics, not investment advice.",
+   "info": {
+    "stage": "Watch",
+    "symbol": "HDFCLIFE",
+    "side": "short",
+    "note": "Early accumulation: Bollinger width in its lowest 20%; stock -4.9% vs Nifty +1.5% over 10 sessions.",
+    "entry": 1742.39,
+    "stop": 1809.3189285714286,
+    "target": 1608.532142857143,
+    "kind": "early",
+    "early_stage": "accumulation",
+    "prev_stage": null,
+    "cause": {
+     "label": "fresh_shorts",
+     "confidence": 0.64,
+     "level": "medium",
+     "driver": "stock",
+     "tags": [],
+     "reason": "Fresh shorts: price -2.2% with futures OI +0.8% (fresh shorts being added); stock-specific (stock RS -6.5 vs sector -2.3)."
+    },
+    "option_plan": {
+     "symbol": "HDFCLIFE",
+     "side": "short",
+     "status": "ok",
+     "notes": [
+      "no expiry 10-15 days out; using 27 days",
+      "lot size unknown; quantity in units",
+      "expiry from the monthly rule (no future expiry in the data)"
+     ],
+     "underlying": {
+      "spot": 1731.1711494000344,
+      "stop": 1739.9722848426602,
+      "target": 1713.568878514783
+     },
+     "iv_percentile": 18.253968253968253,
+     "iv_status": "ok",
+     "iv": 0.2002,
+     "type": "PE",
+     "strike": 1750.0,
+     "moneyness": "atm",
+     "expiry": "2026-11-24",
+     "days_to_expiry": 27,
+     "expiry_in_window": false,
+     "premium": 42.804357013554636,
+     "premium_source": "model (iv.parquet)",
+     "premium_stop": 38.29941215690826,
+     "premium_target": 52.792066183308634,
+     "risk_per_unit": 4.504944856646375,
+     "reward_risk": 2.217054700462897,
+     "risk_pct": 1.0,
+     "risk_amt": 10000.0,
+     "lot_size": null,
+     "lots": null,
+     "qty": 2219,
+     "cost": 94982.86821307773,
+     "risk_at_stop": 9996.472636898307,
+     "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+    }
+   }
   }
  ],
  "paper": {
@@ -6448,7 +7362,9 @@
     "exit_reason": "square_off",
     "pnl": 121.45300345040329,
     "r": 0.012145847158228031,
-    "status": "closed"
+    "status": "closed",
+    "cause": "long_buildup",
+    "early_stage": "none"
    },
    {
     "id": 2,
@@ -6470,7 +7386,9 @@
     "exit_reason": "square_off",
     "pnl": 301.17589111973575,
     "r": 0.03011468649821876,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "none"
    },
    {
     "id": 3,
@@ -6492,7 +7410,9 @@
     "exit_reason": "square_off",
     "pnl": -1022.3845991989253,
     "r": -0.1021963876025519,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "none"
    },
    {
     "id": 4,
@@ -6514,7 +7434,9 @@
     "exit_reason": "stop",
     "pnl": -9993.571449729621,
     "r": -1.0,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "none"
    },
    {
     "id": 5,
@@ -6536,7 +7458,9 @@
     "exit_reason": "square_off",
     "pnl": -4253.881636050529,
     "r": -0.43000288145384574,
-    "status": "closed"
+    "status": "closed",
+    "cause": "long_buildup",
+    "early_stage": "none"
    },
    {
     "id": 6,
@@ -6558,7 +7482,9 @@
     "exit_reason": "square_off",
     "pnl": 1832.3610060513106,
     "r": 0.18601174005049254,
-    "status": "closed"
+    "status": "closed",
+    "cause": "long_buildup",
+    "early_stage": "none"
    },
    {
     "id": 7,
@@ -6580,7 +7506,9 @@
     "exit_reason": "stop",
     "pnl": -9862.968174116337,
     "r": -1.0,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "none"
    },
    {
     "id": 8,
@@ -6602,7 +7530,9 @@
     "exit_reason": "square_off",
     "pnl": -5884.176526016998,
     "r": -0.6023476688722392,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "none"
    },
    {
     "id": 9,
@@ -6624,7 +7554,9 @@
     "exit_reason": "square_off",
     "pnl": 7990.156554954315,
     "r": 0.8226982142481772,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "trigger"
    },
    {
     "id": 10,
@@ -6646,7 +7578,9 @@
     "exit_reason": "square_off",
     "pnl": -3016.220000000295,
     "r": -0.3080885017619206,
-    "status": "closed"
+    "status": "closed",
+    "cause": "long_buildup",
+    "early_stage": "confirmation"
    },
    {
     "id": 11,
@@ -6668,7 +7602,9 @@
     "exit_reason": "stop",
     "pnl": -9755.081687118345,
     "r": -1.0,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "none"
    },
    {
     "id": 12,
@@ -6690,7 +7626,9 @@
     "exit_reason": "stop",
     "pnl": -9663.646716003088,
     "r": -1.0,
-    "status": "closed"
+    "status": "closed",
+    "cause": "fresh_shorts",
+    "early_stage": "accumulation"
    }
   ],
   "equity": [
