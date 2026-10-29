@@ -50,6 +50,27 @@ class DeskPageTests(unittest.TestCase):
         self.assertEqual({"time", "oi", "chg_oi"}, set(p["oi"][0]))
         self.assertTrue(all(c["status"] in ("pass", "fail", "pending", "unknown") for c in p["checklist"]))
 
+    def test_new_optional_fields_are_read_defensively(self):
+        for token in ("renderHealth", "Why it moved", "p.option_plan", "p.early", "p.profile", "data_health"):
+            self.assertIn(token, HTML)
+        # every access to an optional block is guarded, so an old desk file (schema 1) still renders
+        self.assertIn("if (p.cause && p.cause.label)", HTML)
+        self.assertIn("if (o && o.type)", HTML)
+        self.assertIn("if (!h || !h.status)", HTML)
+
+    def test_demo_json_schema2_blocks(self):
+        d = json.loads((WEB / "morning_desk.json").read_text())
+        self.assertEqual(d["schema"], 2)
+        self.assertEqual(list(d)[:3], ["schema", "notice", "data_health"])
+        for k in ("status", "missing", "warnings", "inputs", "repairs"):
+            self.assertIn(k, d["data_health"])
+        for p in d["picks"]:
+            for k in ("cause", "early", "profile", "option_plan"):
+                self.assertIn(k, p)
+            for k in ("label", "confidence", "level", "driver", "reason", "tags"):
+                self.assertIn(k, p["cause"])
+            self.assertIn("stage", p["early"])
+
 
 if __name__ == "__main__":
     unittest.main()

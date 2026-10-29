@@ -9,13 +9,14 @@ import numpy as np
 import pandas as pd
 
 from backtest.engine import COMPONENTS, EXEC, build_panel, normalise, prepare_candidates
+from enrich import enrich_pick
 from features import load_sectors
+from options_plan import STRIKE_STEPS, strike_step  # noqa: F401
 from score import BIAS
 from session import veto_context
 from vetoes import apply_vetoes
 
 NOTICE = "Paper trading and historical statistics only. Not investment advice."
-STRIKE_STEPS = [(100, 2.5), (250, 5), (500, 10), (1000, 20), (2500, 50), (5000, 100), (float("inf"), 250)]
 
 
 # ------------------------------------------------------------------ helpers
@@ -37,10 +38,6 @@ def clean(o):
     return o
 
 
-def strike_step(price: float) -> float:
-    return next(step for lim, step in STRIKE_STEPS if price < lim)
-
-
 def suggest_strike(price: float, side: str, expiry=None) -> dict:
     """ATM strike on an approximate interval table (verify against the live option chain)."""
     step = strike_step(price)
@@ -51,9 +48,9 @@ def suggest_strike(price: float, side: str, expiry=None) -> dict:
                 note="approximate strike interval; check the live option chain")
 
 
-def next_expiry(market, symbol: str, trade_date):
-    exp = pd.to_datetime(pd.Series(market.fo.loc[market.fo["symbol"] == symbol, "expiry"].unique()),
-                         errors="coerce").dropna()
+def next_expiry(market, symbol: str, trade_date, asof=None):
+    fo = market.fo[market.fo["date"] <= pd.Timestamp(asof)] if asof is not None and len(market.fo) else market.fo
+    exp = pd.to_datetime(pd.Series(fo.loc[fo["symbol"] == symbol, "expiry"].unique()), errors="coerce").dropna()
     fut = exp[exp >= pd.Timestamp(trade_date)]
     return fut.min() if len(fut) else None
 
@@ -150,7 +147,7 @@ def intraday_json(bars: pd.DataFrame, markers: list[dict]) -> dict:
 
 
 def build_pick_card(market, row, rank: int, asof, trade_date, cfg: dict, vcfg: dict, rates: dict,
-                    session: dict | None, ledger_rows: pd.DataFrame | None) -> dict:
+                    session: dict | None, ledger_rows: pd.DataFrame | None, capital: float = 1_000_000) -> dict:
     sym, side = row["symbol"], row["direction"]
     atr = daily_atr(market.cash, sym, asof)
     last = float(row["close"])
@@ -181,7 +178,12 @@ def build_pick_card(market, row, rank: int, asof, trade_date, cfg: dict, vcfg: d
                                        reason=t["exit_reason"]))
             sess_bars = intraday_json(b, mk)
     rate = rate_for(rates, row["grade"], row["setup"])
-    exp = next_expiry(market, sym, trade_date)
+    exp = next_expiry(market, sym, trade_date, asof)
+    lv_for_plan = dict(entry_ref=last, stop=stop, target=target)
+    if ledger_rows is not None and len(ledger_rows[ledger_rows["symbol"] == sym]):   # a paper trade fixes the real levels
+        t = ledger_rows[ledger_rows["symbol"] == sym].iloc[0]
+        lv_for_plan = dict(entry_ref=float(t["entry"]), stop=float(t["stop"]), target=float(t["target"]))
+    extra = enrich_pick(market, row, asof, trade_date, lv_for_plan, capital)
     return dict(
         rank=rank, symbol=sym, sector=row["sector"], direction=side, grade=row["grade"], score=row["score"],
         setup=row["setup"], components=row["components"], close=last,
@@ -195,32 +197,56 @@ def build_pick_card(market, row, rank: int, asof, trade_date, cfg: dict, vcfg: d
         checklist=checklist(row, side, cfg, veto, timing),
         stage=(timing or {}).get("stage", "Vetoed" if veto["vetoed"] else "Watch"),
         vetoed=veto["vetoed"] or (timing or {}).get("stage") == "Vetoed", candles=candles(market.cash, sym, asof), oi=oi_series(market.fo, sym, asof),
-        intraday=sess_bars)
+        intraday=sess_bars, **extra)
+
+
+def _nifty_close(market, asof):
+    if not len(market.idx):
+        return None
+    nf = market.idx[(market.idx["index_name"] == "Nifty 50") & (market.idx["date"] <= pd.Timestamp(asof))]
+    return float(nf["close"].iloc[-1]) if len(nf) else None
 
 
 def build_desk(market, picks: pd.DataFrame, asof, trade_date, cfg: dict, vcfg: dict, rates: dict,
-               ledger, session: dict | None = None, mode: str = "premarket") -> dict:
+               ledger, session: dict | None = None, mode: str = "premarket", health: dict | None = None,
+               extra_events: list | None = None) -> dict:
     day = f"{pd.Timestamp(trade_date):%Y-%m-%d}"
     rows = ledger.trades_df()
     day_rows = rows[rows["trade_date"] == day] if len(rows) else rows
-    cards = [build_pick_card(market, r, k, asof, trade_date, cfg, vcfg, rates, session, day_rows)
+    cards = [build_pick_card(market, r, k, asof, trade_date, cfg, vcfg, rates, session, day_rows, ledger.cfg["capital"])
              for k, (_, r) in enumerate(picks.iterrows(), 1)]
     summary = ledger.summary(day)
     closed = rows[rows["status"] == "closed"].tail(15) if len(rows) else rows
     eq = (ledger.cfg["capital"] + rows[rows["status"] == "closed"]["pnl"].cumsum()) if len(rows) else []
+    events = [dict(e) for e in ((session or {}).get("events", []) + list(extra_events or []))]
+    by_sym = {c["symbol"]: c for c in cards}
+    for e in events:                      # let the Telegram formatter see cause/option plan/levels
+        info, c = e.get("info"), by_sym.get(e.get("symbol"))
+        if info is not None and c is not None:
+            info.setdefault("cause", c["cause"] if isinstance(c.get("cause"), dict) else None)
+            info.setdefault("option_plan", c.get("option_plan"))
     desk = dict(
-        schema=1, notice=NOTICE, mode=mode, source=market.source,
+        schema=2, notice=NOTICE, data_health=health or {}, mode=mode, source=market.source,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         asof=f"{pd.Timestamp(asof):%Y-%m-%d}", trade_date=day,
-        market=dict(nifty_close=float(market.idx[(market.idx["index_name"] == "Nifty 50")
-                                                 & (market.idx["date"] <= pd.Timestamp(asof))]["close"].iloc[-1])),
+        market=dict(nifty_close=_nifty_close(market, asof)),
         picks=cards,
-        alerts=(session or {}).get("events", []),
+        alerts=events,
         paper=dict(summary=summary, open=[dict(r) for _, r in rows[rows["status"] == "open"].iterrows()] if len(rows) else [],
                    recent=[dict(r) for _, r in closed.iterrows()] if len(rows) else [],
                    equity=[float(x) for x in list(eq)[-300:]]),
         base_rates=rates)
     return clean(desk)
+
+
+def empty_desk(health: dict, ledger=None, reason: str = "") -> dict:
+    """Desk written when inputs are unusable: no picks, a bad data_health block, paper summary if a ledger exists."""
+    summary = ledger.summary() if ledger is not None else {}
+    return clean(dict(schema=2, notice=NOTICE, data_health=health, mode="unavailable", source=health.get("source"),
+                      generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                      asof=health.get("asof"), trade_date=health.get("trade_date"), market=dict(nifty_close=None),
+                      picks=[], alerts=[], paper=dict(summary=summary, open=[], recent=[], equity=[]),
+                      base_rates={}, reason=reason))
 
 
 def write_desk(desk: dict, path) -> None:

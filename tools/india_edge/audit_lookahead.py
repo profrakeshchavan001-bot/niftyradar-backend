@@ -145,6 +145,51 @@ def audit_session(market: Market, n_days: int = 6, seed: int = 1) -> list[str]:
     return msgs
 
 
+def _cut(market: Market, d) -> Market:
+    """Truncate every input (including IV) at d, so nothing dated later can leak in."""
+    m = market.truncate(d)
+    m.iv = market.iv[market.iv["date"] <= pd.Timestamp(d)] if len(market.iv) else market.iv
+    return m
+
+
+def audit_new_blocks(market: Market, n_days: int = 4, seed: int = 2) -> list[str]:
+    """Cause detector, stock profile, early detection and option plan as-of d must not change when data
+    after d is removed."""
+    import json
+    import cause as CA
+    import enrich
+    from layer1 import scan
+    from morning_desk import clean, daily_atr
+    cfg = load_config()
+    rng = np.random.default_rng(seed)
+    syms = sorted(market.cash["symbol"].unique())
+    feats = build_feature_frame(market, cfg, symbols=syms)
+    dates = market.dates
+    norm = lambda x: json.dumps(clean(x), sort_keys=True, default=str)  # noqa: E731
+    msgs = []
+    for k in rng.choice(np.arange(len(dates) - 200, len(dates) - 2), size=n_days, replace=False):
+        d, nxt = dates[k], dates[k + 1]
+        cut = _cut(market, d)
+        for _, row in scan(market, d, cfg, feats=feats).head(3).iterrows():
+            s = row["symbol"]
+            checks = {
+                "cause": (enrich.cause_for(market, row, d), enrich.cause_for(cut, row, d)),
+                "profile": (CA.stock_profile(market.cash, s, d, market.fo), CA.stock_profile(cut.cash, s, d, cut.fo)),
+                "early stage": (enrich.early_for(market, s, d), enrich.early_for(cut, s, d)),
+            }
+            atr_a, atr_b = daily_atr(market.cash, s, d), daily_atr(cut.cash, s, d)
+            sgn = 1 if row["direction"] == "long" else -1
+            lv = lambda a: dict(entry_ref=float(row["close"]), stop=float(row["close"]) - sgn * 1.5 * a,  # noqa: E731
+                                target=float(row["close"]) + sgn * 3.0 * a)
+            if not (np.isnan(atr_a) or np.isnan(atr_b)):
+                checks["option plan"] = (enrich.plan_for(market, row, d, nxt, lv(atr_a), 1_000_000, {}),
+                                         enrich.plan_for(cut, row, d, nxt, lv(atr_b), 1_000_000, {}))
+            for name, (full, part) in checks.items():
+                if norm(full) != norm(part):
+                    msgs.append(f"{name} for {s} on {d:%Y-%m-%d} changes when later data is removed")
+    return msgs
+
+
 def run_audit(market: Market, cutoffs: int = 3) -> list[str]:
     cfg = load_config()
     syms = sorted(market.cash["symbol"].unique())
@@ -154,6 +199,7 @@ def run_audit(market: Market, cutoffs: int = 3) -> list[str]:
     msgs += audit_signals(market, cut[:2])
     msgs += audit_timing(market)
     msgs += audit_session(market)
+    msgs += audit_new_blocks(market)
     return msgs
 
 

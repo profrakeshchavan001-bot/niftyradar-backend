@@ -15,10 +15,12 @@ from loader import Market, load_fixtures  # noqa: E402
 
 
 def trades():
-    rows = [("2026-10-05", "A", "trend", "long", 20000, 2.0), ("2026-10-06", "B", "trend", "short", -10000, -1.0),
-            ("2026-10-07", "B", "pullback", "long", 5000, 0.5), ("2026-10-08", "A", "index", "short", -10000, -1.0),
-            ("2026-10-12", "A", "trend", "long", 20000, 2.0)]
-    return pd.DataFrame(rows, columns=["trade_date", "grade", "setup", "side", "pnl", "r"]).assign(
+    rows = [("2026-10-05", "A", "trend", "long", 20000, 2.0, "short_covering", "accumulation"),
+            ("2026-10-06", "B", "trend", "short", -10000, -1.0, "long_buildup", "none"),
+            ("2026-10-07", "B", "pullback", "long", 5000, 0.5, "short_covering", "confirmation"),
+            ("2026-10-08", "A", "index", "short", -10000, -1.0, "long_buildup", "accumulation"),
+            ("2026-10-12", "A", "trend", "long", 20000, 2.0, "short_covering", "none")]
+    return pd.DataFrame(rows, columns=["trade_date", "grade", "setup", "side", "pnl", "r", "cause", "early_stage"]).assign(
         status="closed", exit_reason="target")
 
 
@@ -36,6 +38,30 @@ class WeeklyReviewTests(unittest.TestCase):
         self.assertEqual(r["by_setup"]["trend"]["trades"], 2)
         self.assertAlmostEqual(r["by_setup"]["index"]["expectancy_r"], -1.0)
         self.assertEqual(r["all_time"]["trades"], 5)
+
+    def test_by_cause_and_early_stage_hand_computed(self):
+        r = WR.review(trades(), "2026-10-11")
+        sc, lb = r["by_cause"]["short_covering"], r["by_cause"]["long_buildup"]
+        self.assertEqual((sc["trades"], sc["win_pct"]), (2, 100.0))
+        self.assertAlmostEqual(sc["expectancy_r"], 1.25)                    # (2.0 + 0.5) / 2
+        self.assertIsNone(sc["profit_factor"])                              # no losing trades
+        self.assertEqual((lb["trades"], lb["win_pct"]), (2, 0.0))
+        self.assertAlmostEqual(lb["expectancy_r"], -1.0)
+        acc = r["by_early_stage"]["accumulation"]
+        self.assertEqual(acc["trades"], 2)
+        self.assertAlmostEqual(acc["expectancy_r"], 0.5)                    # (2.0 - 1.0) / 2
+        self.assertAlmostEqual(acc["profit_factor"], 20000 / 10000)
+        self.assertEqual(r["by_early_stage"]["confirmation"]["trades"], 1)
+        self.assertEqual(r["all_by_cause"]["short_covering"]["trades"], 3)  # includes the next week's trade
+        md = WR.render_md(r)
+        self.assertIn("## By cause label (this week)", md)
+        self.assertIn("## By early-detection stage (this week)", md)
+
+    def test_old_ledger_without_new_columns(self):
+        old = trades().drop(columns=["cause", "early_stage"])
+        r = WR.review(old, "2026-10-11")
+        self.assertEqual(r["by_cause"]["unknown"]["trades"], 4)
+        self.assertEqual(r["by_early_stage"]["unknown"]["trades"], 4)
 
     def test_week_ending_and_markdown(self):
         self.assertEqual(WR.week_ending_for("2026-10-08"), pd.Timestamp("2026-10-11"))   # Thursday -> that Sunday
@@ -92,6 +118,26 @@ class LookaheadAuditTests(unittest.TestCase):
 
     def test_paper_session_does_not_peek(self):
         self.assertEqual(AU.audit_session(self.m, n_days=4), [])
+
+    def test_cause_profile_early_and_option_plan_do_not_peek(self):
+        self.assertEqual(AU.audit_new_blocks(self.m, n_days=3), [])
+
+    def test_audit_catches_early_detection_that_ignores_asof(self):
+        import early as EA
+
+        real = EA.history
+
+        def leaky(market, symbol, asof, n=170):      # forgets the date <= asof filter
+            c = market.cash[market.cash["symbol"] == symbol].sort_values("date").tail(n)
+            h = real(market, symbol, c["date"].iloc[-1], n)
+            return h
+
+        EA.history = leaky
+        try:
+            msgs = AU.audit_new_blocks(self.m, n_days=4)
+        finally:
+            EA.history = real
+        self.assertTrue(any("early stage" in x for x in msgs), msgs)
 
     def test_timing_rules_do_not_peek(self):
         self.assertEqual(AU.audit_timing(self.m, n_cases=6), [])

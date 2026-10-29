@@ -61,6 +61,11 @@ pre.log{margin:0;white-space:pre-wrap;font:12px/1.5 ui-monospace,Menlo,Consolas,
 #err{display:none;border:1px solid var(--down);color:var(--down);border-radius:8px;padding:12px;margin-bottom:12px}
 footer{color:var(--mute);font-size:12px;margin-top:16px}
 .sr{position:absolute;left:-9999px}
+.health{border-left:4px solid var(--warn)}
+.health.ok{border-left-color:var(--up)}.health.bad{border-left-color:var(--down)}
+.health ul{margin:6px 0 0;padding-left:18px}
+.extras{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.extras .kv{margin:6px 0}
 </style>
 </head>
 <body>
@@ -70,6 +75,7 @@ footer{color:var(--mute);font-size:12px;margin-top:16px}
     <div class="sub"><button class="tab" id="theme" type="button">Toggle theme</button></div>
   </header>
   <div class="notice" id="notice">Paper trading and historical statistics only. Not investment advice.</div>
+  <div class="notice health" id="health" hidden></div>
   <div id="err" role="alert"></div>
   <div class="grid">
     <aside class="panel"><h2>Top 5 selection</h2><div class="picks" id="picks" role="tablist" aria-label="Top five picks"></div></aside>
@@ -165,6 +171,7 @@ footer{color:var(--mute);font-size:12px;margin-top:16px}
     kv(k, "Stage", p.stage);
     root.appendChild(k);
     root.appendChild(el("div", "sub", lv.basis + " Strike interval is approximate; check the live option chain."));
+    extras(root, p);
 
     var tabs = el("div", "tabs");
     ["daily", "intraday"].forEach(function (v) {
@@ -192,6 +199,46 @@ footer{color:var(--mute);font-size:12px;margin-top:16px}
     var ft = el("h2", null, "Why it ranked"); ft.style.marginTop = "14px"; root.appendChild(ft);
     var comp = p.components || {}, line = Object.keys(comp).map(function (n) { return n.replace("_", " ") + " " + fx(comp[n], 1); }).join(" · ");
     root.appendChild(el("div", "detail", line));
+  }
+
+  function extras(root, p) {
+    var box = el("div", "extras");
+    if (p.cause && p.cause.label) {
+      var r = el("div", "row"); r.appendChild(el("b", null, "Why it moved"));
+      r.appendChild(el("span", "chip", p.cause.label.replace(/_/g, " ") + " · " + fx(p.cause.confidence * 100, 0) + "% (" + p.cause.level + ")"));
+      box.appendChild(r); box.appendChild(el("div", "detail", p.cause.reason));
+    }
+    if (p.profile && p.profile.summary) { box.appendChild(el("div", "sub", "Stock habits: " + p.profile.summary + ".")); }
+    if (p.early && p.early.stage) {
+      var line = "Early stage: " + p.early.stage;
+      if (p.early.flags && p.early.flags.length) { line += " (" + p.early.flags.join(", ").replace(/_/g, " ") + ")"; }
+      box.appendChild(el("div", "detail", line));
+      if (p.early.detail && p.early.stage !== "none") { box.appendChild(el("div", "sub", p.early.detail)); }
+    }
+    var o = p.option_plan;
+    if (o && o.type) {
+      var k = el("div", "kv");
+      kv(k, "Contract", o.type + " " + fx(o.strike, 1) + " (" + o.moneyness + ") · exp " + o.expiry + " · " + o.days_to_expiry + "d");
+      if (o.premium !== undefined && o.premium !== null) {
+        kv(k, "Premium (" + (o.premium_source || "?") + ")", fx(o.premium));
+        kv(k, "Premium SL / target", fx(o.premium_stop) + " / " + fx(o.premium_target));
+        kv(k, "Size", (o.lots !== null && o.lots !== undefined ? o.lots + " lots · " : "") + o.qty + " units · risk " + fx(o.risk_at_stop, 0));
+      }
+      kv(k, "IV percentile", o.iv_percentile === null || o.iv_percentile === undefined ? "unavailable" : fx(o.iv_percentile, 0));
+      box.appendChild(k);
+    }
+    if (o && o.notes && o.notes.length) { box.appendChild(el("div", "sub", "Option plan notes: " + o.notes.join("; ") + ".")); }
+    root.appendChild(box);
+  }
+
+  function renderHealth(h) {
+    var box = $("health");
+    if (!h || !h.status) { box.hidden = true; return; }
+    box.hidden = false; box.textContent = ""; box.className = "notice health " + h.status;
+    box.appendChild(el("b", null, "Data health: " + h.status));
+    var items = (h.missing || []).map(function (m) { return "Missing: " + m; }).concat((h.warnings || []).map(function (w) { return "Note: " + w; }));
+    if (!items.length) { box.appendChild(document.createTextNode(" · all inputs present")); return; }
+    var ul = el("ul"); items.forEach(function (t) { ul.appendChild(el("li", null, t)); }); box.appendChild(ul);
   }
 
   function drawCharts(p, c1, c2) {
@@ -269,9 +316,9 @@ footer{color:var(--mute);font-size:12px;margin-top:16px}
   }
 
   function boot(d) {
-    DESK = d;
+    DESK = d; renderHealth(d.data_health);
     $("meta").textContent = "Signals as of " + d.asof + " close · trade day " + d.trade_date + " · mode " + d.mode + " · data " + d.source +
-      " · Nifty 50 " + fx(d.market.nifty_close, 0);
+      " · Nifty 50 " + fx((d.market || {}).nifty_close, 0);
     $("notice").textContent = d.notice;
     $("foot").textContent = "Generated " + d.generated_at + ". Statistics on historical data, not a recommendation. Paper account is simulated.";
     renderPicks(); renderDetail(); renderPaper(); renderAlerts();

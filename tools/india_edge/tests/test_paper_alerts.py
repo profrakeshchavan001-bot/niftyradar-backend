@@ -197,3 +197,29 @@ class TelegramStubTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LedgerCauseColumnTests(unittest.TestCase):
+    def test_cause_and_early_stage_are_stored(self):
+        L = PaperLedger(cfg=cfg())
+        L.open_trade(DAY, sig(), "t", {"grade": "A", "setup": "trend", "score": 80, "cause": "short_covering",
+                                       "early_stage": "accumulation"})
+        t = L.trades_df().iloc[0]
+        self.assertEqual((t["cause"], t["early_stage"]), ("short_covering", "accumulation"))
+
+    def test_old_database_is_migrated(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as d:
+            db = Path(d) / "old.sqlite"
+            c = sqlite3.connect(db)
+            c.execute("CREATE TABLE trades (id INTEGER PRIMARY KEY AUTOINCREMENT, trade_date TEXT, symbol TEXT, side TEXT, "
+                      "grade TEXT, setup TEXT, score REAL, trigger TEXT, entry_ts TEXT, entry REAL, stop REAL, target REAL, "
+                      "qty INTEGER, risk_amt REAL, exit_ts TEXT, exit REAL, exit_reason TEXT, pnl REAL, r REAL, "
+                      "status TEXT DEFAULT 'open')")
+            c.execute("INSERT INTO trades (trade_date, symbol, side, status, pnl, r) VALUES ('2026-10-05','X','long','closed',5,1)")
+            c.commit()
+            c.close()
+            L = PaperLedger(db, cfg=cfg())
+            self.assertEqual(len(L.trades_df()), 1)
+            self.assertIsNone(L.trades_df().iloc[0]["cause"])
+            self.assertIsNotNone(L.open_trade(DAY, sig("Y"), "t", {"cause": "long_buildup"}))

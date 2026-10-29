@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS trades (
   id INTEGER PRIMARY KEY AUTOINCREMENT, trade_date TEXT, symbol TEXT, side TEXT, grade TEXT,
   setup TEXT, score REAL, trigger TEXT, entry_ts TEXT, entry REAL, stop REAL, target REAL,
   qty INTEGER, risk_amt REAL, exit_ts TEXT, exit REAL, exit_reason TEXT, pnl REAL, r REAL,
-  status TEXT DEFAULT 'open');
+  status TEXT DEFAULT 'open', cause TEXT, early_stage TEXT);
 """
 
 
@@ -28,6 +28,11 @@ class PaperLedger:
         self.db = sqlite3.connect(str(db_path))
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        have = {r[1] for r in self.db.execute("PRAGMA table_info(trades)")}
+        for col in ("cause", "early_stage"):      # ledgers created before these columns existed
+            if col not in have:
+                self.db.execute(f"ALTER TABLE trades ADD COLUMN {col} TEXT")
+        self.db.commit()
 
     # ------------------------------------------------------------ state
     def realized_pnl(self, day: str | None = None) -> float:
@@ -87,9 +92,10 @@ class PaperLedger:
         m = meta or {}
         cur = self.db.execute(
             "INSERT INTO trades (trade_date,symbol,side,grade,setup,score,trigger,entry_ts,entry,stop,"
-            "target,qty,risk_amt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "target,qty,risk_amt,cause,early_stage) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (day, sig["symbol"], sig["side"], m.get("grade"), m.get("setup"), m.get("score"),
-             sig.get("trigger"), str(ts), entry, sig["stop"], sig["target"], qty, risk_amt))
+             sig.get("trigger"), str(ts), entry, sig["stop"], sig["target"], qty, risk_amt,
+             m.get("cause"), m.get("early_stage")))
         self.db.commit()
         return int(cur.lastrowid)
 
