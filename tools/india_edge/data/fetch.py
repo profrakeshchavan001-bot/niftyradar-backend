@@ -214,6 +214,17 @@ def _load_missing() -> dict:
         return {}
 
 
+def is_holiday_copy(df: pd.DataFrame, day: pd.Timestamp) -> bool:
+    """NSE publishes sec_bhavdata_full on holidays as a copy of the previous session."""
+    for back in range(1, 8):
+        prev = day_file("cash", day - pd.Timedelta(days=back))
+        if prev.exists():
+            p = pd.read_parquet(prev, columns=["symbol", "close", "volume"])
+            cur = df[["symbol", "close", "volume"]]
+            return len(p) == len(cur) and p.reset_index(drop=True).equals(cur.reset_index(drop=True))
+    return False
+
+
 def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
     missing = _load_missing()
     today = pd.Timestamp.today().normalize()
@@ -237,6 +248,12 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
                         raw = (raw, *(download(session, format_url(u, day)) for u in url_t[1:]))
                 else:
                     raw = download(session, format_url(url_t, day))
+                if name == "cash" and raw is not None and raw[:2] == b"PK":
+                    # a few sec_bhavdata_full days (e.g. 2022-08-08) were published as xlsx
+                    parser = parse_cash_legacy
+                    raw = download(session, format_url(CASH_LEGACY_URLS[0], day))
+                    if raw is not None:
+                        raw = (raw, download(session, format_url(CASH_LEGACY_URLS[1], day)))
             except RuntimeError as exc:
                 log(f"FAIL {key}: {exc}")
                 stats["failed"] += 1
@@ -248,7 +265,13 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
                     missing[key] = True
                 continue
             try:
-                parser(raw, day).to_parquet(path, index=False)
+                df = parser(raw, day)
+                if name == "cash" and is_holiday_copy(df, day):
+                    stats["no_file"] += 1
+                    missing[key] = True
+                    log(f"hol  {key}: copy of previous session")
+                    continue
+                df.to_parquet(path, index=False)
                 stats["downloaded"] += 1
                 log(f"ok   {key}")
             except Exception as exc:  # malformed file: report, keep going
