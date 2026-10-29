@@ -23,23 +23,11 @@ First-time backfill (optional, bigger history): `.venv\Scripts\python data\fetch
 
 Run the tests: `.venv\Scripts\python -m unittest discover -s tests`
 
-## Windows Task Scheduler, 10:30 pm IST
+## Windows Task Scheduler, weekdays 7:30 pm IST
 
-1. Open Task Scheduler, **Create Task** (not Basic Task). Name: `IndiaEdge Layer1`.
-2. **Triggers** > New > Daily, start time `22:30:00`. (PC clock must be IST; if not, convert.) Optionally limit to Mon-Fri via Weekly.
-3. **Actions** > New > Start a program:
-   - Program: `C:\path\to\niftyradar-backend\tools\india_edge\.venv\Scripts\python.exe`
-   - Arguments: `run_scanner.py`
-   - Start in: `C:\path\to\niftyradar-backend\tools\india_edge`
-4. **Settings**: tick "Run task as soon as possible after a scheduled start is missed".
-
-Or one line from an admin prompt:
-
-```powershell
-schtasks /Create /TN "IndiaEdge Layer1" /SC DAILY /ST 22:30 /TR "cmd /c cd /d C:\path\to\niftyradar-backend\tools\india_edge && .venv\Scripts\python.exe run_scanner.py"
-```
-
-NSE usually publishes bhavcopy by about 7 pm IST, so 10:30 pm is safe.
+`daily_pipeline.bat` runs download → scanner → `out/morning_desk.json` and logs to `logs/pipeline.log`.
+Exact `schtasks` command, verification, manual jobs and data notes: [docs/INDIA-EDGE-RUNBOOK.md](docs/INDIA-EDGE-RUNBOOK.md).
+Latest backtest: [docs/BACKTEST-REPORT-2026-10-30.md](docs/BACKTEST-REPORT-2026-10-30.md).
 
 ## Outputs
 

@@ -233,11 +233,18 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
     for day in pd.date_range(start, end, freq="D"):
         if day.weekday() >= 5:
             continue
-        for name in URLS:
+        for name in ("fo", "idx", "cash"):
             path = day_file(name, day)
             key = f"{name}:{day:%Y-%m-%d}"
             if path.exists() or key in missing:
                 stats["skipped"] += 1
+                continue
+            if name == "cash" and not (day_file("fo", day).exists() or day_file("idx", day).exists()):
+                # NSE publishes the cash file on holidays too (a copy of the last session,
+                # which may be a weekend special session); no F&O/index file -> no session
+                stats["no_file"] += 1
+                if (today - day).days > MISSING_AFTER_DAYS:
+                    missing[key] = True
                 continue
             session = session or make_session()
             url_t, parser = source_for(name, day)
@@ -285,11 +292,14 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--from", dest="start", required=True, help="YYYY-MM-DD")
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--from", dest="start", help="YYYY-MM-DD")
+    src.add_argument("--days", type=int, help="incremental: the last N calendar days")
     ap.add_argument("--to", dest="end", default=None, help="YYYY-MM-DD (default today)")
     a = ap.parse_args(argv)
     end = pd.Timestamp(a.end) if a.end else pd.Timestamp.today().normalize()
-    stats = fetch_range(pd.Timestamp(a.start), end)
+    start = pd.Timestamp(a.start) if a.start else end - pd.Timedelta(days=a.days)
+    stats = fetch_range(start, end)
     print(stats)
     return 1 if stats["failed"] else 0
 

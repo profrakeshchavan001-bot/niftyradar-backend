@@ -9,3 +9,7 @@ __pycache__/
 .venv/
 backtest/out/*
 !backtest/out/.gitkeep
+data/manifest.json
+data/quarantine/
+logs/
+backtest/results/
