@@ -92,7 +92,37 @@ def parse_idx(raw: bytes, day: pd.Timestamp) -> pd.DataFrame:
     })
 
 
+def parse_fo_legacy(raw: bytes, day: pd.Timestamp) -> pd.DataFrame:
+    """Pre-July-2024 F&O bhavcopy (fo<DD><MON><YYYY>bhav.csv.zip), mapped to the UDiFF schema."""
+    df = pd.read_csv(io.BytesIO(raw), compression="zip", skipinitialspace=True)
+    df.columns = [c.strip() for c in df.columns]
+    df = df[df["INSTRUMENT"].isin(["FUTSTK", "OPTSTK"])].copy()
+    num = lambda c: pd.to_numeric(df[c], errors="coerce")  # noqa: E731
+    return pd.DataFrame({
+        "date": day,
+        "instr": df["INSTRUMENT"].map({"FUTSTK": "STF", "OPTSTK": "STO"}).values,
+        "symbol": df["SYMBOL"].astype(str).str.strip().values,
+        "expiry": df["EXPIRY_DT"].astype(str).values,
+        "strike": num("STRIKE_PR").values,
+        "opt_type": df["OPTION_TYP"].astype(str).values,
+        "close": num("CLOSE").values,
+        "oi": num("OPEN_INT").values,
+        "chg_oi": num("CHG_IN_OI").values,
+        "volume": num("CONTRACTS").values,
+    }).reset_index(drop=True)
+
+
 PARSERS = {"cash": parse_cash, "fo": parse_fo, "idx": parse_idx}
+UDIFF_START = pd.Timestamp("2024-07-08")  # first day of the UDiFF F&O file format
+FO_LEGACY_URL = ("https://nsearchives.nseindia.com/content/historical/DERIVATIVES/"
+                 "{yyyy}/{mon}/fo{dd}{mon}{yyyy}bhav.csv.zip")
+
+
+def source_for(name: str, day: pd.Timestamp):
+    """(url template, parser) for one dataset on one day."""
+    if name == "fo" and day < UDIFF_START:
+        return FO_LEGACY_URL, parse_fo_legacy
+    return URLS[name], PARSERS[name]
 
 
 # ---------------------------------------------------------------- network
@@ -141,14 +171,16 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
     for day in pd.date_range(start, end, freq="D"):
         if day.weekday() >= 5:
             continue
-        for name, url_t in URLS.items():
+        for name in URLS:
             path = day_file(name, day)
             key = f"{name}:{day:%Y-%m-%d}"
             if path.exists() or key in missing:
                 stats["skipped"] += 1
                 continue
             session = session or make_session()
-            url = url_t.format(dmy=f"{day:%d%m%Y}", ymd=f"{day:%Y%m%d}")
+            url_t, parser = source_for(name, day)
+            url = url_t.format(dmy=f"{day:%d%m%Y}", ymd=f"{day:%Y%m%d}", dd=f"{day:%d}",
+                               mon=f"{day:%b}".upper(), yyyy=f"{day:%Y}")
             try:
                 raw = download(session, url)
             except RuntimeError as exc:
@@ -162,7 +194,7 @@ def fetch_range(start: pd.Timestamp, end: pd.Timestamp, log=print) -> dict:
                     missing[key] = True
                 continue
             try:
-                PARSERS[name](raw, day).to_parquet(path, index=False)
+                parser(raw, day).to_parquet(path, index=False)
                 stats["downloaded"] += 1
                 log(f"ok   {key}")
             except Exception as exc:  # malformed file: report, keep going
