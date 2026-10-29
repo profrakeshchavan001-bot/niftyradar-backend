@@ -1,0 +1,33 @@
+# Layer 1 scanner settings. Edit freely; no code change needed.
+
+# Score weights (points out of 100 when all five are at maximum)
+weights:
+  quadrant: 30
+  delivery: 20
+  rs: 20
+  sector_rs: 15
+  unusual_oi: 15
+
+# Grade cut-offs: A >= grades.A, B >= grades.B, else C
+grades:
+  A: 70
+  B: 50
+
+thresholds:
+  quadrant_reversal_weight: 0.6   # short covering / long unwinding earn 60% of buildup points
+  delivery_spike_mult: 1.5        # delivery % >= 1.5x its 20-day avg flags a spike
+  delivery_full_mult: 2.0         # delivery points are full at 2.0x the 20-day avg
+  rs_full_pct: 10.0               # RS vs Nifty (20d, % points) that earns full RS points
+  sector_rs_full_pct: 5.0         # same for sector RS
+  unusual_oi_flag: 2.0            # options OI change >= 2x 20-day avg flags unusual
+  unusual_oi_full: 3.0            # full unusual-OI points at 3x
+  index_sector_min: 0.5           # setup "index": sector component >= 50% ...
+  index_stock_max: 0.3            # ... while stock's own RS component <= 30%
+
+universe:
+  size: 60
+  lookback_days: 20
+
+lookback: 20          # days for averages and relative strength
+min_adv_cr: 50        # skip stocks with 20-day avg traded value below this (INR crore)
+top_n: 5
