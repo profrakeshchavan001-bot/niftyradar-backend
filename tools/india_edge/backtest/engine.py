@@ -88,7 +88,8 @@ def build_panel(cash, fo, idx, cfg, sectors, feature_shift: int = 0) -> pd.DataF
     directions' gross R. feature_shift=n lags every feature by n days (audit only)."""
     dates = pd.DatetimeIndex(sorted(cash["date"].unique()))
     member = monthly_membership(fo, dates, cfg["universe"]["size"], cfg["universe"]["lookback_days"])
-    syms = [s for s in member.columns if member[s].any() and s in set(cash["symbol"])]
+    traded = set(cash["symbol"].unique())
+    syms = [s for s in member.columns if member[s].any() and s in traded]
     feats = build_features(cash, fo, idx, syms, sectors, cfg["lookback"])
     if feature_shift:
         feats = feats.sort_values(["symbol", "date"]).reset_index(drop=True)
@@ -104,7 +105,9 @@ def build_panel(cash, fo, idx, cfg, sectors, feature_shift: int = 0) -> pd.DataF
         R, K = simulate_side(O, H, L, C, a, side, EXEC["stop_atr"], EXEC["target_r"], EXEC["hold"])
         out[f"{side}_R"] = R.stack().reindex(out.index)
         out[f"{side}_k"] = K.stack().reindex(out.index)
-    out["member"] = [bool(member.at[d, s]) for d, s in out.index]
+    m = member.stack()
+    m.index.names = out.index.names
+    out["member"] = m.reindex(out.index).fillna(False).astype(bool).to_numpy()
     out = out.reset_index()
     out["_pos"] = dates.get_indexer(out["date"])
     panel = out
