@@ -24,7 +24,8 @@ def stock_card(P, R, s, day, cfg) -> dict:
         out["note"] = {"new_listing": "Too little price history for a reliable score.",
                        "suspended": "No trade print on the latest day.",
                        "illiquid": "Too many zero-volume days recently.",
-                       "not_listed": "Not listed in this window."}[out["status"]]
+                       "not_listed": "Not listed in this window.",
+                       "not_in_universe": "Not in the F&O list on this date."}[out["status"]]
         return out
     for k in (*engine.NAMES, "overall"):
         if k not in R.scores:
@@ -49,7 +50,7 @@ def build(P, cfg=None, day=None) -> dict:
     day = pd.Timestamp(day) if day is not None else P.dates[-1]
     if day not in P.dates:
         raise ValueError(f"{day:%Y-%m-%d} is not a trading day in the data")
-    cards = [stock_card(P, R, s, day, cfg) for s in P.symbols if R.status.at[day, s] != "not_listed"]
+    cards = [stock_card(P, R, s, day, cfg) for s in P.symbols if R.status.at[day, s] not in ("not_listed", "not_in_universe")]
     scored = sorted([c for c in cards if c["status"] == "ok" and "overall" in c["scores"]],
                     key=lambda c: -c["scores"]["overall"]["score"])
     d = f"{day:%Y-%m-%d}"

@@ -97,7 +97,7 @@ def indicators(P) -> dict:
 
 
 def status(P, cfg: dict) -> pd.DataFrame:
-    """Per date x symbol: ok / new_listing / suspended / illiquid (only 'ok' gets scored)."""
+    """Per date x symbol: ok / new_listing / suspended / illiquid / not_in_universe / not_listed (only 'ok' is scored)."""
     bars = P.close.notna().cumsum()
     traded = P.close.notna() & (P.volume.fillna(0) > 0)
     zero5 = (P.volume.fillna(0) <= 0).astype(int).rolling(5, min_periods=1).sum()
@@ -105,6 +105,8 @@ def status(P, cfg: dict) -> pd.DataFrame:
     st = st.mask(zero5 >= cfg["stale_zero_volume"], "illiquid")
     st = st.mask(P.close.isna() & (bars > 0), "suspended")
     st = st.mask(bars < cfg["min_history"], "new_listing")
+    if getattr(P, "member", None) is not None:
+        st = st.mask(~P.member, "not_in_universe")      # point-in-time F&O membership: never scored outside it
     st = st.mask(bars == 0, "not_listed")
     return st.where(traded | (st != "ok"), "illiquid")
 

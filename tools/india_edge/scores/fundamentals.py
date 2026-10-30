@@ -279,15 +279,15 @@ def validate_csv(path: Path, min_fill: float = 0.5) -> list[str]:
 
 # ------------------------------------------------------------------ CLI
 def symbols_from_data() -> list[str]:
-    """Every symbol that ever had stock futures in the loaded bhavcopy (point-in-time universe)."""
+    """Symbols in F&O on the latest day of the loaded bhavcopy."""
     from scores import universe
-    return universe.ever_members_from_market()
+    return universe.current_members_from_market()
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--symbols", help="comma separated NSE symbols")
-    ap.add_argument("--from-data", action="store_true", help="use every F&O symbol found in DATA_DIR bhavcopy")
+    ap.add_argument("--from-data", action="store_true", help="use the F&O symbols on the latest day of the DATA_DIR bhavcopy")
     ap.add_argument("--out", default="fundamentals.csv")
     ap.add_argument("--cache-dir", default=str(Path(__file__).resolve().parent / "cache" / "fundamentals"))
     ap.add_argument("--max-age-days", type=float, default=None, help="override cache age for all sources")

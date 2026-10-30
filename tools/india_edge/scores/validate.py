@@ -36,8 +36,10 @@ def spearman(a: pd.Series, b: pd.Series) -> float:
 
 
 def forward(close: pd.DataFrame, h: int) -> pd.DataFrame:
-    """Return from close of t+1 to close of t+1+h (one-day execution delay)."""
-    return close.shift(-(1 + h)) / close.shift(-1) - 1
+    """Return from close of t+1 to close of t+1+h (one-day execution delay). Exit uses the last traded price
+    if the stock stopped trading, so delistings are not silently dropped (survivorship)."""
+    exit_px = close.ffill().shift(-(1 + h))         # a stock delisted/merged mid-hold exits at its last traded price
+    return exit_px / close.shift(-1) - 1
 
 
 def run(P, R, cfg: dict | None = None) -> dict:

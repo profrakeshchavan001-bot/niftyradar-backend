@@ -24,6 +24,8 @@ def check(P, R, day) -> dict:
         "delivery_out_of_range_today": bad_dlv, "unmapped_sector": other,
         "has_vix": P.vix is not None, "has_pcr": P.pcr is not None, "has_fundamentals": P.fundamentals is not None,
         "has_nifty": bool(P.nifty.notna().any()),
+        "point_in_time_universe": getattr(P, "member", None) is not None,
+        "fo_members_today": None if getattr(P, "member", None) is None else int(P.member.loc[day].sum()),
     }
     ok = counts.get("ok", 0)
     if ok < 20:
@@ -36,6 +38,8 @@ def check(P, R, day) -> dict:
         notes.append("Some rows failed basic sanity checks.")
     if other:
         notes.append(f"{other} stocks have no sector mapping (sector views use 'Other').")
+    if not checks["point_in_time_universe"]:
+        notes.append("No F&O data: universe is not point-in-time, so results are exposed to survivorship bias.")
     if not checks["has_vix"]:
         notes.append("India VIX not loaded: fear/greed uses Nifty realised volatility.")
     if not checks["has_pcr"]:

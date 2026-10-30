@@ -43,6 +43,7 @@ class Panels:
         self.pcr = _pcr(fo, self.dates)
         self.fundamentals = _fund(fundamentals, self.symbols)
         self.source = "unknown"
+        self.member = None            # date x symbol bool, point-in-time F&O membership (None = no F&O data)
 
 
 def _pcr(fo, dates):
@@ -82,9 +83,32 @@ def read_fundamentals(path) -> pd.DataFrame | None:
     return pd.read_csv(path)
 
 
-def from_market(market, sectors: dict | None = None, fundamentals: pd.DataFrame | None = None) -> Panels:
-    return Panels(market.cash, market.idx, sectors if sectors is not None else load_sectors(),
-                  market.fo if len(market.fo) else None, fundamentals)
+def from_market(market, sectors: dict | None = None, fundamentals: pd.DataFrame | None = None,
+                pit_universe: bool = True) -> Panels:
+    """Panels for the point-in-time F&O universe: only stocks that were ever in F&O are loaded, and a
+    stock is scored only on days it was a member (survivorship-free by construction)."""
+    from scores import universe
+    cash, fo = market.cash, (market.fo if len(market.fo) else None)
+    mem = None
+    if pit_universe and fo is not None:
+        dates = pd.DatetimeIndex(sorted(pd.to_datetime(cash["date"]).unique()))
+        mem = universe.membership(fo, dates, _renames())
+        ever = universe.ever_members(mem)
+        if ever:
+            cash = cash[cash["symbol"].isin(ever)]
+            mem = mem[ever]
+    P = Panels(cash, market.idx, sectors if sectors is not None else load_sectors(), fo, fundamentals)
+    if mem is not None and len(mem.columns):
+        P.member = mem.reindex(index=P.dates, columns=P.symbols, fill_value=False)
+    return P
+
+
+def _renames() -> dict:
+    try:
+        with open(ROOT / "symbol_renames.json", encoding="utf-8") as fh:
+            return {k: v for k, v in json.load(fh).items() if not k.startswith("_")}
+    except (OSError, ValueError):
+        return {}
 
 
 def load(fundamentals_path=None, sectors_path=None) -> Panels:
