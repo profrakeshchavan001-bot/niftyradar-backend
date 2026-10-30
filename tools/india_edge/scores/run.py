@@ -21,6 +21,7 @@ def main(argv=None) -> int:
     ap.add_argument("--asof")
     ap.add_argument("--fundamentals", help="CSV: symbol,roe,debt_equity,profit_margin,pe,pb,promoter_pct,promoter_pledge_pct")
     ap.add_argument("--validate", action="store_true", help="also write validation.json (rank-IC by year/regime, doubled costs)")
+    ap.add_argument("--report", action="store_true", help="portfolio-level validation report (report.md + report.json, ~30 s)")
     ap.add_argument("--out", default=str(ROOT / "scores" / "out"))
     a = ap.parse_args(argv)
     P = data.load(a.fundamentals)
@@ -31,6 +32,12 @@ def main(argv=None) -> int:
         out["validation"] = validate.run(P, R)
         out["sensitivity"] = {**sensitivity.run(P, R), "screeners": sensitivity.screener_sensitivity(P, R)}
         out["heatmap"] = sensitivity.heatmap(P, R)
+    if a.report:
+        from scores import report
+        rep = report.run(P, R)
+        out["report"] = rep
+        Path(a.out).mkdir(parents=True, exist_ok=True)
+        (Path(a.out) / "report.md").write_text(report.to_markdown(rep))
     names = build.write(out, Path(a.out))
     print(f"{out['overview']['date']}: {out['overview']['scored']} scored, health {out['health']['grade']} -> {a.out} ({', '.join(names)})")
     return 0

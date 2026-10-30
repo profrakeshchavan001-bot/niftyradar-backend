@@ -34,3 +34,25 @@ screeners:               # untuned. Percent = share of scored stocks (top/bottom
   delivery_rise:    {enter: 0.15, exit: 0.25}
   steady_uptrend:   {enter: 0.25, exit: 0.35, trend: 0.40}
   weakest:          {enter: 0.15, exit: 0.25}
+costs:                   # equity DELIVERY trades (10-day holds), percent of traded value unless noted. Check current NSE/SEBI rates.
+  multiplier: 2.0        # reports DOUBLE every cost (rule: costs doubled)
+  stt_pct: 0.10          # securities transaction tax, buy and sell
+  brokerage_pct: 0.03    # conservative: many brokers charge 0 on delivery
+  exchange_pct: 0.00297  # NSE transaction charge
+  sebi_pct: 0.0001       # Rs 10 per crore
+  gst_pct: 18            # on brokerage + exchange + SEBI fee
+  stamp_buy_pct: 0.015   # stamp duty, buy side only
+  dp_sell_rs: 15.93      # depository charge per sell (Rs 13.5 + 18% GST), flat per scrip
+  slippage_atr_frac: 0.05  # each side: 5% of the stock's average true range (as a fraction of price)
+portfolio:
+  capital: 1000000       # Rs, paper only
+  n_positions: 10
+  hold_days: 10          # rebalance every N sessions; positions still selected are kept (no trade, no cost)
+  capacity_adv_pct: 5    # a position may be at most 5% of the stock's 20-day average traded value
+stats:
+  bootstrap_reps: 2000
+  block: 3               # block length (in rebalance periods) for the bootstrap and Monte Carlo
+  mc_paths: 5000
+  random_null_runs: 100  # random-selection portfolios used to show what "by chance" looks like
+  alpha: 0.05
+  seed: 20261030
