@@ -181,3 +181,14 @@ class SurvivorshipInValidation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Report(unittest.TestCase):
+    def test_summary_counts_by_year(self):
+        d = pd.bdate_range("2023-12-18", periods=30)
+        fo = fo_rows({"A": (0, None), "B": (5, None), "C": (0, 14)}, d)
+        r = universe.report(fo, d)
+        self.assertEqual((r["members_first_day"], r["members_last_day"], r["ever_members"]), (2, 2, 3))
+        self.assertEqual(r["by_year"]["2023"]["entries"], 1)          # B joins on day 5 (still 2023)
+        self.assertEqual(r["by_year"]["2024"]["exits"], 1)            # C leaves after day 14 -> falls in 2024
+        self.assertFalse(r["lot_size_column"])

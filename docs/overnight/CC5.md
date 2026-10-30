@@ -31,3 +31,32 @@ Statistics on historical data, not advice.
 - **Fundamentals + NSE shareholding**: no free bulk file is wired. Provide `fundamentals.csv` (columns in `scores/README.md`), built from yfinance and NSE shareholding on CC8. It is a snapshot (not point-in-time), so it is used for today's score only and excluded from validation. Not done here: yfinance/NSE are not reachable and no fake data was made.
 - **Survivorship**: the universe is the current top-60 F&O list; real-data validation will be flattered by that. Needs a historical F&O membership list to fix.
 - **Wiring**: nothing is mounted in `server.js` (other windows own it). To publish, serve `scores/web/` and `scores/out/*.json` from any static host.
+
+
+---
+
+# Round 2 (fundamentals, point-in-time universe, realistic validation, robust screeners, daily runner, pages, handover)
+
+## Decisions (round 2)
+13. **Fundamentals transport**: yfinance is imported lazily (not needed for tests, dry runs or anything else) and listed in `scores/requirements-fundamentals.txt`; NSE shareholding/pledge use `requests` against the public JSON endpoints with cookie warm-up. Field names for NSE are my best knowledge and tolerant (several candidates, latest filing wins); `--probe` prints the real ones for you to confirm. No network is touched by tests.
+14. **fundamentals.csv schema** is exactly the 8 columns the engine reads (`symbol,roe,debt_equity,profit_margin,pe,pb,promoter_pct,promoter_pledge_pct`); run metadata goes to a sidecar `.meta.json` so the CSV is byte-identical for identical inputs. A symbol with no data at all gets no row (never a row of fake values). Yahoo percent conventions are converted (ROE/margin fraction x100, debtToEquity /100).
+15. **Universe**: membership = stock-futures rows with open interest or volume on the day; missing F&O file days carry the last membership for at most 3 days. Only stocks that were ever members are loaded; a stock is scored only on days it was a member (`not_in_universe` otherwise). Suspect renames are reported, never auto-applied. Validation exits a stock that stopped trading at its last traded price (not dropped).
+16. **Lot sizes**: `data/fetch.py` does not keep lot size (outside my lane, not touched), so lot-size changes cannot be derived; `lot_changes()` works if a `lot` column ever exists. Capacity uses traded value only.
+17. **Screeners**: absolute score cut-offs replaced by cross-sectional percentile thresholds with hysteresis (enter at top 15%, stay until top 25%). All numbers are untuned and fixed up front; no tuning happened, so "tune on train only" has nothing to tune. Hysteresis state depends on history before the day only (tested with cut-the-future).
+18. **Costs**: equity delivery rates from config (`costs:`), my recollection of current NSE/SEBI/STT/stamp/GST/DP charges; all doubled; slippage = 5% of ATR per side. Rates change: verify. Equity delivery was chosen (10-day holds); futures/options costs differ and are not modelled.
+19. **Portfolio sim**: 10 equal slots, rebalance every 10 sessions, one-day execution delay, kept positions cost nothing, unfilled slots stay cash, capacity 5% of 20-day average traded value, whole shares. Excess is measured against the Nifty 50 (headline) and against the equal-weight universe (shown).
+20. **Multiple testing**: Holm and Benjamini-Hochberg across 9 rules on the test period; plus 100 random-selection portfolios to show what luck looks like. The verdict line says "No edge found" unless a rule survives Holm.
+21. **Daily runner**: output folder layout, 30 history days, 60 log days, lock stale after 3 h, fails (and publishes nothing) if data health is BAD or the newest bar is over 5 days old; download failure alone is only a warning. Telegram only on failure, only via environment variables.
+22. **Pages**: one static page, hash routes, dark/light (follows the system, toggle stored in localStorage inside try/catch), sortable tables, no data in innerHTML. "Weakest scores" wording kept, no tips anywhere (tested).
+
+## Findings (round 2, fixtures: planted trends, so NOT evidence)
+- Percentile screeners with hysteresis: moving every threshold by +-20% changes list size by about +-20% and flips under 7% of stock-days (absolute thresholds before: 9 to 22 or 1 stocks). Hysteresis cuts membership changes by more than 10% against a single threshold.
+- On fixtures several rules "pass" even after Holm correction because the generator plants persistent trends. The random-walk control passes none, and a deliberately leaked score gets CAGR above 100% with p near zero, so the harness can detect both.
+- Round-2 run times (200 stocks x 3000 days, synthetic): scores+screeners+rotation+fear/greed about 6 s; full validation report about 30 s; sensitivity and heatmaps about 40 s (can be trimmed).
+
+## Needs Rakesh (round 2)
+- Run `docs/RUN-ON-PC.md` on a PC with NSE access. Step 3 needs `pip install yfinance` and a check of NSE field names with `--probe` (I could not test live endpoints).
+- Confirm the cost rates in `config.yaml` (`costs:`) match your broker and the current NSE/SEBI schedule.
+- A historical F&O lot-size source if you want lot-size-aware capacity (needs a change in `data/fetch.py`, which I did not touch).
+- Merger terms are not modelled (exit at last traded price). If you care about specific mergers (e.g. HDFC into HDFCBANK) add them to `symbol_renames.json` only where the share-swap makes the old price series continuous.
+- Telegram bot token and chat id for failure alerts, set as user environment variables on the PC (never in the repo).

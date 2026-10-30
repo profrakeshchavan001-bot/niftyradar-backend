@@ -104,3 +104,36 @@ def current_members_from_market() -> list[str]:
     m = load_market()
     mem = membership(m.fo, pd.DatetimeIndex(sorted(m.cash["date"].unique())))
     return members_on(mem, mem.index[-1])
+
+
+def report(fo: pd.DataFrame, dates: pd.DatetimeIndex, renames: dict | None = None) -> dict:
+    """Plain summary of the point-in-time universe (what the owner should eyeball on the first real run)."""
+    m = membership(fo, dates, renames)
+    ch = changes(m)
+    size = m.sum(axis=1)
+    by_year = {}
+    for y, g in size.groupby(size.index.year):
+        e = ch[(ch.date.dt.year == y)]
+        by_year[str(y)] = {"members_min": int(g.min()), "members_max": int(g.max()), "entries": int((e.event == "enter").sum()),
+                           "exits": int((e.event == "exit").sum())}
+    return {"first_day": f"{dates[0]:%Y-%m-%d}", "last_day": f"{dates[-1]:%Y-%m-%d}", "members_first_day": int(size.iloc[0]),
+            "members_last_day": int(size.iloc[-1]), "ever_members": len(ever_members(m)), "by_year": by_year,
+            "suspect_renames": suspect_renames(fo), "lot_size_column": "lot" in fo.columns,
+            "lot_changes": int(len(lot_changes(fo)))}
+
+
+def main(argv=None) -> int:
+    """python -m scores.universe   (reads DATA_DIR, or the synthetic fixtures if unset)"""
+    import json
+    import sys
+    from loader import load_market
+    from scores import data
+    mk = load_market()
+    rep = report(mk.fo, pd.DatetimeIndex(sorted(pd.to_datetime(mk.cash["date"]).unique())), data._renames())
+    print(json.dumps(rep, indent=1))
+    return 0 if rep["ever_members"] else 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
