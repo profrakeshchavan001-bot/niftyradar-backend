@@ -14,3 +14,6 @@ data/idxopt_banknifty.parquet
 backtest/out/
 backtest/results/
 logs/
+data/quarantine/
+data/manifest.json
+data/idxopt_audit.json
