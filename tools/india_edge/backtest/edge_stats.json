@@ -19,7 +19,11 @@
   "examples": [],
   "leak_detector_works": true
  },
- "survivors": [],
+ "survivors": [
+  "options_yt:condor",
+  "options_yt:strangle",
+  "options_yt:calendar"
+ ],
  "rules": {
   "donchian20_long": {
    "direction": "long",
@@ -558,5 +562,94 @@
    "avg_r": -0.098
   },
   "survives_0.2R": false
+ },
+ "options_yt": {
+  "generated": "2026-10-31",
+  "split_date": "2022-06-10",
+  "pricing": "Black-Scholes, flat IV = India VIX",
+  "per": "1 lot (75), net of costs, Rs",
+  "strategies": {
+   "condor": {
+    "train": {
+     "trades": 80,
+     "win_pct": 63.7,
+     "avg_inr": 1183.0,
+     "avg_r": 0.091,
+     "total_inr": 94602.0,
+     "max_dd_inr": 35052.0,
+     "worst_inr": -13308.0,
+     "worst_vs_sl": 0.75,
+     "costs_inr": 67198.0
+    },
+    "test": {
+     "trades": 51,
+     "win_pct": 60.8,
+     "avg_inr": 1608.0,
+     "avg_r": 0.066,
+     "total_inr": 81984.0,
+     "max_dd_inr": 48058.0,
+     "worst_inr": -21856.0,
+     "worst_vs_sl": 1.17,
+     "costs_inr": 43811.0
+    },
+    "walk_forward_total_inr": 149057.0,
+    "wf_positive_windows": "9/9",
+    "survivor": true
+   },
+   "strangle": {
+    "train": {
+     "trades": 80,
+     "win_pct": 67.5,
+     "avg_inr": 3119.0,
+     "avg_r": 0.24,
+     "total_inr": 249512.0,
+     "max_dd_inr": 96745.0,
+     "worst_inr": -22629.0,
+     "worst_vs_sl": 1.74,
+     "costs_inr": 41637.0
+    },
+    "test": {
+     "trades": 52,
+     "win_pct": 61.5,
+     "avg_inr": 2525.0,
+     "avg_r": 0.194,
+     "total_inr": 131308.0,
+     "max_dd_inr": 77649.0,
+     "worst_inr": -29065.0,
+     "worst_vs_sl": 2.24,
+     "costs_inr": 39802.0
+    },
+    "walk_forward_total_inr": 251119.0,
+    "wf_positive_windows": "7/9",
+    "survivor": true
+   },
+   "calendar": {
+    "train": {
+     "trades": 172,
+     "win_pct": 56.4,
+     "avg_inr": -226.0,
+     "avg_r": -0.038,
+     "total_inr": -38802.0,
+     "max_dd_inr": 70369.0,
+     "worst_inr": -18288.0,
+     "worst_vs_sl": 3.05,
+     "costs_inr": 267547.0
+    },
+    "test": {
+     "trades": 126,
+     "win_pct": 65.1,
+     "avg_inr": 300.0,
+     "avg_r": 0.05,
+     "total_inr": 37743.0,
+     "max_dd_inr": 51458.0,
+     "worst_inr": -30867.0,
+     "worst_vs_sl": 5.14,
+     "costs_inr": 191285.0
+    },
+    "walk_forward_total_inr": 37792.0,
+    "wf_positive_windows": "7/9",
+    "survivor": true
+   }
+  }
  }
 }
