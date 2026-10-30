@@ -52,6 +52,28 @@ Other notes: grade/setup tables use every candidate row, not only the daily top 
 
 **Verdict unchanged: no edge found. Do not trade these rules. Nothing here is a guarantee of profit.**
 
+## Deep check of the "index" setup (30-31 Oct 2026): does NOT survive
+
+The earlier +0.105R train figure belongs to the daily top-5 A/B "index" trades (`backtest/index_check.py`, weights and grades from `config_adjusted.yaml`, nothing re-tuned, adjusted prices).
+
+| Variant / cost | Train net R (trades) | Test net R (trades) | Max drawdown (R) |
+|---|---|---|---|
+| top-5 index, 0.1R | +0.105 (57) | **−0.016 (36)** | 9.3 |
+| top-5 index, 0.2R | +0.005 (57) | −0.116 (36) | 12.3 |
+| top-5 index, 0.3R | −0.095 (57) | −0.216 (36) | 19.1 |
+| all index candidates, 0.1R | −0.094 (4,833) | −0.071 (2,978) | 670 |
+| all index candidates, 0.2R | −0.194 | −0.171 | 1,450 |
+
+- **Never positive on both halves**, even at 0.1R. The test half is negative; both halves are under 100 trades, so the train number is noise.
+- Per year (top-5, 0.1R, 4 to 14 trades a year): 2016 +0.34, 2017 +0.12, 2018 +0.40, 2019 −0.17, 2020 −0.08, 2021 +0.10, 2022 −0.02, 2023 +0.25, 2024 −0.35, 2025 −0.26, 2026 +0.31. Too few trades per year to read anything; 2015 had none.
+- Rolling 5-year walk-forward (train 5 years, trade the next year only if train was positive): 2020-2026 out-of-sample −0.031R on 58 trades at 0.1R, −0.098R on 26 trades at 0.2R, nothing selected at 0.3R.
+- All-candidate "index": negative in 10 of 12 years at 0.1R; walk-forward never selects it.
+- **Verdict: no edge. It fails the 0.2R cost test and walk-forward.** Statistics on historical data, not advice; no profit is guaranteed.
+
+## CC5 scores engine on real data (30-31 Oct 2026)
+
+Run on the real bhavcopy (adjusted, 114 symbols with a sector, latest day 2026-10-30; output `backtest/cc5_scores_latest.csv`). Latest scores: no NaN, spread across the 0-100 range, no constant column. No lookahead (truncated-history scores equal full-history scores on the sampled days). One defect: Nifty 50 is missing from the index files on 212 days of 2015 and 1 of 2016, so every score is blank until about April 2016 (the 63-day Nifty return is NaN). Fix: forward-fill the Nifty series in `scores/engine.py` panel(); the loader also has no VIX series. Trading-day scores since mid-2016 are usable.
+
 ---
 
 

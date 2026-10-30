@@ -526,5 +526,37 @@
    "positive_both": false
   }
  },
- "disclaimer": "Historical base rates after a 0.1R cost; not a forecast and not advice. 28 rules were tested, so a few will look positive on both halves by chance. Past results do not guarantee future profit."
+ "disclaimer": "Historical base rates after a 0.1R cost; not a forecast and not advice. 28 rules were tested, so a few will look positive on both halves by chance. Past results do not guarantee future profit.",
+ "index_setup_check": {
+  "verdict": "no edge",
+  "top5_index_0.1R": {
+   "train": {
+    "trades": 57,
+    "avg_r": 0.105
+   },
+   "test": {
+    "trades": 36,
+    "avg_r": -0.016
+   }
+  },
+  "top5_index_0.2R": {
+   "train": {
+    "trades": 57,
+    "avg_r": 0.005
+   },
+   "test": {
+    "trades": 36,
+    "avg_r": -0.116
+   }
+  },
+  "walk_forward_5y_0.1R": {
+   "trades": 58,
+   "avg_r": -0.031
+  },
+  "walk_forward_5y_0.2R": {
+   "trades": 26,
+   "avg_r": -0.098
+  },
+  "survives_0.2R": false
+ }
 }
