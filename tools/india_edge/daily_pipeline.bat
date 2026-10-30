@@ -10,7 +10,8 @@ echo ==== %date% %time% start >> %LOG%
 rem a failed download is logged but does not stop the scan of stored data
 "%PY%" data\fetch.py --days 10 >> %LOG% 2>&1
 "%PY%" run_scanner.py --no-fetch >> %LOG% 2>&1 || goto :fail
-"%PY%" morning_desk.py >> %LOG% 2>&1 || goto :fail
+set DATA_DIR=%~dp0data
+"%PY%" run_daily.py >> %LOG% 2>&1 || goto :fail
 echo ==== %date% %time% ok >> %LOG%
 exit /b 0
 :fail

@@ -89,6 +89,7 @@ def adjust_corporate_actions(cash: pd.DataFrame, notes: dict, ratio: float = 0.1
                                            move_pct=round(float(c.at[i, "close"] / prev_close_row[i] - 1) * 100, 1)))
     if not ev.any():
         return c
+    c[["volume", "deliv_qty"]] = c[["volume", "deliv_qty"]].astype(float)
     for i in sorted(np.nonzero(ev.to_numpy())[0], key=lambda k: c.at[k, "date"], reverse=True):
         sym, d, f = c.at[i, "symbol"], c.at[i, "date"], float(fac[i])
         m = (c["symbol"] == sym) & (c["date"] < d)

@@ -1,0 +1,6 @@
+# tuned on train 2015-22 only
+chop: 0.35
+event: false
+expiry: true
+l2: candle
+squeeze: true

@@ -78,6 +78,10 @@ def read_days(name: str, errors: list) -> pd.DataFrame:
         if len(df) == 0:
             errors.append(f"{name}/{f.name}: empty")
             continue
+        if name == "fo" and "strike" in df.columns:  # 11 years of strike rows do not fit in memory
+            df = (df.assign(abs_chg_oi=df["chg_oi"].abs())
+                  .groupby(["date", "instr", "symbol", "expiry"], as_index=False)[
+                      ["oi", "chg_oi", "volume", "abs_chg_oi"]].sum())
         frames.append(df)
     if not frames:
         return pd.DataFrame()
