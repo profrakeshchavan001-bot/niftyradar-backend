@@ -1,0 +1,2 @@
+yfinance>=0.2.40   # only for scores/fundamentals.py real runs; tests and dry runs do not need it
+requests>=2.31
