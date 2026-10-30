@@ -65,3 +65,7 @@ Sector map: `sectors.json` (no sector map existed in the repo; edit freely, unma
 - Data URLs are NSE archive files (`sec_bhavdata_full`, UDiFF `BhavCopy_NSE_FO`, `ind_close_all`). If NSE changes a format, `data/fetch.py` fails loudly per day and keeps the rest.
 - Holidays: a 404 older than 4 days is remembered in `data/.missing.json`.
 - `pyarrow` (parquet) and `pyyaml` (config) are added to the requirements next to pandas/numpy/requests.
+
+## Scores engine (CC5)
+
+`python scores/build_public.py --fixtures` writes browser-safe JSON to `out/public/` (scores, 8 screeners, sector rotation, fear/greed, edge stats). Formulas and weights stay in `scores/` (Python); the API (`/api/edge/:name`) serves only that JSON. Tests: `python -m unittest discover -s scores/tests`. Page: `/desk/`.

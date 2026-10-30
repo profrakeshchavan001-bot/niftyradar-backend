@@ -1,0 +1,9 @@
+# SERVER-SIDE ONLY. Never copied into out/public, never served by the API.
+weights:            # overall score = weighted mean of the five 0-100 scores
+  trend: 0.25
+  momentum: 0.25
+  volume_delivery: 0.15
+  relative_strength: 0.20
+  sector_strength: 0.15
+bands: {strong: 70, mixed: 40}   # >= strong -> Strong, >= mixed -> Mixed, else Weak
+min_history: 60                   # days of history needed before a score is produced
