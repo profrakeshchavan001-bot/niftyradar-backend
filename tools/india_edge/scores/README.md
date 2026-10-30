@@ -18,5 +18,13 @@ python -m unittest discover -s scores/tests -p "test_*.py"
 ## What is public vs server side
 Public JSON: scores 0-100, band (Strong/Mixed/Weak), a plain sentence, and per component the plain reading plus a 0-100 sub-score. Never: weights, thresholds, formulas (`engine.py`, `config.yaml`). Tests enforce this.
 
+## Round 2 additions
+- `fundamentals.py` yfinance + NSE shareholding -> `fundamentals.csv` (cache, resumable, dry run, `--probe`, `--validate`).
+- `universe.py` point-in-time F&O membership from the bhavcopy (`python -m scores.universe` prints a summary).
+- `costs.py`, `portfolio.py`, `stats.py`, `report.py` realistic paper-portfolio validation, costs doubled, bootstrap, Holm/BH, random null, Monte Carlo drawdown (`--report`).
+- `screeners.py` percentile thresholds with hysteresis; `sensitivity.py` weight/threshold sensitivity and heatmap.
+- `daily.py` + `run_daily.ps1` + `install_task.ps1` Windows daily runner (`docs/RUN-DAILY.md`); full real-data sequence in `docs/RUN-ON-PC.md`.
+- Historical tests never see the fundamentals snapshot (`engine.compute(..., use_fundamentals=False)`).
+
 ## Files
 `data.py` panels, `engine.py` scores, `screeners.py` (8, each row has a one-line reason), `rotation.py`, `feargreed.py`, `health.py`, `build.py` (JSON), `validate.py` (rank link by year/regime with doubled costs, controls), `sensitivity.py`, `run.py`, `serve.py`, `web/index.html`.

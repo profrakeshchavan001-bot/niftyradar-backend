@@ -1,9 +1,6 @@
 """Data-health checks for the scores run. Counts only; never raises."""
 from __future__ import annotations
 
-import numpy as np
-import pandas as pd
-
 
 def check(P, R, day) -> dict:
     notes, c = [], P.close

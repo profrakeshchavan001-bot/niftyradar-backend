@@ -5,7 +5,6 @@ Stable rankings mean no hidden dependence on one lucky weight. Research output o
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 
 from scores import engine
 

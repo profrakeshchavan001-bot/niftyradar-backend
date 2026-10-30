@@ -2,13 +2,10 @@
 wrecked. Covers scores, status, screeners, sector rotation and the fear/greed meter."""
 import unittest
 
-import numpy as np
 import pandas as pd
 
-from helpers import fixture_panels
 from scores import data, engine, feargreed, rotation, screeners
 from loader import load_market
-from robust import sanitize_market  # noqa: F401
 
 CFG = engine.load_cfg()
 M = load_market()
@@ -71,3 +68,37 @@ class Leak(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BuilderCutTheFuture(unittest.TestCase):
+    """End to end through the real loader path (point-in-time universe, hysteresis screeners, rotation, fear/greed):
+    the JSON for day t built from data cut at t equals the JSON for day t built from the full history."""
+
+    def test_build_outputs_identical_when_future_is_removed(self):
+        from loader import Market
+        from scores import build
+        full = data.from_market(M)
+        for k in (200, 60):
+            day = full.dates[-k]
+            cut = lambda df: df[pd.to_datetime(df["date"]) <= day]  # noqa: E731
+            part = data.from_market(Market(cut(M.cash), cut(M.fo), cut(M.idx), pd.DataFrame(), pd.DataFrame(), "test"))
+            a, _ = build.build(full, day=day)
+            b, _ = build.build(part, day=day)
+            for part_name in ("scores", "screeners", "rotation", "feargreed", "overview"):
+                self.assertEqual(a[part_name], b[part_name], f"{part_name} at {day:%F}")
+
+    def test_screener_lists_do_not_depend_on_where_history_starts(self):
+        import copy
+        from scores import screeners
+        P = data.from_market(M)
+        R = engine.compute(P, CFG)
+        m, _, _ = screeners.masks(P, R)
+        day = P.dates[-1]
+        keep = list(range(len(P.dates) - 900, len(P.dates)))            # start 900 sessions later: >3 years of warm-up remain
+        Q = copy.copy(P)
+        for a in ("close", "open", "high", "low", "volume", "deliv"):
+            setattr(Q, a, getattr(P, a).iloc[keep])
+        Q.nifty, Q.dates, Q.member = P.nifty.iloc[keep], P.dates[keep], P.member.iloc[keep]
+        mq, _, _ = screeners.masks(Q, engine.compute(Q, CFG))
+        for k in m:
+            self.assertTrue((m[k].loc[day] == mq[k].loc[day]).all(), k)    # hysteresis memory fades: same list on the last day

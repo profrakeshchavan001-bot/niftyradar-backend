@@ -1,7 +1,6 @@
 """Sector rotation: equal-weight sector index vs Nifty 50, strength and its change."""
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 from scores import engine

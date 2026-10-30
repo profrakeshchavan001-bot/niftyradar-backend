@@ -22,7 +22,7 @@ import time
 import traceback
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
