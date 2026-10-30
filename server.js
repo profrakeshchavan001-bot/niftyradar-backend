@@ -452,6 +452,11 @@ app.get('/', (req, res) => {
   });
 });
 
+// DERIVATIVES DESK - sample option-chain statistics (engine in tools/india_edge/chain, results only)
+app.use('/api', require('./src/routes/derivsDesk.js').createDerivsDeskRouter());
+app.get('/derivs-desk', (req, res) => res.sendFile(path.join(__dirname, 'public', 'derivs-desk.html')));
+app.get('/derivs-desk.js', (req, res) => res.sendFile(path.join(__dirname, 'public', 'derivs-desk.js')));
+
 // LOT SIZES - live, derived from Dhan's own instrument master (see loadInstrumentMaster)
 app.get('/api/lot-sizes', (req, res) => {
   res.json({ lotSizes, loadedAt: instrumentsLoadedAt ? new Date(instrumentsLoadedAt).toISOString() : null });

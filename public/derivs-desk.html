@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Derivatives Desk</title>
+<style>
+:root{--bg:#0B0F17;--panel:#121826;--panel-2:#171E2E;--line:rgba(255,255,255,.08);--text:#E8ECF4;--muted:#9AA4B5;--up:#00C076;--down:#F6465D;--neutral:#8B93A1;--sel-fill:rgba(255,255,255,.12);--sel-line:#fff;--sel-ink:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}a{color:var(--text)}.muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Loading Derivatives Desk...</p></main>
+<script src="/derivs-desk.js"></script>
+<script>
+(function () {
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var api = function (p) { return fetch('/api' + p).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }); };
+  var draw = function () {
+    var m = /^#\/derivs-desk\/?([A-Za-z]*)/.exec(location.hash);
+    window.PictoDerivsDesk.render(document.getElementById('app'), { api: api, esc: esc, setBanner: function () {}, symbol: m && m[1] ? m[1] : '' });
+  };
+  window.addEventListener('hashchange', draw); draw();
+})();
+</script>
+</body>
+</html>
