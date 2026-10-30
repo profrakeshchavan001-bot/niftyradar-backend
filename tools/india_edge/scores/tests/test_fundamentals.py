@@ -220,3 +220,17 @@ class EngineReadsIt(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReadFundamentalsIsDefensive(unittest.TestCase):
+    def test_empty_corrupt_or_out_of_range_file_gives_none_not_crash(self):
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "f.csv"
+            p.write_text("")
+            self.assertIsNone(data.read_fundamentals(p))
+            p.write_text("symbol,roe\nA,25\n")                       # header missing columns: filled with NaN, still readable
+            self.assertIsNotNone(data.read_fundamentals(p))
+            pd.DataFrame([["A", 500, 0, 20, 10, 1, 65, 0]], columns=F.SCHEMA).to_csv(p, index=False)   # ROE 500 %: impossible
+            self.assertIsNone(data.read_fundamentals(p))
+            self.assertIsNone(data.read_fundamentals(Path(t) / "missing.csv"))
+            self.assertIsNone(data.read_fundamentals(None))

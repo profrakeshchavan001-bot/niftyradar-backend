@@ -15,21 +15,25 @@ from scores import costs as C
 from scores import engine
 
 
+def prepare(P, R) -> dict:
+    """Arrays every simulation needs (price, traded flags, ATR, ADV). Build once, pass as `pre=` to reuse."""
+    close = P.close
+    return {"cl": close.to_numpy(float), "clF": close.ffill().to_numpy(float),
+            "traded": (close.notna() & (P.volume.fillna(0) > 0)).to_numpy(),
+            "atr": R.extra["ind"]["atr_pct"].to_numpy(float),
+            "adv": (close * P.volume).rolling(20, min_periods=10).mean().to_numpy(float),
+            "ok": (R.status == "ok").to_numpy(), "nifty": P.nifty.to_numpy(float)}
+
+
 def simulate(P, R, cand: pd.DataFrame, rank: pd.DataFrame, cfg: dict | None = None, *, cost_mult: float | None = None,
-             n_pos: int | None = None, h: int | None = None, start: int = 0) -> dict:
+             n_pos: int | None = None, h: int | None = None, start: int = 0, pre: dict | None = None) -> dict:
     cfg = cfg or engine.load_cfg()
     pc, cc = cfg["portfolio"], cfg["costs"]
     n_pos, h = n_pos or pc["n_positions"], h or pc["hold_days"]
     cap_frac = pc["capacity_adv_pct"] / 100.0
-    close = P.close
-    closeF = close.ffill()
-    cl, clF = close.to_numpy(float), closeF.to_numpy(float)
-    traded = (close.notna() & (P.volume.fillna(0) > 0)).to_numpy()
-    atr = R.extra["ind"]["atr_pct"].to_numpy(float)
-    adv = (close * P.volume).rolling(20, min_periods=10).mean().to_numpy(float)
-    ok = (R.status == "ok").to_numpy()
+    pre = pre or prepare(P, R)
+    cl, clF, traded, atr, adv, ok, nifty = (pre[k] for k in ("cl", "clF", "traded", "atr", "adv", "ok", "nifty"))
     cd, rk = cand.reindex(index=P.dates, columns=P.symbols).fillna(False).to_numpy(bool), rank.reindex(index=P.dates, columns=P.symbols).to_numpy(float)
-    nifty = P.nifty.to_numpy(float)
     n = len(P.dates)
     syms = list(P.symbols)
     rb = list(range(max(start, 1), n - 1, h))                     # rebalance (trade) days r; signal day is r-1

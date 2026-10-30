@@ -75,3 +75,45 @@ class Drawdown(unittest.TestCase):
         P = mk({f"S{i}": np.linspace(100, 110, 400) for i in range(25)})
         out = validate.run(P, engine.compute(P, CFG), CFG)
         self.assertIn("top_quintile_max_drawdown_pct", out["all"])
+
+
+class FundamentalsNeverLeakIntoHistory(unittest.TestCase):
+    """The fundamentals file is a snapshot as of today: using it for past dates is look-ahead."""
+
+    def world(self, fund):
+        rng = np.random.default_rng(6)
+        n = 700
+        P = mk({f"S{i}": 100 * np.exp(np.cumsum(rng.normal(0.0003, 0.013, n))) for i in range(30)},
+               nifty=20000 * np.exp(np.cumsum(rng.normal(0.0003, 0.007, n))), sectors={f"S{i}": f"X{i % 5}" for i in range(30)}, fund=fund)
+        return P
+
+    def fund(self):
+        rng = np.random.default_rng(1)
+        return pd.DataFrame({"symbol": [f"S{i}" for i in range(30)], "roe": rng.uniform(0, 30, 30), "debt_equity": rng.uniform(0, 2, 30),
+                             "profit_margin": rng.uniform(0, 20, 30), "pe": rng.uniform(8, 50, 30), "pb": rng.uniform(1, 8, 30),
+                             "promoter_pct": rng.uniform(20, 70, 30), "promoter_pledge_pct": rng.uniform(0, 30, 30)})
+
+    def test_validation_refuses_scores_that_contain_fundamentals(self):
+        P = self.world(self.fund())
+        R = engine.compute(P, CFG)                                          # includes quality/valuation
+        self.assertIn("quality", R.scores)
+        with self.assertRaises(ValueError):
+            validate.run(P, R, CFG)
+
+    def test_validation_identical_with_or_without_the_file(self):
+        a = validate.run(self.world(None), engine.compute(self.world(None), CFG), CFG)
+        P2 = self.world(self.fund())
+        b = validate.run(P2, engine.compute(P2, CFG, use_fundamentals=False), CFG)
+        self.assertEqual(a, b)
+
+    def test_todays_scores_do_use_the_file(self):
+        P = self.world(self.fund())
+        with_f, without = engine.compute(P, CFG), engine.compute(P, CFG, use_fundamentals=False)
+        d = P.dates[-1]
+        self.assertNotEqual(with_f.scores["overall"].loc[d].round(1).tolist(), without.scores["overall"].loc[d].round(1).tolist())
+
+    def test_report_refuses_snapshot_scores_too(self):
+        from scores import report
+        P = self.world(self.fund())
+        with self.assertRaises(ValueError):
+            report.run(P, engine.compute(P, CFG), CFG)

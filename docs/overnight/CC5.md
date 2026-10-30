@@ -60,3 +60,10 @@ Statistics on historical data, not advice.
 - A historical F&O lot-size source if you want lot-size-aware capacity (needs a change in `data/fetch.py`, which I did not touch).
 - Merger terms are not modelled (exit at last traded price). If you care about specific mergers (e.g. HDFC into HDFCBANK) add them to `symbol_renames.json` only where the share-swap makes the old price series continuous.
 - Telegram bot token and chat id for failure alerts, set as user environment variables on the PC (never in the repo).
+
+## Extra queue (round 2)
+- **Look-ahead found and fixed**: with a fundamentals file loaded, today's quality/valuation snapshot would have been applied to every past date inside `overall`, leaking into validation, the report, screener percentiles and the heatmap. `engine.compute(..., use_fundamentals=False)` now feeds all historical tests; `validate.run` and `report.run` refuse scores that contain the snapshot (tested), and `run.py` computes a second score set for them. Today's page still uses the snapshot.
+- Corrupt/empty/out-of-range `fundamentals.csv` no longer crashes a run: warning, quality/valuation skipped.
+- Speed (200 stocks x 3000 days): weights+thresholds+heatmap 41 s -> about 14 s (shared percentile cache); full report 30 s -> 9 s (vectorised bootstrap and Monte Carlo, shared price arrays); plain scores run about 6 s.
+- Edge-case tests through the real loader path: 2:1 split, 1:1 bonus and 5:1 split leave every score unchanged; a real 50% crash is NOT adjusted but is flagged and scored as a fall; a 12-day suspension is `suspended` then scored again and does not touch other stocks; new listing scored from its 60th bar (200-day reading drops out, others renormalise); delisting; all stocks in one sector; zero-volume streak is `illiquid`.
+- 163 scores tests pass offline (about 2.5 minutes). The older 215 India Edge tests are untouched and pass.

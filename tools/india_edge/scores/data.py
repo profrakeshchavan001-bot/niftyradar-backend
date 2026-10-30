@@ -80,7 +80,18 @@ def read_fundamentals(path) -> pd.DataFrame | None:
     A point-in-time-unsafe SNAPSHOT: used for today's score only, never in validation."""
     if not path or not Path(path).exists():
         return None
-    return pd.read_csv(path)
+    try:
+        df = pd.read_csv(path)
+    except Exception as exc:               # empty/corrupt file: do not take the whole run down, say so
+        print(f"WARNING: fundamentals file {path} unreadable ({type(exc).__name__}); quality/valuation skipped", file=sys.stderr)
+        return None
+    from scores import fundamentals as F  # noqa: PLC0415
+    errs = F.validate_frame(df[[c for c in F.SCHEMA if c in df.columns]].reindex(columns=F.SCHEMA), min_fill=0.0) if len(df) else ["no rows"]
+    bad = [e for e in errs if "outside" in e or "duplicate" in e or "non-numeric" in e or "no rows" in e]
+    if bad:
+        print("WARNING: fundamentals file has problems, quality/valuation skipped: " + "; ".join(bad[:3]), file=sys.stderr)
+        return None
+    return df
 
 
 def from_market(market, sectors: dict | None = None, fundamentals: pd.DataFrame | None = None,

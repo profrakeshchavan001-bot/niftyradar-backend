@@ -132,7 +132,9 @@ def _sector_median(P, df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def compute(P, cfg: dict | None = None) -> Result:
+def compute(P, cfg: dict | None = None, use_fundamentals: bool = True) -> Result:
+    """use_fundamentals=False for ANY historical test: the fundamentals file is a snapshot taken today, so
+    applying it to past dates would be look-ahead. Validation, reports and heatmaps always pass False."""
     cfg = cfg or load_cfg()
     I = indicators(P)
     c, ma, ret, nret = P.close, I["ma"], I["ret"], I["nret"]
@@ -183,7 +185,7 @@ def compute(P, cfg: dict | None = None) -> Result:
         Comp("60-day drawdown", I["dd60"], sub(I["dd60"], -0.25, 0), 1.5, lambda x: f"{abs(x) * 100:.1f}% below its 60-day high"),
         Comp("Gap frequency", I["gap60"], sub(I["gap60"], 0.2, 0), 1, lambda x: f"Opened 2%+ away from prior close on {x * 100:.0f}% of days"),
     ]
-    fund = P.fundamentals
+    fund = P.fundamentals if use_fundamentals else None
     if fund is not None:
         broad = lambda s: pd.DataFrame([s.values] * len(P.dates), index=P.dates, columns=s.index)  # noqa: E731
         f = {k: broad(fund[k]) for k in fund.columns}

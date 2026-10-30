@@ -39,15 +39,19 @@ def _scaled(T: dict, f: float) -> dict:
     return {k: {a: min(0.9, b * f) if isinstance(b, (int, float)) else b for a, b in v.items()} for k, v in T.items()}
 
 
-def masks(P, R, T: dict | None = None):
+def masks(P, R, T: dict | None = None, cache: dict | None = None):
     """-> (members {id: bool frame}, order {id: frame to sort by (higher = listed first)}, meta {id: (title, rule)})."""
     from scores import engine
     T = T or engine.load_cfg()["screeners"]
     ok = R.status == "ok"
     S, I = R.scores, R.extra["ind"]
     c, ma50 = P.close, I["ma"][50]
-    top = lambda df: xpct(df, ok)                    # noqa: E731  high value -> near 1
-    bot = lambda df: 1 - xpct(df, ok) + 1.0 / max(1, ok.sum(axis=1).max())   # noqa: E731  low value -> near 0 (top-of-low)
+    cache = {} if cache is None else cache           # percentile ranks depend on the data only, so callers that vary T share it
+
+    def X(key, df):
+        if key not in cache:
+            cache[key] = xpct(df, ok)
+        return cache[key]
     pct = lambda x: f"{x * 100:g}%"                  # noqa: E731
     r5, r20 = I["ret"][5], I["ret"][21]
     dist = (c / I["hi252"] - 1)
@@ -60,22 +64,22 @@ def masks(P, R, T: dict | None = None):
     t = T["strong_trend"]
     band("strong_trend", "Strong trend",
          f"Trend score in the top {pct(t['enter'])} of stocks (stays listed until it leaves the top {pct(t['exit'])}) and overall score in the top {pct(t['overall'])}",
-         (top(S["trend"]) >= 1 - t["enter"]) & (top(S["overall"]) >= 1 - t["overall"]),
-         (top(S["trend"]) >= 1 - t["exit"]) & (top(S["overall"]) >= 1 - t["overall"] - 0.15), S["trend"])
+         (X("trend", S["trend"]) >= 1 - t["enter"]) & (X("overall", S["overall"]) >= 1 - t["overall"]),
+         (X("trend", S["trend"]) >= 1 - t["exit"]) & (X("overall", S["overall"]) >= 1 - t["overall"] - 0.15), S["trend"])
     t = T["pullback_uptrend"]
     band("pullback_uptrend", "Pullback inside an uptrend",
          f"5-day return in the weakest {pct(t['enter'])} of stocks (stays until it leaves the weakest {pct(t['exit'])}), trend score in the top {pct(t['trend'])}, close above the 50-day average",
-         (xpct(r5, ok) <= t["enter"]) & (top(S["trend"]) >= 1 - t["trend"]) & (c > ma50),
-         (xpct(r5, ok) <= t["exit"]) & (top(S["trend"]) >= 1 - t["trend"] - 0.10) & (c > ma50), -r5)
+         (X("r5", r5) <= t["enter"]) & (X("trend", S["trend"]) >= 1 - t["trend"]) & (c > ma50),
+         (X("r5", r5) <= t["exit"]) & (X("trend", S["trend"]) >= 1 - t["trend"] - 0.10) & (c > ma50), -r5)
     t = T["volume_breakout"]
     band("volume_breakout", "Volume breakout",
          f"Close above the prior 20-day high on volume in the top {pct(t['enter'])} of stocks versus their 20-day average",
-         (c > I["hi20_prior"]) & (top(I["vol_today"]) >= 1 - t["enter"]), None, I["vol_today"])
+         (c > I["hi20_prior"]) & (X("vol_today", I["vol_today"]) >= 1 - t["enter"]), None, I["vol_today"])
     t = T["rs_leaders"]
     band("rs_leaders", "Relative-strength leaders",
          f"Relative-strength score in the top {pct(t['enter'])} of stocks (stays until it leaves the top {pct(t['exit'])}) with trend score in the top {pct(t['trend'])}",
-         (top(S["relative_strength"]) >= 1 - t["enter"]) & (top(S["trend"]) >= 1 - t["trend"]),
-         (top(S["relative_strength"]) >= 1 - t["exit"]) & (top(S["trend"]) >= 1 - t["trend"] - 0.10), S["relative_strength"])
+         (X("relative_strength", S["relative_strength"]) >= 1 - t["enter"]) & (X("trend", S["trend"]) >= 1 - t["trend"]),
+         (X("relative_strength", S["relative_strength"]) >= 1 - t["exit"]) & (X("trend", S["trend"]) >= 1 - t["trend"] - 0.10), S["relative_strength"])
     t = T["near_52w_high"]
     band("near_52w_high", "Near 52-week high",
          f"Close within {pct(t['enter'])} of its 52-week high (stays listed until more than {pct(t['exit'])} below)",
@@ -83,16 +87,16 @@ def masks(P, R, T: dict | None = None):
     t = T["delivery_rise"]
     band("delivery_rise", "Delivery rising",
          f"5-day delivery % ratio in the top {pct(t['enter'])} of stocks (stays until it leaves the top {pct(t['exit'])}) with a positive 1-month return",
-         (top(I["dr"]) >= 1 - t["enter"]) & (r20 > 0), (top(I["dr"]) >= 1 - t["exit"]) & (r20 > 0), I["dr"])
+         (X("dr", I["dr"]) >= 1 - t["enter"]) & (r20 > 0), (X("dr", I["dr"]) >= 1 - t["exit"]) & (r20 > 0), I["dr"])
     t = T["steady_uptrend"]
     band("steady_uptrend", "Steady uptrends",
          f"Stability score in the top {pct(t['enter'])} of stocks (stays until it leaves the top {pct(t['exit'])}) with trend score in the top {pct(t['trend'])}",
-         (top(S["volatility"]) >= 1 - t["enter"]) & (top(S["trend"]) >= 1 - t["trend"]),
-         (top(S["volatility"]) >= 1 - t["exit"]) & (top(S["trend"]) >= 1 - t["trend"] - 0.10), S["volatility"])
+         (X("volatility", S["volatility"]) >= 1 - t["enter"]) & (X("trend", S["trend"]) >= 1 - t["trend"]),
+         (X("volatility", S["volatility"]) >= 1 - t["exit"]) & (X("trend", S["trend"]) >= 1 - t["trend"] - 0.10), S["volatility"])
     t = T["weakest"]
     band("weakest", "Weakest scores",
          f"Overall score in the lowest {pct(t['enter'])} of stocks (stays until it leaves the lowest {pct(t['exit'])})",
-         xpct(S["overall"], ok) <= t["enter"], xpct(S["overall"], ok) <= t["exit"], -S["overall"])
+         X("overall", S["overall"]) <= t["enter"], X("overall", S["overall"]) <= t["exit"], -S["overall"])
     return out, order, meta
 
 

@@ -34,12 +34,12 @@ def max_drawdown(r: np.ndarray) -> float | None:
     return float((eq / np.maximum.accumulate(eq) - 1).min())
 
 
-def _blocks(rng, n: int, block: int, size: int) -> np.ndarray:
-    """Indices for a circular block bootstrap of length `size` from n observations."""
+def _block_idx(rng, n: int, block: int, size: int, reps: int) -> np.ndarray:
+    """(reps, size) index matrix of circular block bootstraps, drawn in one call."""
     nb = -(-size // block)
-    starts = rng.integers(0, n, nb)
-    idx = (starts[:, None] + np.arange(block)[None, :]) % n
-    return idx.ravel()[:size]
+    starts = rng.integers(0, n, (reps, nb))
+    idx = (starts[:, :, None] + np.arange(block)[None, None, :]) % n
+    return idx.reshape(reps, nb * block)[:, :size]
 
 
 def bootstrap(r: np.ndarray, reps: int, block: int, seed: int, h: int) -> dict:
@@ -50,14 +50,13 @@ def bootstrap(r: np.ndarray, reps: int, block: int, seed: int, h: int) -> dict:
     if n < 8:
         return {"n": n, "mean": None, "ci": None, "sharpe_ci": None, "p_mean_gt0": None}
     rng = np.random.default_rng(seed)
-    means, sh, null = np.empty(reps), np.empty(reps), np.empty(reps)
-    c = r - r.mean()
-    for i in range(reps):
-        ix = _blocks(rng, n, block, n)
-        s = r[ix]
-        means[i], null[i] = s.mean(), c[ix].mean()
-        sd = s.std(ddof=1)
-        sh[i] = s.mean() / sd * math.sqrt(ann_factor(h)) if sd > 0 else np.nan
+    ix = _block_idx(rng, n, block, n, reps)
+    s = r[ix]
+    means = s.mean(axis=1)
+    sd = s.std(axis=1, ddof=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        sh = np.where(sd > 0, means / sd * math.sqrt(ann_factor(h)), np.nan)
+    null = (r - r.mean())[ix].mean(axis=1)
     p = (1 + np.sum(null >= r.mean())) / (reps + 1)
     return {"n": n, "mean": float(r.mean()), "ci": [float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))],
             "sharpe_ci": [float(np.nanpercentile(sh, 2.5)), float(np.nanpercentile(sh, 97.5))], "p_mean_gt0": float(p)}
@@ -71,9 +70,8 @@ def mc_drawdown(r: np.ndarray, paths: int, block: int, seed: int, length: int | 
         return {"paths": 0}
     length = length or n
     rng = np.random.default_rng(seed)
-    dd = np.empty(paths)
-    for i in range(paths):
-        dd[i] = max_drawdown(r[_blocks(rng, n, block, length)])
+    eq = np.cumprod(1 + r[_block_idx(rng, n, block, length, paths)], axis=1)
+    dd = (eq / np.maximum.accumulate(eq, axis=1) - 1).min(axis=1)
     return {"paths": paths, "median_pct": round(float(np.median(dd)) * 100, 2), "p95_worst_pct": round(float(np.percentile(dd, 5)) * 100, 2),
             "prob_dd_over_20pct": round(float((dd < -0.20).mean()), 3), "prob_dd_over_30pct": round(float((dd < -0.30).mean()), 3)}
 

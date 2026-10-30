@@ -41,10 +41,11 @@ def screener_sensitivity(P, R, cfg: dict | None = None, days: int = 500) -> dict
     should move list size roughly in proportion and flip few stock-days (tested)."""
     from scores import screeners
     cfg = cfg or engine.load_cfg()
-    base, _, _ = screeners.masks(P, R, cfg["screeners"])
+    cache: dict = {}
+    base, _, _ = screeners.masks(P, R, cfg["screeners"], cache)
     out = {}
     for f in (0.8, 1.2):
-        alt, _, _ = screeners.masks(P, R, screeners._scaled(cfg["screeners"], f))
+        alt, _, _ = screeners.masks(P, R, screeners._scaled(cfg["screeners"], f), cache)
         for k in base:
             b, a = base[k].iloc[-days:], alt[k].iloc[-days:]
             nb, na = float(b.sum(axis=1).mean()), float(a.sum(axis=1).mean())
@@ -63,13 +64,14 @@ def heatmap(P, R, cfg: dict | None = None, screener: str = "strong_trend", days:
     cfg = cfg or engine.load_cfg()
     fwd = validate.forward(P.close, cfg["validate"]["horizon"])
     uni = fwd.where(R.status == "ok").mean(axis=1)
+    cache: dict = {}
     cells = []
     for e in enters:
         row = []
         for x in exits_extra:
             T = {k: dict(v) for k, v in cfg["screeners"].items()}
             T[screener]["enter"], T[screener]["exit"] = e, min(0.9, e + x)
-            m = screeners.masks(P, R, T)[0][screener].iloc[-days:]
+            m = screeners.masks(P, R, T, cache)[0][screener].iloc[-days:]
             cnt = m.sum(axis=1)
             chg = (m != m.shift(1)).iloc[1:].sum(axis=1)
             ex = (fwd.iloc[-days:].where(m).mean(axis=1) - uni.iloc[-days:]).dropna()

@@ -43,6 +43,9 @@ def forward(close: pd.DataFrame, h: int) -> pd.DataFrame:
 
 
 def run(P, R, cfg: dict | None = None) -> dict:
+    """R must come from engine.compute(P, use_fundamentals=False); a result that includes the fundamentals snapshot is refused."""
+    if "quality" in R.scores or "valuation" in R.scores:
+        raise ValueError("validation needs scores computed with use_fundamentals=False (the snapshot would be look-ahead)")
     cfg = cfg or engine.load_cfg()
     v = cfg["validate"]
     h, cost = v["horizon"], 2 * v["cost_per_side_pct"] * 2 / 100       # doubled, round trip

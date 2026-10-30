@@ -58,8 +58,8 @@ def _r(x):
     return None if x is None else round(x, 2)
 
 
-def evaluate(P, R, name: str, cand, rank, cfg: dict) -> dict:
-    sim = portfolio.simulate(P, R, cand, rank, cfg)
+def evaluate(P, R, name: str, cand, rank, cfg: dict, pre: dict | None = None) -> dict:
+    sim = portfolio.simulate(P, R, cand, rank, cfg, pre=pre)
     dates = sim["dates"]
     v = cfg["validate"]
     tr = (dates <= pd.Timestamp(v["train_end"]))
@@ -74,7 +74,7 @@ def evaluate(P, R, name: str, cand, rank, cfg: dict) -> dict:
     return out
 
 
-def random_null(P, R, cfg: dict, runs: int) -> dict:
+def random_null(P, R, cfg: dict, runs: int, pre: dict | None = None) -> dict:
     """Mean excess vs Nifty per period (test window) of random-selection portfolios: what luck looks like."""
     rng = np.random.default_rng(cfg["stats"]["seed"] + 1)
     cand = R.status == "ok"
@@ -82,7 +82,7 @@ def random_null(P, R, cfg: dict, runs: int) -> dict:
     means = []
     for _ in range(runs):
         rank = pd.DataFrame(rng.random(cand.shape), index=cand.index, columns=cand.columns)
-        sim = portfolio.simulate(P, R, cand, rank, cfg)
+        sim = portfolio.simulate(P, R, cand, rank, cfg, pre=pre)
         if te is None:
             te = sim["dates"] >= pd.Timestamp(cfg["validate"]["test_start"])
         ex = (sim["ret"] - sim["bench"])[te]
@@ -95,13 +95,16 @@ def random_null(P, R, cfg: dict, runs: int) -> dict:
 
 
 def run(P, R, cfg: dict | None = None) -> dict:
+    if "quality" in R.scores or "valuation" in R.scores:
+        raise ValueError("report needs scores computed with use_fundamentals=False (the snapshot would be look-ahead)")
     cfg = cfg or engine.load_cfg()
     members, order, meta = screeners.masks(P, R, cfg["screeners"])
     ok = R.status == "ok"
     strategies = {k: (members[k], order[k], meta[k][0]) for k in members}
     strategies["overall_top"] = (ok, R.scores["overall"], "Top overall scores (10 highest)")
-    res = {k: evaluate(P, R, t, c, o, cfg) for k, (c, o, t) in strategies.items()}
-    null = random_null(P, R, cfg, cfg["stats"]["random_null_runs"])
+    pre = portfolio.prepare(P, R)
+    res = {k: evaluate(P, R, t, c, o, cfg, pre) for k, (c, o, t) in strategies.items()}
+    null = random_null(P, R, cfg, cfg["stats"]["random_null_runs"], pre)
     for k, r in res.items():
         ex = r["test"]["_excess"]
         r["test"]["pct_of_random_below"] = None if not len(null["_means"]) or not len(ex) else round(float((null["_means"] < ex.mean()).mean()) * 100, 1)

@@ -26,15 +26,20 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     P = data.load(a.fundamentals)
     out, R = build.build(P, day=a.asof)
+    Rv = R
+    if a.validate or a.report:
+        from scores import engine
+        # historical tests must not see the fundamentals snapshot (it is as-of today: look-ahead)
+        Rv = engine.compute(P, use_fundamentals=False) if P.fundamentals is not None else R
     if a.validate:
         from scores import validate
         from scores import sensitivity
-        out["validation"] = validate.run(P, R)
+        out["validation"] = validate.run(P, Rv)
         out["sensitivity"] = {**sensitivity.run(P, R), "screeners": sensitivity.screener_sensitivity(P, R)}
-        out["heatmap"] = sensitivity.heatmap(P, R)
+        out["heatmap"] = sensitivity.heatmap(P, Rv)
     if a.report:
         from scores import report
-        rep = report.run(P, R)
+        rep = report.run(P, Rv)
         out["report"] = rep
         Path(a.out).mkdir(parents=True, exist_ok=True)
         (Path(a.out) / "report.md").write_text(report.to_markdown(rep))
