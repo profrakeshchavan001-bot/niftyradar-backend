@@ -20,10 +20,16 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--asof")
     ap.add_argument("--fundamentals", help="CSV: symbol,roe,debt_equity,profit_margin,pe,pb,promoter_pct,promoter_pledge_pct")
+    ap.add_argument("--validate", action="store_true", help="also write validation.json (rank-IC by year/regime, doubled costs)")
     ap.add_argument("--out", default=str(ROOT / "scores" / "out"))
     a = ap.parse_args(argv)
     P = data.load(a.fundamentals)
-    out, _ = build.build(P, day=a.asof)
+    out, R = build.build(P, day=a.asof)
+    if a.validate:
+        from scores import validate
+        from scores import sensitivity
+        out["validation"] = validate.run(P, R)
+        out["sensitivity"] = sensitivity.run(P, R)
     names = build.write(out, Path(a.out))
     print(f"{out['overview']['date']}: {out['overview']['scored']} scored, health {out['health']['grade']} -> {a.out} ({', '.join(names)})")
     return 0

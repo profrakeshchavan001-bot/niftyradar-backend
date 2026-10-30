@@ -4,6 +4,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from scores import engine
+
 STAGE_SAYS = {"Leading": "Ahead of the market and gaining", "Weakening": "Ahead of the market but losing pace",
               "Improving": "Behind the market but gaining", "Lagging": "Behind the market and losing pace"}
 
@@ -18,15 +20,15 @@ def series(P, R, cfg: dict) -> dict[str, pd.DataFrame]:
     rc = cfg["rotation"]
     ok = R.status == "ok"
     r1 = P.close.pct_change(1, fill_method=None).where(ok)
-    by = r1.T.groupby(P.sector)
-    sec_ret = by.mean().T                                   # date x sector equal-weight daily return
-    n_ok = ok.T.groupby(P.sector).sum().T
+    sec_ret = engine.sector_mean(P, r1)                      # date x sector equal-weight daily return
+    n_ok = engine.sector_count(P, ok)
     idx = (1 + sec_ret.fillna(0)).cumprod()
     rs = idx.div(P.nifty / P.nifty.dropna().iloc[0], axis=0)
     strength = (rs / rs.rolling(rc["rs_ma"], min_periods=rc["rs_ma"]).mean() - 1) * 100
     change = strength - strength.shift(rc["change_days"])
-    above50 = ((P.close > R.extra["ind"]["ma"][50]).where(ok)).T.groupby(P.sector).mean().T * 100
-    avg = R.scores["overall"].T.groupby(P.sector).mean().T
+    ma50 = R.extra["ind"]["ma"][50]
+    above50 = engine.sector_mean(P, (P.close > ma50).astype(float).where(ma50.notna()), ok) * 100
+    avg = engine.sector_mean(P, R.scores["overall"])
     return {"strength": strength.where(n_ok >= rc["min_stocks"]), "change": change.where(n_ok >= rc["min_stocks"]),
             "n": n_ok, "breadth": above50, "avg_score": avg}
 

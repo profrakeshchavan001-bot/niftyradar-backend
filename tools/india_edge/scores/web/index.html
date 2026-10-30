@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NiftyRadar Scores</title>
+<style>
+:root{--bg:#0a0e14;--card:#111823;--line:#1e2a3a;--txt:#d6e0ee;--dim:#8a9bb2;--g:#2ecc8f;--r:#ff5d6c;--a:#f5b84b;--b:#4aa3ff}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+h1{font-size:15px;margin:0;letter-spacing:.08em;color:var(--g)}
+nav{display:flex;flex-wrap:wrap;gap:6px}nav a{color:var(--dim);text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+nav a.on{color:var(--txt);border-color:var(--g)}
+main{padding:12px 16px 24px;max-width:1120px;margin:0 auto}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.i{margin-left:auto;width:24px;height:24px;border-radius:50%;border:1px solid var(--dim);background:none;color:var(--dim);font:inherit;font-size:12px;cursor:pointer;flex:none}
+.tip{margin:0 0 10px;padding:8px;border-left:2px solid var(--b);background:#0d1420;color:var(--dim);font-size:12px}.tip[hidden]{display:none}
+svg{display:block;width:100%;height:auto}.gauge{max-width:300px;margin:0 auto}
+.big{text-align:center;font-size:30px;font-weight:700;line-height:1.1}.lab{text-align:center;color:var(--dim);margin-bottom:6px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:6px 0;border-top:1px solid var(--line);min-width:0}
+.row.first{border-top:0}.sym{font-weight:700;min-width:104px;font-size:13px}a.sym{color:var(--txt);text-decoration:none;border-bottom:1px dotted var(--dim)}
+.bar{flex:1;height:8px;background:#1a2433;border-radius:4px;overflow:hidden;min-width:48px}.bar>i{display:block;height:100%}
+.n{width:32px;text-align:right}.says{color:var(--dim);font-size:12px;flex-basis:100%}
+.pill{font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid currentColor;white-space:nowrap}
+.Strong,.Leading,.Greed,.good,.Extreme-greed{color:var(--g)}.Weak,.Lagging,.Fear,.bad,.Extreme-fear{color:var(--r)}.Mixed,.Weakening,.Neutral,.warn{color:var(--a)}.Improving{color:var(--b)}
+.disc{color:var(--dim);font-size:11px;margin:14px 0 4px}.empty{color:var(--dim);margin:4px 0 0}
+input[type=search]{width:100%;padding:10px;background:#0d1420;border:1px solid var(--line);border-radius:8px;color:var(--txt);font:inherit;margin-bottom:10px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--dim);font-size:11px;margin-top:6px}.legend b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+.note{color:var(--dim);font-size:12px;margin:6px 0 0}
+@media(max-width:480px){main{padding:10px 10px 20px}.sym{min-width:92px}}
+</style></head><body>
+<header><h1>NIFTYRADAR · SCORES</h1>
+<nav id="nav"><a href="#overview">Overview</a><a href="#screeners">Screeners</a><a href="#stocks">Stocks</a><a href="#validation">Does it work?</a><a href="#health">Data health</a></nav></header>
+<main id="app" aria-live="polite"><p class="empty">Loading…</p></main>
+<script>
+const BASE=new URL('../out/',location.href).href;
+const $=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const NS='http://www.w3.org/2000/svg';
+const sv=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.append(e);return e};
+const col=v=>v>=70?'var(--g)':v>=40?'var(--a)':'var(--r)';
+const cls=s=>String(s).replace(/ /g,'-');
+const cache={};async function j(n){if(!cache[n]){const r=await fetch(BASE+n+'.json');if(!r.ok)throw new Error(r.status===404?'Data not built yet. Run python -m scores.run.':'Could not load data.');cache[n]=await r.json()}return cache[n]}
+function card(title,tip){const c=$('section','card'),h=$('h2');h.append($('span',null,title));
+  if(tip){const b=$('button','i','i');b.type='button';b.setAttribute('aria-label','About '+title);b.setAttribute('aria-expanded','false');
+    const t=$('p','tip',tip);t.hidden=true;b.onclick=()=>{t.hidden=!t.hidden;b.setAttribute('aria-expanded',String(!t.hidden))};h.append(b);c.append(h,t)}else c.append(h);return c}
+const grid=(...c)=>{const g=$('div','grid');g.append(...c);return g};
+const bar=v=>{const b=$('div','bar'),i=$('i');i.style.width=v+'%';i.style.background=col(v);b.append(i);return b};
+const disc=t=>$('p','disc',t);
+function gauge(v){const s=sv('svg',{viewBox:'0 0 200 112',class:'gauge',role:'img','aria-label':'Gauge '+v+' of 100'});
+  const pt=a=>[100+80*Math.cos(Math.PI*(1-a/100)),100-80*Math.sin(Math.PI*(1-a/100))];
+  [[0,25,'#ff5d6c'],[25,45,'#ff9a5d'],[45,55,'#f5b84b'],[55,75,'#8ccf6b'],[75,100,'#2ecc8f']].forEach(([a,b,c])=>{const [x0,y0]=pt(a),[x1,y1]=pt(b);sv('path',{d:`M${x0} ${y0}A80 80 0 0 1 ${x1} ${y1}`,stroke:c,'stroke-width':14,fill:'none'},s)});
+  const a=Math.PI*(1-v/100);sv('line',{x1:100,y1:100,x2:100+62*Math.cos(a),y2:100-62*Math.sin(a),stroke:'#d6e0ee','stroke-width':3,'stroke-linecap':'round'},s);return s}
+function lineChart(h){if(h.length<2)return $('p','empty','Not enough history yet.');
+  const W=360,H=130,s=sv('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Fear and greed history, last '+h.length+' days'});
+  [[0,25,'#ff5d6c'],[25,45,'#ff9a5d'],[45,55,'#f5b84b'],[55,75,'#8ccf6b'],[75,100,'#2ecc8f']].forEach(([a,b,c])=>sv('rect',{x:0,y:H-b*H/100,width:W,height:(b-a)*H/100,fill:c,opacity:.12},s));
+  const pts=h.map((p,i)=>[i*(W-2)/(h.length-1)+1,H-p.v*H/100]);
+  sv('polyline',{points:pts.map(p=>p.join(',')).join(' '),fill:'none',stroke:'#d6e0ee','stroke-width':1.6,'stroke-linejoin':'round'},s);
+  const l=pts[pts.length-1];sv('circle',{cx:l[0],cy:l[1],r:3.5,fill:'#d6e0ee'},s);return s}
+function rrg(rows){const W=360,H=300,s=sv('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Sector rotation chart: strength against its change'});
+  const mx=Math.max(2,...rows.flatMap(r=>[Math.abs(r.strength),...r.trail.map(t=>Math.abs(t.x))])),my=Math.max(1,...rows.flatMap(r=>[Math.abs(r.change),...r.trail.map(t=>Math.abs(t.y))]));
+  const X=v=>W/2+v/mx*(W/2-34),Y=v=>H/2-v/my*(H/2-18);
+  [['Improving',4,14,'var(--b)'],['Leading',W/2+4,14,'var(--g)'],['Lagging',4,H-6,'var(--r)'],['Weakening',W/2+4,H-6,'var(--a)']].forEach(([t,x,y,c])=>{const e=sv('text',{x,y,fill:c,'font-size':11,opacity:.8},s);e.textContent=t});
+  sv('line',{x1:W/2,y1:0,x2:W/2,y2:H,stroke:'#2a3a50'},s);sv('line',{x1:0,y1:H/2,x2:W,y2:H/2,stroke:'#2a3a50'},s);
+  const stc={Leading:'#2ecc8f',Weakening:'#f5b84b',Improving:'#4aa3ff',Lagging:'#ff5d6c'};
+  rows.forEach(r=>{const c=stc[r.stage];if(r.trail.length>1)sv('polyline',{points:r.trail.map(t=>X(t.x)+','+Y(t.y)).join(' '),fill:'none',stroke:c,opacity:.45,'stroke-width':1.5},s);
+    const x=X(r.strength),y=Y(r.change);sv('circle',{cx:x,cy:y,r:5,fill:c},s);
+    const e=sv('text',{x:Math.min(x+8,W-2),y:y+4,fill:'#d6e0ee','font-size':11,'text-anchor':x>W-70?'end':'start'},s);e.textContent=r.sector;if(x>W-70)e.setAttribute('x',x-8)});return s}
+function radar(sc){const keys=Object.keys(sc).filter(k=>k!=='overall'),n=keys.length,R=82,C=110;
+  const s=sv('svg',{viewBox:'0 0 220 220',role:'img','aria-label':'Score profile: '+keys.map(k=>NAME[k]+' '+sc[k].score).join(', ')});
+  const P=(i,r)=>[C+r*Math.sin(2*Math.PI*i/n),C-r*Math.cos(2*Math.PI*i/n)];
+  [.25,.5,.75,1].forEach(f=>sv('polygon',{points:keys.map((_,i)=>P(i,R*f).join(',')).join(' '),fill:'none',stroke:'#26364b'},s));
+  keys.forEach((k,i)=>{const [x,y]=P(i,R+14);const t=sv('text',{x,y:y+4,fill:'#8a9bb2','font-size':9,'text-anchor':x<C-5?'end':x>C+5?'start':'middle'},s);t.textContent=NAME[k]});
+  sv('polygon',{points:keys.map((k,i)=>P(i,R*sc[k].score/100).join(',')).join(' '),fill:'rgba(46,204,143,.25)',stroke:'#2ecc8f','stroke-width':2},s);return s}
+const NAME={trend:'Trend',momentum:'Momentum',relative_strength:'Rel. strength',volume_delivery:'Vol & delivery',volatility:'Stability',quality:'Quality',valuation:'Valuation',overall:'Overall'};
+function stockRow(c,first){const o=c.scores.overall,r=$('div','row'+(first?' first':''));const a=$('a','sym',c.symbol);a.href='#stock/'+encodeURIComponent(c.symbol);
+  r.append(a,bar(o.score),$('span','n',o.score),$('span','pill '+o.band,o.band),$('div','says',c.sector+' · '+o.says));return r}
+const V={
+async overview(m){const [fg,rot,ov]=await Promise.all([j('feargreed'),j('rotation'),j('overview')]);
+  const c1=card('Fear / Greed','A 0-100 reading of market mood built from market breadth, advances and declines, volatility, option positioning and Nifty trend. Each reading is placed against its own past year. It describes mood today and does not predict anything.');
+  if(fg.value==null)c1.append($('p','empty','Not enough history for the meter yet.'));else{c1.append(gauge(fg.value),$('div','big',fg.value),$('div','lab '+cls(fg.label),fg.label),lineChart(fg.history));
+    fg.parts.forEach((p,i)=>{const r=$('div','row'+(i?'':' first'));r.append($('span',null,p.name));r.firstChild.style.flex='1.6';r.append(p.value==null?$('span','n','–'):bar(p.value),$('span','n',p.value==null?'':p.value));c1.append(r)});
+    if(fg.not_available.length)c1.append($('p','note','Not loaded: '+fg.not_available.join(', ')+'.'))}
+  const c2=card('Sector rotation','Each dot is a sector. Right means ahead of the Nifty 50 over recent weeks, up means that lead is growing. The tail shows the last 8 sessions.');
+  c2.append(rrg(rot.sectors));rot.sectors.forEach((r,i)=>{const w=$('div','row'+(i?'':' first'));w.append($('span','sym',r.sector),$('span','pill '+r.stage,r.stage),$('span','says',`${r.says} · ${r.stocks} stocks · ${r.breadth==null?'–':r.breadth+'%'} above 50-day`));w.lastChild.style.flexBasis='100%';c2.append(w)});
+  const c3=card('Highest overall scores','Overall score 0-100 summarises trend, momentum, relative strength, volume and delivery, stability and (when loaded) quality and valuation. It describes what the data shows now. It is not a recommendation.');
+  ov.top.forEach((s,i)=>c3.append(stockRow(s,!i)));
+  const c4=card('Lowest overall scores','The weakest readings across the same measures.');ov.bottom.forEach((s,i)=>c4.append(stockRow(s,!i)));
+  const hb=$('p','note');hb.append('Data health: ',$('span',ov.health_grade,ov.health_grade));hb.append(' · '+ov.scored+' stocks scored · ');const l=$('a',null,'details');l.href='#health';l.style.color='var(--b)';hb.append(l);
+  m.append(grid(c1,c2,c3,c4),hb,disc(ov.disclaimer+' Data date '+ov.date+'.'))},
+async screeners(m){const d=await j('screeners');const g=$('div','grid');
+  d.screeners.forEach(sc=>{const c=card(sc.title+' ('+sc.count+')','Rule: '+sc.rule+'. A statistical filter shown as data. Not a recommendation.');
+    if(!sc.rows.length)c.append($('p','empty','No stocks match today.'));
+    sc.rows.forEach((r,i)=>{const w=$('div','row'+(i?'':' first')),a=$('a','sym',r.symbol);a.href='#stock/'+encodeURIComponent(r.symbol);w.append(a,$('span','n',r.overall==null?'':r.overall),$('div','says',r.why));c.append(w)});g.append(c)});
+  m.append(g,disc(d.disclaimer+' Data date '+d.date+'.'))},
+async stocks(m){const d=await j('scores');const c=card('All stocks','Overall score and band for every stock. Open a stock for its full breakdown.');
+  const q=$('input');q.type='search';q.placeholder='Search symbol';q.setAttribute('aria-label','Search symbol');const list=$('div');
+  const draw=()=>{list.replaceChildren();const t=q.value.trim().toUpperCase();let k=0;
+    d.stocks.filter(s=>s.status==='ok'&&s.scores.overall&&s.symbol.includes(t)).sort((a,b)=>b.scores.overall.score-a.scores.overall.score).forEach(s=>list.append(stockRow(s,!k++)));
+    d.stocks.filter(s=>s.status!=='ok'&&s.symbol.includes(t)).forEach(s=>{const r=$('div','row'+(k++?'':' first'));r.append($('span','sym',s.symbol),$('span','says',s.note));list.append(r)});
+    if(!k)list.append($('p','empty','No match.'))};
+  q.oninput=draw;draw();c.append(q,list);m.append(c,disc(d.disclaimer+' Data date '+d.date+'.'))},
+async stock(m,sym){const d=await j('scores');const s=d.stocks.find(x=>x.symbol===sym);if(!s){m.append($('p','empty','Unknown symbol.'));return}
+  const back=$('a',null,'← all stocks');back.href='#stocks';back.style.color='var(--b)';m.append(back);
+  if(s.status!=='ok'){m.append(card(s.symbol,null)).append($('p','empty',s.note));return}
+  const o=s.scores.overall;const c1=card(s.symbol+' · '+s.sector,'Overall is a weighted blend of the seven scores that have data. Coverage = how many scores had data.');
+  c1.append(radar(s.scores),$('div','big',o.score),$('div','lab '+o.band,o.band+' · '+o.says),$('p','note','Scores with data: '+o.coverage));
+  const g=$('div','grid');g.append(c1);
+  Object.keys(s.scores).filter(k=>k!=='overall').forEach(k=>{const x=s.scores[k],c=card(NAME[k]+' · '+x.score,'What this score looks at. The listed readings are the plain facts behind it.');
+    c.append($('p','lab '+x.band,x.band+' · '+x.says));x.components.forEach((p,i)=>{const r=$('div','row'+(i?'':' first'));r.append($('span',null,p.reading),bar(p.score),$('span','n',p.score));r.firstChild.style.flexBasis='100%';c.append(r)});g.append(c)});
+  m.append(g,disc(d.disclaimer+' Data date '+d.date+'.'))},
+async validation(m){const d=await j('validation');const c=card('Plain verdict','Rank link = how well higher scores lined up with higher returns over the next 10 sessions, on days the scores never saw. Costs are doubled. Test years were never used to choose anything.');
+  c.append($('div','big '+(d.verdict.startsWith('No edge')||d.source==='fixtures'?'warn':'good'),d.verdict.startsWith('No edge')?'NO EDGE FOUND':d.source==='fixtures'?'SAMPLE DATA':'LEAD ONLY'),$('p','lab',d.verdict));
+  const g=[['Train 2015-2022',d.train],['Test 2023-now',d.test]].map(([t,x])=>{const k=card(t);[['Periods',x.periods],['Rank link (mean)',x.ic_overall_mean],['t-stat',x.ic_overall_t],['Up-periods',x.ic_hit_rate==null?'–':Math.round(x.ic_hit_rate*100)+'%'],['Top fifth minus all, after costs',x.top_quintile_minus_all_net_pct==null?'–':x.top_quintile_minus_all_net_pct+'%']].forEach(([a,b],i)=>{const r=$('div','row'+(i?'':' first'));r.append($('span',null,a),$('span','says',String(b)));r.lastChild.style.flex='1';r.lastChild.style.flexBasis='auto';k.append(r)});return k});
+  const y=card('By year','Each year is judged out of sample. Bars right of the line = scores lined up with returns.');
+  const yrs=Object.entries(d.by_year),mx=Math.max(.05,...yrs.map(([,v])=>Math.abs(v.ic_overall_mean||0)));
+  yrs.forEach(([a,v],i)=>{const r=$('div','row'+(i?'':' first'));r.append($('span','sym',a));const b=$('div','bar'),e=$('i'),val=v.ic_overall_mean||0;e.style.width=Math.abs(val)/mx*100+'%';e.style.background=val>=0?'var(--g)':'var(--r)';b.append(e);r.append(b,$('span','n',val.toFixed(2)));y.append(r)});
+  const cv=card('Caveats');d.caveats.forEach((t,i)=>{const r=$('div','row'+(i?'':' first'));r.append($('span',null,t));cv.append(r)});
+  m.append(grid(c,...g,y,cv),disc('Historical statistics for education only. Not investment advice.'))},
+async health(m){const d=await j('health');const c=card('Data health');c.append($('div','big '+d.grade,d.grade.toUpperCase()));
+  (d.notes.length?d.notes:['No problems found.']).forEach((n,i)=>{const r=$('div','row'+(i?'':' first'));r.append($('span',null,n));c.append(r)});
+  const k=d.checks,t=card('Checks');[['Stocks in file',k.stocks_total],['Last bar',k.last_bar],['Status',Object.entries(k.status).map(e=>e.join(' ')).join(', ')],['Price jumps over 40% (1y)',k.price_jumps_over_40pct_1y],['Unmapped sectors',k.unmapped_sector],['India VIX loaded',k.has_vix?'yes':'no'],['Put/call data',k.has_pcr?'yes':'no'],['Fundamentals',k.has_fundamentals?'yes':'no']].forEach(([a,b],i)=>{const r=$('div','row'+(i?'':' first'));r.append($('span',null,a),$('span','says',String(b)));r.lastChild.style.flex='1';r.lastChild.style.flexBasis='auto';t.append(r)});
+  m.append(grid(c,t))}};
+async function route(){const h=(location.hash||'#overview').slice(1),[v,arg]=h.split('/');const k=V[v]?v:'overview';
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.hash==='#'+(k==='stock'?'stocks':k)));
+  const m=$('div');try{await V[k](m,arg?decodeURIComponent(arg):null)}catch(e){m.replaceChildren($('p','empty',e.message))}
+  document.getElementById('app').replaceChildren(m);scrollTo(0,0)}
+addEventListener('hashchange',route);route();
+</script></body></html>

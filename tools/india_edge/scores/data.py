@@ -42,6 +42,7 @@ class Panels:
         self.sector = pd.Series({s: sectors.get(s, "Other") for s in self.symbols})
         self.pcr = _pcr(fo, self.dates)
         self.fundamentals = _fund(fundamentals, self.symbols)
+        self.source = "unknown"
 
 
 def _pcr(fo, dates):
@@ -89,4 +90,7 @@ def from_market(market, sectors: dict | None = None, fundamentals: pd.DataFrame 
 def load(fundamentals_path=None, sectors_path=None) -> Panels:
     """Fixtures if DATA_DIR unset, else real day files (loader.load_market decides)."""
     from loader import load_market
-    return from_market(load_market(), load_sectors(sectors_path), read_fundamentals(fundamentals_path))
+    m = load_market()
+    P = from_market(m, load_sectors(sectors_path), read_fundamentals(fundamentals_path))
+    P.source = m.source
+    return P

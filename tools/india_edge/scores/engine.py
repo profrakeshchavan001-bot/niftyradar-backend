@@ -109,8 +109,25 @@ def status(P, cfg: dict) -> pd.DataFrame:
     return st.where(traded | (st != "ok"), "illiquid")
 
 
+def sector_mean(P, df: pd.DataFrame, mask: pd.DataFrame | None = None) -> pd.DataFrame:
+    """date x sector mean of `df` over symbols (optionally only where `mask`), via one matrix product."""
+    onehot = pd.get_dummies(P.sector).astype(float).reindex(df.columns)
+    ok = df.notna() if mask is None else (df.notna() & mask)
+    num = df.where(ok, 0.0).to_numpy() @ onehot.to_numpy()
+    den = ok.astype(float).to_numpy() @ onehot.to_numpy()
+    return pd.DataFrame(np.where(den > 0, num / np.where(den > 0, den, 1), np.nan), index=df.index, columns=onehot.columns)
+
+
+def sector_count(P, mask: pd.DataFrame) -> pd.DataFrame:
+    onehot = pd.get_dummies(P.sector).astype(float).reindex(mask.columns)
+    return pd.DataFrame(mask.astype(float).to_numpy() @ onehot.to_numpy(), index=mask.index, columns=onehot.columns)
+
+
 def _sector_median(P, df: pd.DataFrame) -> pd.DataFrame:
-    return df.T.groupby(P.sector).transform("median").T
+    out = pd.DataFrame(np.nan, index=df.index, columns=df.columns)
+    for sec, cols in P.sector.groupby(P.sector):
+        out[list(cols.index)] = np.repeat(df[list(cols.index)].median(axis=1).to_numpy()[:, None], len(cols), axis=1)
+    return out
 
 
 def compute(P, cfg: dict | None = None) -> Result:
