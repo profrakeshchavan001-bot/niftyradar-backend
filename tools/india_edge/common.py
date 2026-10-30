@@ -1,13 +1,22 @@
 """Shared paths and parquet helpers for the India Edge scanner."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parent
-DATA_DIR = ROOT / "data"
+
+
+def data_root() -> Path:
+    """Folder holding cash/fo/idx day files; override with the DATA_DIR env var."""
+    env = os.environ.get("DATA_DIR")
+    return Path(env) if env else ROOT / "data"
+
+
+DATA_DIR = data_root()
 OUT_DIR = ROOT / "out"
 DATASETS = ("cash", "fo", "idx")
 
@@ -18,7 +27,7 @@ def load_config(path: Path | None = None) -> dict:
 
 
 def dataset_dir(name: str) -> Path:
-    d = DATA_DIR / name
+    d = data_root() / name
     d.mkdir(parents=True, exist_ok=True)
     return d
 

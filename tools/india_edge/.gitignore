@@ -13,3 +13,4 @@ data/manifest.json
 data/quarantine/
 logs/
 backtest/results/
+logs/
