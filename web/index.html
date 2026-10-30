@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NiftyRadar Morning Desk</title>
+<style>
+:root{--bg:#0a0e14;--card:#111823;--line:#1e2a3a;--txt:#d6e0ee;--dim:#7f90a8;--g:#2ecc8f;--r:#ff5d6c;--a:#f5b84b;--b:#4aa3ff}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+h1{font-size:15px;margin:0;letter-spacing:.08em;color:var(--g)}
+nav{display:flex;gap:6px}nav a{color:var(--dim);text-decoration:none;padding:6px 10px;border:1px solid var(--line);border-radius:6px}
+nav a.on{color:var(--txt);border-color:var(--g)}
+main{padding:12px 16px;max-width:1100px;margin:0 auto}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));grid-auto-flow:dense;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.card h2{font-size:13px;margin:0 0 8px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+.i{margin-left:auto;width:22px;height:22px;border-radius:50%;border:1px solid var(--dim);background:none;color:var(--dim);font:inherit;font-size:12px;cursor:pointer;flex:none}
+.tip{margin:0 0 10px;padding:8px;border-left:2px solid var(--b);background:#0d1420;color:var(--dim);font-size:12px}
+.tip[hidden]{display:none}
+.gauge{display:block;margin:0 auto;width:100%;max-width:300px}
+.big{text-align:center;font-size:30px;font-weight:700}.lab{text-align:center;color:var(--dim)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);min-width:0}
+.row:first-of-type{border-top:0}.sym{font-weight:700;min-width:104px;font-size:13px}
+.bar{flex:1;height:8px;background:#1a2433;border-radius:4px;overflow:hidden;min-width:40px}.bar>i{display:block;height:100%}
+.n{width:34px;text-align:right}.says{color:var(--dim);font-size:12px;flex-basis:100%}
+.pill{font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid currentColor;white-space:nowrap}
+.Strong,.Leading,.Greed{color:var(--g)}.Weak,.Lagging,.Fear{color:var(--r)}.Mixed,.Weakening,.Neutral{color:var(--a)}.Improving{color:var(--b)}
+.disc{color:var(--dim);font-size:11px;margin:14px 0 4px}.empty{color:var(--dim);margin:4px 0 0}
+.edge-msg{font-size:16px;padding:14px;border:1px dashed var(--a);border-radius:8px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse}td,th{padding:6px 4px;text-align:left;border-top:1px solid var(--line);vertical-align:top}th{color:var(--dim);font-weight:600;font-size:12px}
+@media(max-width:480px){main{padding:10px}.sym{min-width:96px}}
+</style></head><body>
+<header><h1>NIFTYRADAR · MORNING DESK</h1>
+<nav id="nav"><a href="#desk">Desk</a><a href="#screeners">Screeners</a><a href="#scores">Scores</a><a href="#edge">Edge Stats</a></nav></header>
+<main id="app" aria-live="polite"><p class="empty">Loading…</p></main>
+<script>
+const API=(location.pathname.startsWith('/desk')?'':'')+'/api/edge/';
+const $=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const col=v=>v>=70?'var(--g)':v>=40?'var(--a)':'var(--r)';
+const NS='http://www.w3.org/2000/svg';
+function card(title,tip){const c=$('section','card'),h=$('h2');h.append($('span',null,title));
+  if(tip){const b=$('button','i','i');b.setAttribute('aria-label','About '+title);b.setAttribute('aria-expanded','false');
+    const t=$('p','tip',tip);t.hidden=true;b.onclick=()=>{t.hidden=!t.hidden;b.setAttribute('aria-expanded',String(!t.hidden))};
+    h.append(b);c.append(h,t)}else c.append(h);return c}
+function gauge(v){const s=document.createElementNS(NS,'svg');s.setAttribute('viewBox','0 0 200 120');s.setAttribute('class','gauge');
+  s.setAttribute('role','img');s.setAttribute('aria-label','Gauge '+v+' of 100');
+  const arc=(a0,a1,c)=>{const p=document.createElementNS(NS,'path'),pt=a=>[100+80*Math.cos(Math.PI*(1-a/100)),100-80*Math.sin(Math.PI*(1-a/100))];
+    const [x0,y0]=pt(a0),[x1,y1]=pt(a1);p.setAttribute('d',`M${x0} ${y0}A80 80 0 0 1 ${x1} ${y1}`);p.setAttribute('stroke',c);p.setAttribute('stroke-width','14');p.setAttribute('fill','none');return p};
+  [[0,25,'#ff5d6c'],[25,45,'#ff9a5d'],[45,55,'#f5b84b'],[55,75,'#8ccf6b'],[75,100,'#2ecc8f']].forEach(x=>s.append(arc(...x)));
+  const a=Math.PI*(1-v/100),n=document.createElementNS(NS,'line');
+  n.setAttribute('x1',100);n.setAttribute('y1',100);n.setAttribute('x2',100+62*Math.cos(a));n.setAttribute('y2',100-62*Math.sin(a));
+  n.setAttribute('stroke','#d6e0ee');n.setAttribute('stroke-width','3');n.setAttribute('stroke-linecap','round');s.append(n);return s}
+function bar(v){const b=$('div','bar'),i=$('i');i.style.width=v+'%';i.style.background=col(v);b.append(i);return b}
+function stockRow(s){const r=$('div','row');r.append($('span','sym',s.symbol),bar(s.overall.score),$('span','n',s.overall.score),$('span','pill '+s.overall.band,s.overall.band),$('div','says',s.sector+' · '+s.overall.says));return r;}
+function disc(t){return $('p','disc',t)}
+const VIEWS={
+async desk(m){const d=await j('desk');const fg=d.fear_greed;
+  const c1=card('Fear / Greed','A 0-100 reading of market mood from five public market readings. It describes the mood today; it does not predict anything.');
+  c1.append(gauge(fg.value),$('div','big',fg.value),$('div','lab '+fg.label.split(' ').pop(),fg.label));
+  fg.parts.forEach(p=>{const r=$('div','row');r.append($('span',null,p.name),bar(p.value),$('span','n',p.value));r.firstChild.style.flex='1.4';c1.append(r)});
+  const c2=card('Sector rotation','Each sector shown by its strength against the Nifty 50 over 20 days, and whether that strength is rising or falling.');
+  const mx=Math.max(1,...d.rotation.map(r=>Math.abs(r.strength)));
+  d.rotation.forEach(r=>{const w=$('div','row');const b=$('div','bar');const i=$('i');i.style.width=(Math.abs(r.strength)/mx*100)+'%';i.style.background=r.strength>=0?'var(--g)':'var(--r)';b.append(i);
+    w.append($('span','sym',r.sector),b,$('span','n',(r.strength>0?'+':'')+r.strength),$('span','pill '+r.stage,r.stage));c2.append(w)});
+  const c3=card('Top scores today','Overall score 0-100 summarising trend, momentum, volume/delivery, relative strength and sector strength. It describes what the data shows now; it is not a recommendation.');
+  d.top.forEach(s=>c3.append(stockRow(s)));
+  m.append(grid(c1,c2,c3),disc(d.disclaimer+' Data date '+d.date+'.'))},
+async scores(m){const d=await j('scores');const c=card('All scores','Five 0-100 readings per stock plus an overall. Bands: Strong, Mixed, Weak.');
+  d.stocks.forEach(s=>{const r=stockRow(s);c.append(r)});m.append(c,disc(d.disclaimer))},
+async screeners(m){const d=await j('screeners');const g=$('div','grid');
+  d.screeners.forEach(sc=>{const c=card(sc.title,'Rule: '+sc.rule+'. Shown as a statistical filter, not a recommendation.');
+    if(!sc.rows.length)c.append($('p','empty','No stocks match today.'));
+    sc.rows.forEach(r=>{const w=$('div','row');w.append($('span','sym',r.symbol),$('div','says',r.why));c.append(w)});g.append(c)});
+  m.append(g,disc(d.disclaimer))},
+async edge(m){const d=await j('edge');const msg=$('div','edge-msg',d.message);m.append(msg);
+  if(d.setups.length){const c=card('Setups tested','Hit rate = share of past cases that closed higher after '+d.horizon_days+' sessions, against the base rate for all stocks.');
+    const t=$('table');t.innerHTML='<tr><th>Setup</th><th>Cases</th><th>Hit</th><th>Base</th><th>Result</th></tr>';
+    d.setups.forEach(s=>{const r=t.insertRow();[s.name,s.samples,(s.hit_rate*100).toFixed(0)+'%',(s.base_rate*100).toFixed(0)+'%',s.survived?'Survived':'No edge'].forEach((x,i)=>{const td=r.insertCell();td.textContent=x;if(i==4)td.className=s.survived?'Strong':'Mixed'})});
+    c.append(t);m.append(c)}
+  m.append(disc(d.disclaimer||''))}};
+function grid(...c){const g=$('div','grid');g.append(...c);return g}
+async function j(n){const r=await fetch(API+n);if(!r.ok)throw new Error(r.status===503?'Data is not built yet.':'Could not load data.');return r.json()}
+async function route(){const v=(location.hash||'#desk').slice(1);const k=VIEWS[v]?v:'desk';
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.hash==='#'+k));
+  const m=$('div');try{await VIEWS[k](m)}catch(e){m.replaceChildren($('p','empty',e.message))}
+  document.getElementById('app').replaceChildren(m)}
+addEventListener('hashchange',route);route();
+</script></body></html>

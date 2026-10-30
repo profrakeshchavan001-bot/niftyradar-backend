@@ -1,0 +1,44 @@
+{
+  "asof": "2026-10-28",
+  "source": "fixture",
+  "horizon_days": 10,
+  "n_tested": 4,
+  "setups": [
+    {
+      "name": "Delivery spike + above 50-day average",
+      "samples": 412,
+      "hit_rate": 0.57,
+      "base_rate": 0.51,
+      "p_value": 0.012,
+      "survived": true,
+      "note": "Survived out-of-sample and multiple-test correction."
+    },
+    {
+      "name": "Fresh 52-week high with volume surge",
+      "samples": 230,
+      "hit_rate": 0.53,
+      "base_rate": 0.51,
+      "p_value": 0.31,
+      "survived": false,
+      "note": "Not distinguishable from base rate."
+    },
+    {
+      "name": "Sector leader pullback",
+      "samples": 96,
+      "hit_rate": 0.49,
+      "base_rate": 0.51,
+      "p_value": 0.62,
+      "survived": false,
+      "note": "Too few samples."
+    },
+    {
+      "name": "Oversold bounce",
+      "samples": 301,
+      "hit_rate": 0.5,
+      "base_rate": 0.51,
+      "p_value": 0.74,
+      "survived": false,
+      "note": "No difference from base rate."
+    }
+  ]
+}
