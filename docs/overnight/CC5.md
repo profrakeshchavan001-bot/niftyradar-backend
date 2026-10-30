@@ -21,6 +21,8 @@ Statistics on historical data, not advice.
 - Fixture data has planted per-stock trend regimes (+0.20%/-0.18% a day), so the scores show a positive rank link there (test mean 0.11). That is the generator, not an edge. On an i.i.d. random-walk world the same harness gives mean about 0 (t between -1.4 and 0.9) and negative after costs.
 - Weight sensitivity: nudging any single weight by +-25% keeps the ranking at rank correlation >= 0.998 (top-10 overlap >= 0.98) on fixtures.
 - Lookahead audit (`tests/test_leak.py`): scores, status, screeners, rotation and fear/greed for day t are identical when all later data is deleted, and identical when later data is wrecked (x9 prices, x0.1 index).
+- Screener thresholds are knife-edged: scaling one threshold by +-20% moved e.g. "Relative-strength leaders" from 9 stocks to 22 (-20%) or 1 (+20%) and "Delivery rising" from 0 to 10. Counts are shown as data, so the page lists the rule next to each screener; do not read a short list as a signal. Thresholds now live in `config.yaml` (`screeners:`); `--validate` writes the full table to `sensitivity.json`.
+- Bug found and fixed by the browser check: the stock page crashed for new listings (chained `append`). Regression test added (`tests/test_web.py`), plus a test that `serve.py` refuses `.py`/`config.yaml`.
 - Speed: 200 stocks x 3000 days full build about 5 s (was 9 s before vectorising rotation).
 
 ## Needs Rakesh

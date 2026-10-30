@@ -33,3 +33,21 @@ def run(P, R, cfg: dict | None = None, days: int = 60) -> dict:
             out[f"{k} x{f}"] = {"rank_corr": round(float(np.mean(rho)), 4), "top10_overlap": round(float(np.mean(ov)), 3)}
     worst = min(out.items(), key=lambda kv: kv[1]["rank_corr"])
     return {"days": len(last), "variants": out, "min_rank_corr": worst[1]["rank_corr"], "most_sensitive": worst[0]}
+
+
+def screener_sensitivity(P, R, cfg: dict | None = None, day=None) -> dict:
+    """Scale every screener threshold by 0.8 and 1.2 (one at a time) and report the stock count of its
+    screener. Wide swings = a screener leaning on a knife-edge threshold."""
+    from scores import screeners
+    cfg = cfg or engine.load_cfg()
+    day = day if day is not None else P.dates[-1]
+    base = {s["id"]: s["count"] for s in screeners.run(P, R, day, cfg["screeners"])}
+    out = {}
+    for k, v in cfg["screeners"].items():
+        for f in (0.8, 1.2):
+            T = dict(cfg["screeners"])
+            T[k] = v * f
+            counts = {s["id"]: s["count"] for s in screeners.run(P, R, day, T)}
+            changed = {i: [base[i], counts[i]] for i in base if counts[i] != base[i]}
+            out[f"{k} x{f}"] = changed
+    return {"base_counts": base, "variants": out}

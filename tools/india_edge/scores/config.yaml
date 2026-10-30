@@ -25,3 +25,17 @@ validate:
   cost_per_side_pct: 0.10   # base assumption; reports use DOUBLE (0.20 per side)
   train_end: "2022-12-31"
   test_start: "2023-01-01"
+screeners:               # untuned defaults; sensitivity.py scales them +-20%
+  strong_trend: 75
+  strong_overall: 60
+  pullback_trend: 65
+  pullback_drop: 0.02
+  breakout_volume: 1.5
+  rs_score: 80
+  rs_trend: 50
+  near_high: 0.03
+  delivery_ratio: 1.3
+  steady_stability: 70
+  steady_trend: 60
+  weak_overall: 30
+  weak_both: 25

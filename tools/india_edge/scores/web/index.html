@@ -102,7 +102,7 @@ async stocks(m){const d=await j('scores');const c=card('All stocks','Overall sco
   q.oninput=draw;draw();c.append(q,list);m.append(c,disc(d.disclaimer+' Data date '+d.date+'.'))},
 async stock(m,sym){const d=await j('scores');const s=d.stocks.find(x=>x.symbol===sym);if(!s){m.append($('p','empty','Unknown symbol.'));return}
   const back=$('a',null,'← all stocks');back.href='#stocks';back.style.color='var(--b)';m.append(back);
-  if(s.status!=='ok'){m.append(card(s.symbol,null)).append($('p','empty',s.note));return}
+  if(s.status!=='ok'){const n=card(s.symbol+' · '+s.sector,null);n.append($('p','empty',s.note));m.append(n);return}
   const o=s.scores.overall;const c1=card(s.symbol+' · '+s.sector,'Overall is a weighted blend of the seven scores that have data. Coverage = how many scores had data.');
   c1.append(radar(s.scores),$('div','big',o.score),$('div','lab '+o.band,o.band+' · '+o.says),$('p','note','Scores with data: '+o.coverage));
   const g=$('div','grid');g.append(c1);

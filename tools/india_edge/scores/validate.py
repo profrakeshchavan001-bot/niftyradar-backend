@@ -66,6 +66,13 @@ def run(P, R, cfg: dict | None = None) -> dict:
         rows.append(rec)
     D = pd.DataFrame(rows).set_index("date")
 
+    def max_dd(r: pd.Series) -> float | None:
+        r = r.dropna()
+        if r.empty:
+            return None
+        eq = (1 + r).cumprod()
+        return float((eq / eq.cummax() - 1).min())
+
     def summ(x: pd.DataFrame) -> dict:
         ic = x["ic_overall"].dropna()
         n = len(ic)
@@ -75,6 +82,7 @@ def run(P, R, cfg: dict | None = None) -> dict:
                 "ic_hit_rate": None if not n else round(float((ic > 0).mean()), 3),
                 "top_quintile_minus_all_net_pct": None if x["top_minus_all_net"].dropna().empty else round(float(x["top_minus_all_net"].mean() * 100), 3),
                 "top_minus_bottom_gross_pct": None if x["top_minus_bottom"].dropna().empty else round(float(x["top_minus_bottom"].mean() * 100), 3),
+                "top_quintile_max_drawdown_pct": None if max_dd(x["top_minus_all_net"]) is None else round(max_dd(x["top_minus_all_net"]) * 100, 2),
                 "ic_by_score": {k: round(float(x["ic_" + k].mean()), 4) for k in names if x["ic_" + k].notna().any()}}
 
     tr, te = pd.Timestamp(v["train_end"]), pd.Timestamp(v["test_start"])

@@ -67,3 +67,11 @@ class HarnessIsHonest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Drawdown(unittest.TestCase):
+    def test_max_drawdown_hand(self):
+        # equity 1.10 -> 0.88 -> 0.968: peak 1.10, trough 0.88 => 0.88/1.10 - 1 = -20%
+        P = mk({f"S{i}": np.linspace(100, 110, 400) for i in range(25)})
+        out = validate.run(P, engine.compute(P, CFG), CFG)
+        self.assertIn("top_quintile_max_drawdown_pct", out["all"])
