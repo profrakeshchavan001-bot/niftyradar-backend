@@ -44,6 +44,23 @@ def stock_card(P, R, s, day, cfg) -> dict:
     return out
 
 
+HISTORY_DAYS = 120
+
+
+def history(P, R, day, days: int = HISTORY_DAYS) -> dict:
+    """Last `days` sessions of each score per scored stock (null where not scored). Sparklines only."""
+    pos = P.dates.get_loc(day)
+    sl = slice(max(0, pos - days + 1), pos + 1)
+    dates = P.dates[sl]
+    stocks = {}
+    for s in P.symbols:
+        if R.status.at[day, s] != "ok":
+            continue
+        row = {k: [None if pd.isna(x) else int(round(x)) for x in R.scores[k][s].iloc[sl]] for k in (*engine.NAMES, "overall") if k in R.scores}
+        stocks[s] = {k: v for k, v in row.items() if any(x is not None for x in v)}
+    return {"schema": SCHEMA, "dates": [f"{d:%Y-%m-%d}" for d in dates], "stocks": stocks}
+
+
 def build(P, cfg=None, day=None) -> dict:
     cfg = cfg or engine.load_cfg()
     R = engine.compute(P, cfg)
@@ -61,6 +78,7 @@ def build(P, cfg=None, day=None) -> dict:
         "rotation": {"schema": SCHEMA, "date": d, "sectors": rotation.board(P, R, day, cfg), "disclaimer": DISCLAIMER},
         "feargreed": {"schema": SCHEMA, "date": d, **feargreed.public(P, R, day, cfg), "disclaimer": DISCLAIMER},
         "health": {"schema": SCHEMA, "date": d, **h},
+        "history": history(P, R, day),
         "overview": {"schema": SCHEMA, "date": d, "scored": len(scored), "top": scored[:8], "bottom": scored[-5:][::-1],
                      "avg_overall": None if not scored else int(round(np.mean([c["scores"]["overall"]["score"] for c in scored]))),
                      "health_grade": h["grade"], "disclaimer": DISCLAIMER},

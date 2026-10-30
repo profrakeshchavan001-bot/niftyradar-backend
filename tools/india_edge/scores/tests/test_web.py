@@ -38,6 +38,20 @@ class Page(unittest.TestCase):
         # Node.append() returns undefined, so `x.append(...).append(...)` throws at runtime
         self.assertIsNone(re.search(r"\.append\([^;]*\)\)?\.append\(", self.html))
 
+    def test_dark_and_light_themes_and_safe_storage(self):
+        self.assertIn(":root[data-theme=light]", self.html)
+        self.assertIn("prefers-color-scheme:light", self.html)
+        self.assertRegex(self.html, r"try\{t=localStorage\.getItem\('theme'\)\}catch")        # storage may be blocked
+        self.assertRegex(self.html, r"try\{localStorage\.setItem\('theme',nx\)\}catch")
+
+    def test_empty_states_not_fake_numbers(self):
+        for msg in ("The validation has not been run", "No stocks match today", "No history file for this stock", "Not enough history"):
+            self.assertIn(msg, self.html)
+
+    def test_tables_are_sortable_and_accessible(self):
+        self.assertIn("aria-sort", self.html)
+        self.assertIn("scope", self.html)
+
     def test_font_sizes_not_tiny(self):
         sizes = [float(x) for x in re.findall(r"font-size:\s*([\d.]+)px", self.html)]
         self.assertTrue(sizes and min(sizes) >= 11)
