@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="data-base" content="../out/">
 <title>NiftyRadar Scores</title>
 <style>
 :root{--bg:#0a0e14;--card:#111823;--line:#1e2a3a;--txt:#d6e0ee;--dim:#8a9bb2;--g:#2ecc8f;--r:#ff5d6c;--a:#f5b84b;--b:#4aa3ff}
@@ -34,7 +35,7 @@ input[type=search]{width:100%;padding:10px;background:#0d1420;border:1px solid v
 <nav id="nav"><a href="#overview">Overview</a><a href="#screeners">Screeners</a><a href="#stocks">Stocks</a><a href="#validation">Does it work?</a><a href="#health">Data health</a></nav></header>
 <main id="app" aria-live="polite"><p class="empty">Loading…</p></main>
 <script>
-const BASE=new URL('../out/',location.href).href;
+const BASE=new URL((document.querySelector('meta[name=data-base]')||{}).content||'../out/',location.href).href;
 const $=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
 const NS='http://www.w3.org/2000/svg';
 const sv=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.append(e);return e};
