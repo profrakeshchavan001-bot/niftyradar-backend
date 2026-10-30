@@ -40,6 +40,18 @@ No bucket is under 100 trades except top-5 "index" (flagged above); its train +0
 
 Other notes: grade/setup tables use every candidate row, not only the daily top 5, so grade C exists; trades overlap across days. Adjusting prices did not change the conclusion: unadjusted Layer 1 test was −0.066R to −0.079R, adjusted is −0.134R. Layer 2 is still a daily proxy; real 15-minute timing and IV/spread vetoes remain untested for lack of data. Earlier reliability audit below still applies, except item 4 (corporate actions), which is now fixed in the backtest.
 
+## Pattern hunt on real data (added 30 Oct 2026): still NO edge
+
+28 rules tested (`backtest/pattern_hunt.py`): own-code SMC concepts (BOS, liquidity sweep, fair-value-gap retest, order-block retest; long and short) plus 10 classic patterns (engulfing, hammer/shooting star, inside-bar break, NR7 break, 20-day Donchian break, 20/50 MA cross, RSI(2) reversion, gap fade, 52-week break, morning/evening star). Adjusted prices, top 300 by turnover, next-open entry, 1.5 ATR stop, 2R target, 5-day exit, 0.1R cost. Train 2015-22, test 2023 to 30 Oct 2026. Nothing tuned; rules were fixed before running.
+
+- **Survivors (positive net R on both train and test, 100+ trades each): none.** 27 of 28 rules are negative on test; the one positive test value (order-block long, +0.025R on 549 trades, t=0.65) was -0.169R on train and is noise.
+- Average net R sits around -0.06 to -0.24 per trade with t-stats mostly below -5, i.e. the rules lose roughly the cost plus the stop-first assumption; no pattern adds measurable gross edge.
+- **Lookahead audit passed:** 1,764 truncated-vs-full signal comparisons, 0 mismatches; a deliberately leaky rule was caught by the same check. Entry and exit read only bars after the signal bar.
+- Base rates for the website "Edge Stats" page: `backtest/edge_stats.json` (all 28 rules, train/test, with an empty survivor list and a plain disclaimer).
+- Caveats: overlapping trades and same-day clustering mean t-stats are overstated; a daily-bar stop-first rule is conservative; intraday timing and options pricing remain untested.
+
+**Verdict unchanged: no edge found. Do not trade these rules. Nothing here is a guarantee of profit.**
+
 ---
 
 
