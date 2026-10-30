@@ -1,8 +1,51 @@
-# India Edge 3-Layer Backtest Report, 30 Oct 2026
+# India Edge Backtest Report, 30 Oct 2026
+
+## Verdict: NO edge
+
+Re-run on split/bonus-adjusted prices (`robust.adjust_corporate_actions`, the live loader's adjustment; 1,949 corporate-action events on 4.97M cash rows). Train 2015-22, test 2023 to 29 Oct 2026, 0.1R cost per trade, all tuning on train only (`backtest/adjusted_run.py`). **No setup and no grade is positive net of cost on both train and test.** The tuned Layer 1+2+3 stack is +0.057R on train (796 trades) and **−0.110R on test (301 trades, PF 0.76)**, so the train result is overfit. Do not trade it. Paper-trade and watchlist use only.
+
+Recalibrated Layer 1 on adjusted data: weights quadrant 10, delivery 20, RS 20, sector RS 20, unusual OI 30; A ≥ 70, B ≥ 60. Tuned filters: close in the signal direction (upper/lower 40% of range), squeeze, ER ≥ 0.15, skip expiry. Layer 1 alone: train −0.052R (3,717 trades), test −0.134R (1,514).
+
+### Per setup (all qualifying candidates; net R after 0.1R cost; 100+ trades needed to trust)
+
+| Setup | Train trades | Train net R | Test trades | Test net R | Positive on both? |
+|---|---|---|---|---|---|
+| trend | 30,298 | −0.098 | 16,291 | −0.087 | no |
+| pullback | 20,039 | −0.124 | 11,340 | −0.103 | no |
+| event* | 1,128 | −0.035 | 625 | −0.102 | no |
+| index | 4,833 | −0.094 | 2,978 | −0.071 | no |
+
+### Per grade (all qualifying candidates)
+
+| Grade | Train trades | Train net R | Test trades | Test net R | Positive on both? |
+|---|---|---|---|---|---|
+| A | 1,849 | −0.078 | 602 | −0.130 | no |
+| B | 2,784 | −0.070 | 1,120 | −0.139 | no |
+| C | 51,665 | −0.109 | 29,512 | −0.089 | no |
+
+### Daily top-5 A/B trades only (what the desk would actually take)
+
+| Bucket | Train trades | Train net R | Test trades | Test net R |
+|---|---|---|---|---|
+| trend | 2,543 | −0.057 | 996 | −0.148 |
+| pullback | 600 | −0.095 | 214 | −0.129 |
+| event* | 517 | +0.009 | 268 | −0.100 |
+| index | 57 (too few to trust) | +0.105 | 36 (too few to trust) | −0.016 |
+| grade A | 1,741 | −0.080 | 593 | −0.129 |
+| grade B | 1,976 | −0.026 | 921 | −0.136 |
+
+No bucket is under 100 trades except top-5 "index" (flagged above); its train +0.105R did not hold on test, so it is noise. Grade A is not better than B or C, so the score does not rank trade quality.
+
+\*"event" is a fixed definition made before looking at results: signal-day volume ≥ 2x its prior 20-day mean and |gap| ≥ 1.5%. It takes priority over trend/pullback/index. Event buckets overlap rows that earlier ran as trend or pullback.
+
+Other notes: grade/setup tables use every candidate row, not only the daily top 5, so grade C exists; trades overlap across days. Adjusting prices did not change the conclusion: unadjusted Layer 1 test was −0.066R to −0.079R, adjusted is −0.134R. Layer 2 is still a daily proxy; real 15-minute timing and IV/spread vetoes remain untested for lack of data. Earlier reliability audit below still applies, except item 4 (corporate actions), which is now fixed in the backtest.
+
+---
+
 
 Data: NSE bhavcopy 2015-01-01 to 2026-10-29 (2,918 days, cash + F&O + index). Train 2015-22, test 2023 to 29 Oct 2026. 0.1R cost per trade, next-open entry, 1.5 ATR stop, 2R target, 5-day exit. Every threshold was tuned on train only; test was run once, untouched. Statistics on historical data, not advice.
 
-## Result: no tradable edge on the test period
+## Earlier run on unadjusted prices (superseded by the verdict above)
 
 | Variant (params fixed from train) | Train trades | Train net R | Test trades | Test net R | Test PF | Test win % |
 |---|---|---|---|---|---|---|

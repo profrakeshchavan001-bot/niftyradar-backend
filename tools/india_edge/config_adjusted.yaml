@@ -1,0 +1,32 @@
+# tuned on adjusted prices, train only
+weights:
+  quadrant: 10.0
+  delivery: 20.0
+  rs: 20.0
+  sector_rs: 20.0
+  unusual_oi: 30.0
+grades:
+  A: 70
+  B: 60
+thresholds:
+  quadrant_reversal_weight: 0.6
+  delivery_spike_mult: 1.5
+  delivery_full_mult: 2.0
+  rs_full_pct: 10.0
+  sector_rs_full_pct: 5.0
+  unusual_oi_flag: 2.0
+  unusual_oi_full: 3.0
+  index_sector_min: 0.5
+  index_stock_max: 0.3
+universe:
+  size: 60
+  lookback_days: 20
+lookback: 20
+min_adv_cr: 50
+top_n: 5
+layers:
+  l2: close
+  squeeze: true
+  chop: 0.15
+  event: false
+  expiry: true
