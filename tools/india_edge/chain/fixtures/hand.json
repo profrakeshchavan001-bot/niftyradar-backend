@@ -1,0 +1,24 @@
+{
+  "cur": {
+    "symbol": "HAND", "asOf": "2026-10-29", "expiry": "2026-11-27", "spot": 121,
+    "rows": [
+      { "strike": 100, "ce": { "oi": 100, "vol": 50,  "oiChg": 10,  "ltp": 24 },  "pe": { "oi": 400, "vol": 300, "oiChg": 50,  "ltp": 0.5 } },
+      { "strike": 110, "ce": { "oi": 200, "vol": 120, "oiChg": -20, "ltp": 15 },  "pe": { "oi": 800, "vol": 500, "oiChg": 200, "ltp": 2 } },
+      { "strike": 120, "ce": { "oi": 500, "vol": 400, "oiChg": 100, "ltp": 8 },   "pe": { "oi": 600, "vol": 450, "oiChg": 150, "ltp": 6 } },
+      { "strike": 130, "ce": { "oi": 900, "vol": 700, "oiChg": 300, "ltp": 4 },   "pe": { "oi": 150, "vol": 100, "oiChg": -30, "ltp": 12 } },
+      { "strike": 140, "ce": { "oi": 300, "vol": 200, "oiChg": 50,  "ltp": 1.5 }, "pe": { "oi": 50,  "vol": 30,  "oiChg": -10, "ltp": 20 } }
+    ]
+  },
+  "prev": {
+    "symbol": "HAND", "asOf": "2026-10-28", "expiry": "2026-11-27", "spot": 119,
+    "rows": [
+      { "strike": 100, "ce": { "oi": 100, "vol": 40, "oiChg": 0, "ltp": 20 },  "pe": { "oi": 900, "vol": 300, "oiChg": 0, "ltp": 1 } },
+      { "strike": 110, "ce": { "oi": 150, "vol": 90, "oiChg": 0, "ltp": 11 },  "pe": { "oi": 300, "vol": 200, "oiChg": 0, "ltp": 2 } },
+      { "strike": 120, "ce": { "oi": 400, "vol": 300, "oiChg": 0, "ltp": 6 },  "pe": { "oi": 400, "vol": 300, "oiChg": 0, "ltp": 6 } },
+      { "strike": 130, "ce": { "oi": 700, "vol": 500, "oiChg": 0, "ltp": 2 },  "pe": { "oi": 100, "vol": 80, "oiChg": 0, "ltp": 15 } },
+      { "strike": 140, "ce": { "oi": 950, "vol": 600, "oiChg": 0, "ltp": 0.5 }, "pe": { "oi": 40, "vol": 20, "oiChg": 0, "ltp": 25 } }
+    ]
+  },
+  "participants": { "fii": { "longs": 120000, "shorts": 80000 }, "pro": { "longs": 85000, "shorts": 115000 } },
+  "prevParticipants": { "fii": { "longs": 100000, "shorts": 90000 }, "pro": { "longs": 90000, "shorts": 100000 } }
+}
