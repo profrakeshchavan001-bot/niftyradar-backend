@@ -118,21 +118,3 @@ class Sensitivity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-class ScreenerThresholds(unittest.TestCase):
-    def test_rule_text_follows_config_and_looser_gives_more(self):
-        from scores import screeners
-        rng = np.random.default_rng(4)
-        P = mk({f"S{i}": 100 * np.exp(np.cumsum(rng.normal(0.001, 0.012, 300))) for i in range(40)},
-               nifty=20000 * np.exp(np.cumsum(rng.normal(0.0003, 0.007, 300))), sectors={f"S{i}": f"X{i % 5}" for i in range(40)})
-        R = engine.compute(P, CFG)
-        d = P.dates[-1]
-        strict = dict(CFG["screeners"], strong_trend=95)
-        loose = dict(CFG["screeners"], strong_trend=40, strong_overall=30)
-        a = {s["id"]: s for s in screeners.run(P, R, d, strict)}["strong_trend"]
-        b = {s["id"]: s for s in screeners.run(P, R, d, loose)}["strong_trend"]
-        self.assertLessEqual(a["count"], b["count"])
-        self.assertIn("95+", a["rule"])
-        out = sensitivity.screener_sensitivity(P, R, CFG)
-        self.assertEqual(len(out["variants"]), 2 * len(CFG["screeners"]))

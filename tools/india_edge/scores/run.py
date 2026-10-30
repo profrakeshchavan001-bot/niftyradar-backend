@@ -30,6 +30,7 @@ def main(argv=None) -> int:
         from scores import sensitivity
         out["validation"] = validate.run(P, R)
         out["sensitivity"] = {**sensitivity.run(P, R), "screeners": sensitivity.screener_sensitivity(P, R)}
+        out["heatmap"] = sensitivity.heatmap(P, R)
     names = build.write(out, Path(a.out))
     print(f"{out['overview']['date']}: {out['overview']['scored']} scored, health {out['health']['grade']} -> {a.out} ({', '.join(names)})")
     return 0

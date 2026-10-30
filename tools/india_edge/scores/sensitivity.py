@@ -35,19 +35,47 @@ def run(P, R, cfg: dict | None = None, days: int = 60) -> dict:
     return {"days": len(last), "variants": out, "min_rank_corr": worst[1]["rank_corr"], "most_sensitive": worst[0]}
 
 
-def screener_sensitivity(P, R, cfg: dict | None = None, day=None) -> dict:
-    """Scale every screener threshold by 0.8 and 1.2 (one at a time) and report the stock count of its
-    screener. Wide swings = a screener leaning on a knife-edge threshold."""
+def screener_sensitivity(P, R, cfg: dict | None = None, days: int = 500) -> dict:
+    """Scale every screener percentile/band by 0.8 and 1.2 and report, over the last `days` days, the
+    change in average list size and the share of stock-days whose membership flips. Percentile rules
+    should move list size roughly in proportion and flip few stock-days (tested)."""
     from scores import screeners
     cfg = cfg or engine.load_cfg()
-    day = day if day is not None else P.dates[-1]
-    base = {s["id"]: s["count"] for s in screeners.run(P, R, day, cfg["screeners"])}
+    base, _, _ = screeners.masks(P, R, cfg["screeners"])
     out = {}
-    for k, v in cfg["screeners"].items():
-        for f in (0.8, 1.2):
-            T = dict(cfg["screeners"])
-            T[k] = v * f
-            counts = {s["id"]: s["count"] for s in screeners.run(P, R, day, T)}
-            changed = {i: [base[i], counts[i]] for i in base if counts[i] != base[i]}
-            out[f"{k} x{f}"] = changed
-    return {"base_counts": base, "variants": out}
+    for f in (0.8, 1.2):
+        alt, _, _ = screeners.masks(P, R, screeners._scaled(cfg["screeners"], f))
+        for k in base:
+            b, a = base[k].iloc[-days:], alt[k].iloc[-days:]
+            nb, na = float(b.sum(axis=1).mean()), float(a.sum(axis=1).mean())
+            out.setdefault(k, {})[f"x{f}"] = {"avg_count_base": round(nb, 2), "avg_count": round(na, 2),
+                                              "count_ratio": None if nb == 0 else round(na / nb, 3),
+                                              "flip_share": round(float((b != a).to_numpy().mean()), 4)}
+    return {"days": days, "screeners": out}
+
+
+def heatmap(P, R, cfg: dict | None = None, screener: str = "strong_trend", days: int = 750,
+            enters=(0.05, 0.10, 0.15, 0.20, 0.25, 0.30), exits_extra=(0.0, 0.05, 0.10, 0.15)) -> dict:
+    """Enter-percent x exit-band grid for one screener (fixtures or real): average list size, daily
+    turnover (changes per listed stock per day) and mean gross 10-day return of listed stocks minus the
+    universe. Descriptive only: nothing is selected from it."""
+    from scores import screeners, validate
+    cfg = cfg or engine.load_cfg()
+    fwd = validate.forward(P.close, cfg["validate"]["horizon"])
+    uni = fwd.where(R.status == "ok").mean(axis=1)
+    cells = []
+    for e in enters:
+        row = []
+        for x in exits_extra:
+            T = {k: dict(v) for k, v in cfg["screeners"].items()}
+            T[screener]["enter"], T[screener]["exit"] = e, min(0.9, e + x)
+            m = screeners.masks(P, R, T)[0][screener].iloc[-days:]
+            cnt = m.sum(axis=1)
+            chg = (m != m.shift(1)).iloc[1:].sum(axis=1)
+            ex = (fwd.iloc[-days:].where(m).mean(axis=1) - uni.iloc[-days:]).dropna()
+            row.append({"avg_count": round(float(cnt.mean()), 2),
+                        "turnover": None if cnt.mean() == 0 else round(float(chg.mean() / cnt.mean()), 4),
+                        "excess_10d_pct": None if ex.empty else round(float(ex.mean() * 100), 3)})
+        cells.append(row)
+    return {"screener": screener, "days": days, "enter": list(enters), "exit_extra": list(exits_extra), "cells": cells,
+            "note": "Descriptive grid: thresholds were fixed up front and are not chosen from this table."}

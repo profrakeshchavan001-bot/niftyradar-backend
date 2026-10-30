@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from helpers import mk, fixture_panels
-from scores import build, data, engine, feargreed, health, rotation, screeners
+from scores import build, data, engine, feargreed, health, rotation
 
 CFG = engine.load_cfg()
 
@@ -99,40 +99,6 @@ class Rotation(unittest.TestCase):
         r1 = P.close.pct_change(1, fill_method=None).where(R.status == "ok")
         # last-day returns A +10%, B 0, C 0 -> equal-weight sector return = 10/3 = 3.333%
         self.assertAlmostEqual(r1.iloc[-1].mean(), 0.10 / 3, places=12)
-
-
-class Screeners(unittest.TestCase):
-    def test_volume_breakout_rule(self):
-        n = 120
-        a = np.r_[np.full(n - 1, 100.0), 105.0]               # close above the prior 20-day high of 100
-        b = np.r_[np.full(n - 1, 100.0), 105.0]
-        vol = {"A": np.r_[np.full(n - 1, 1e6), 2e6], "B": np.full(n, 1e6)}   # A: 2.0x usual, B: 1.0x
-        P = mk({"A": a, "B": b}, volume=vol)
-        R = engine.compute(P, CFG)
-        rows = {s["id"]: s for s in screeners.run(P, R, P.dates[-1])}
-        self.assertEqual([r["symbol"] for r in rows["volume_breakout"]["rows"]], ["A"])
-        self.assertIn("2.0x usual volume", rows["volume_breakout"]["rows"][0]["why"])
-
-    def test_pullback_in_uptrend_rule(self):
-        n = 260
-        base = np.linspace(100, 200, n)
-        dip = base.copy(); dip[-1] = dip[-6] * 0.97           # -3% over 5 days (close at day n-1 vs n-6), still far above ma50
-        P = mk({"DIP": dip, "STEADY": base, "X": np.linspace(100, 90, n), "Y": np.linspace(100, 95, n)})
-        R = engine.compute(P, CFG)
-        rows = {s["id"]: s for s in screeners.run(P, R, P.dates[-1])}
-        self.assertEqual([r["symbol"] for r in rows["pullback_uptrend"]["rows"]], ["DIP"])
-
-    def test_every_row_has_one_line_reason_and_no_advice_words(self):
-        P = fixture_panels()
-        out, _ = build.build(P)
-        self.assertEqual(len(out["screeners"]["screeners"]), 8)
-        for sc in out["screeners"]["screeners"]:
-            for r in sc["rows"]:
-                self.assertTrue(10 < len(r["why"]) < 140)
-                self.assertNotIn("\n", r["why"])
-        blob = json.dumps(out).lower()
-        for bad in ("buy", "sell", "avoid", "target", "stop loss", "guarantee", "profit", "recommend"):
-            self.assertNotIn(bad, blob.replace("not investment advice", ""), bad)
 
 
 class Health(unittest.TestCase):

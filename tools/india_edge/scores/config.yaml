@@ -25,17 +25,12 @@ validate:
   cost_per_side_pct: 0.10   # base assumption; reports use DOUBLE (0.20 per side)
   train_end: "2022-12-31"
   test_start: "2023-01-01"
-screeners:               # untuned defaults; sensitivity.py scales them +-20%
-  strong_trend: 75
-  strong_overall: 60
-  pullback_trend: 65
-  pullback_drop: 0.02
-  breakout_volume: 1.5
-  rs_score: 80
-  rs_trend: 50
-  near_high: 0.03
-  delivery_ratio: 1.3
-  steady_stability: 70
-  steady_trend: 60
-  weak_overall: 30
-  weak_both: 25
+screeners:               # untuned. Percent = share of scored stocks (top/bottom); enter/exit = hysteresis band
+  strong_trend:     {enter: 0.15, exit: 0.25, overall: 0.40}   # trend top 15%, stays until out of top 25%; overall top 40%
+  pullback_uptrend: {enter: 0.15, exit: 0.25, trend: 0.35}     # 5-day return in the bottom 15%; trend top 35%
+  volume_breakout:  {enter: 0.15}                              # one-day event: volume ratio top 15%
+  rs_leaders:       {enter: 0.15, exit: 0.25, trend: 0.60}
+  near_52w_high:    {enter: 0.03, exit: 0.05}                  # distance below the 52-week high (a fraction, not a rank)
+  delivery_rise:    {enter: 0.15, exit: 0.25}
+  steady_uptrend:   {enter: 0.25, exit: 0.35, trend: 0.40}
+  weakest:          {enter: 0.15, exit: 0.25}
