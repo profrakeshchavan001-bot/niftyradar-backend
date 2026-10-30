@@ -1,0 +1,185 @@
+{
+ "files": 2919,
+ "calendar_days": 2919,
+ "first": "2015-01-01",
+ "last": "2026-10-30",
+ "calendar_days_without_file": [],
+ "NIFTY": {
+  "rows": 6205641,
+  "days": 2919,
+  "min_rows_per_day": 1265,
+  "settle_nonpositive_rows": 218273,
+  "by_year": {
+   "2015": {
+    "days": 247,
+    "median_rows_per_day": 2158,
+    "distinct_expiries": 25,
+    "median_live_contracts": 535
+   },
+   "2016": {
+    "days": 246,
+    "median_rows_per_day": 2095,
+    "distinct_expiries": 26,
+    "median_live_contracts": 512
+   },
+   "2017": {
+    "days": 248,
+    "median_rows_per_day": 2143,
+    "distinct_expiries": 27,
+    "median_live_contracts": 566
+   },
+   "2018": {
+    "days": 246,
+    "median_rows_per_day": 2306,
+    "distinct_expiries": 26,
+    "median_live_contracts": 618
+   },
+   "2019": {
+    "days": 244,
+    "median_rows_per_day": 3272,
+    "distinct_expiries": 68,
+    "median_live_contracts": 708
+   },
+   "2020": {
+    "days": 250,
+    "median_rows_per_day": 2294,
+    "distinct_expiries": 73,
+    "median_live_contracts": 772
+   },
+   "2021": {
+    "days": 247,
+    "median_rows_per_day": 2097,
+    "distinct_expiries": 73,
+    "median_live_contracts": 863
+   },
+   "2022": {
+    "days": 248,
+    "median_rows_per_day": 2227,
+    "distinct_expiries": 72,
+    "median_live_contracts": 1104
+   },
+   "2023": {
+    "days": 245,
+    "median_rows_per_day": 1365,
+    "distinct_expiries": 71,
+    "median_live_contracts": 884
+   },
+   "2024": {
+    "days": 246,
+    "median_rows_per_day": 1610,
+    "distinct_expiries": 70,
+    "median_live_contracts": 1078
+   },
+   "2025": {
+    "days": 248,
+    "median_rows_per_day": 1570,
+    "distinct_expiries": 83,
+    "median_live_contracts": 1138
+   },
+   "2026": {
+    "days": 204,
+    "median_rows_per_day": 1735,
+    "distinct_expiries": 61,
+    "median_live_contracts": 1239
+   }
+  },
+  "parity_forward_spread_median_pts": 20.7,
+  "parity_days_spread_gt_100": 451,
+  "stale_close_vs_settle_pct": 72.6,
+  "expiry_weekdays": {
+   "Thursday": 387,
+   "Tuesday": 71,
+   "Wednesday": 18,
+   "Monday": 9
+  }
+ },
+ "BANKNIFTY": {
+  "rows": 3527746,
+  "days": 2919,
+  "min_rows_per_day": 232,
+  "settle_nonpositive_rows": 50966,
+  "by_year": {
+   "2015": {
+    "days": 247,
+    "median_rows_per_day": 294,
+    "distinct_expiries": 14,
+    "median_live_contracts": 138
+   },
+   "2016": {
+    "days": 246,
+    "median_rows_per_day": 814,
+    "distinct_expiries": 46,
+    "median_live_contracts": 152
+   },
+   "2017": {
+    "days": 248,
+    "median_rows_per_day": 897,
+    "distinct_expiries": 62,
+    "median_live_contracts": 188
+   },
+   "2018": {
+    "days": 246,
+    "median_rows_per_day": 979,
+    "distinct_expiries": 62,
+    "median_live_contracts": 224
+   },
+   "2019": {
+    "days": 244,
+    "median_rows_per_day": 1129,
+    "distinct_expiries": 62,
+    "median_live_contracts": 276
+   },
+   "2020": {
+    "days": 250,
+    "median_rows_per_day": 1854,
+    "distinct_expiries": 65,
+    "median_live_contracts": 385
+   },
+   "2021": {
+    "days": 247,
+    "median_rows_per_day": 2186,
+    "distinct_expiries": 65,
+    "median_live_contracts": 590
+   },
+   "2022": {
+    "days": 248,
+    "median_rows_per_day": 1622,
+    "distinct_expiries": 63,
+    "median_live_contracts": 850
+   },
+   "2023": {
+    "days": 245,
+    "median_rows_per_day": 1231,
+    "distinct_expiries": 67,
+    "median_live_contracts": 711
+   },
+   "2024": {
+    "days": 246,
+    "median_rows_per_day": 1490,
+    "distinct_expiries": 59,
+    "median_live_contracts": 931
+   },
+   "2025": {
+    "days": 248,
+    "median_rows_per_day": 920,
+    "distinct_expiries": 28,
+    "median_live_contracts": 568
+   },
+   "2026": {
+    "days": 204,
+    "median_rows_per_day": 974,
+    "distinct_expiries": 16,
+    "median_live_contracts": 573
+   }
+  },
+  "parity_forward_spread_median_pts": 128.35,
+  "parity_days_spread_gt_100": 1608,
+  "stale_close_vs_settle_pct": 68.0,
+  "expiry_weekdays": {
+   "Thursday": 405,
+   "Wednesday": 78,
+   "Tuesday": 24,
+   "Monday": 3
+  }
+ }
+}

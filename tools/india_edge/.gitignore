@@ -6,3 +6,11 @@ out/*
 !out/.gitkeep
 universe.json
 __pycache__/
+data/idxopt/
+data/idxopt_raw/
+data/nifty/
+data/idxopt_nifty.parquet
+data/idxopt_banknifty.parquet
+backtest/out/
+backtest/results/
+logs/
