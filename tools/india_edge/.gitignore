@@ -9,3 +9,4 @@ __pycache__/
 backtest/out/*
 !backtest/out/.gitkeep
 logs/
+scores/out/

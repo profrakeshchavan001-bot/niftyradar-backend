@@ -1,0 +1,27 @@
+# SERVER-SIDE ONLY. Never copied into out/public or any web file.
+# Every number here is an UNTUNED default chosen up front (not fitted to any data).
+min_history: 60          # bars before a stock gets a score (else status new_listing)
+stale_zero_volume: 3     # >= this many zero-volume days in the last 5 -> status illiquid
+band_strong: 70
+band_mixed: 40
+weights:
+  trend: 0.20
+  momentum: 0.20
+  relative_strength: 0.20
+  volume_delivery: 0.15
+  volatility: 0.10
+  quality: 0.075         # only when a fundamentals file exists
+  valuation: 0.075       # only when a fundamentals file exists
+fear_greed:
+  window: 252            # trailing days used to place each reading on 0-100
+  min_window: 120
+  bands: [25, 45, 55, 75]
+rotation:
+  min_stocks: 3
+  rs_ma: 60
+  change_days: 10
+validate:
+  horizon: 10
+  cost_per_side_pct: 0.10   # base assumption; reports use DOUBLE (0.20 per side)
+  train_end: "2022-12-31"
+  test_start: "2023-01-01"
