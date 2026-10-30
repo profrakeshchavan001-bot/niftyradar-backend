@@ -1,0 +1,25 @@
+# CC12 decisions (tools/india_edge/chain)
+
+Where the brief was ambiguous I picked the safer reading and logged it. Change any of these in one place (named module).
+
+| # | Topic | Decision | Where |
+|---|---|---|---|
+| 1 | Repo state | No Signal Box contract, no "docs rules" for Power Stocks and no `docs/` folder existed on `main`. Record keys follow the brief exactly (`symbol, support, resistance, reversal_s, reversal_r, flags[], market_score, fii_pulse`) plus `group: "derivatives"`, `date`, `spot`, `expiry`, `detail{}`. **CC5/CC8: map to the real contract if it differs.** | signalbox.py |
+| 2 | Support / resistance | Support = PE strikes at or below spot; resistance = CE strikes at or above spot. Ties go to the strike nearest spot. Primary = by OI; vol and OI-change versions reported too. | sr.py |
+| 3 | Colour tags | Top strike red (CE) / green (PE), 2nd yellow, then any strike with >= 75 % of the top is light yellow. Computed on OI over the relevant half only. | sr.py |
+| 4 | PCR | sum PE OI / sum CE OI over the whole chain; green > 1.2, red < 0.8, exactly 1.2 / 0.8 stay grey. | sr.py |
+| 5 | Reversal price | Premiums repriced with Black-Scholes (r = 7 %, no dividend), per-strike IV from the traded premium, India VIX when the premium is unusable. `level` = exact root of CE-PE = 0 on a +-30 % bracket; `projection` = spot - gap/(delta_CE + abs(delta_PE)) (puts have negative delta, so magnitudes are added). Primary output uses `level`, falls back to `projection`. Expiry-day time floor is 0.5 day. | reversal.py |
+| 6 | Gap-zero cross | CE-PE flips + to - = `SUPPORT_BREAK`; - to + on the resistance pair = `RESISTANCE_BREAK`. Compared against the previous day for the same strikes. | reversal.py, signalbox.py |
+| 7 | Shift flags | SFT = resistance strike down, SFB = support strike up, STT = both up, STB = both down (my reading of STT/STB; the brief did not define them). TOT: S up/R up strong-bull; one up and other same bull; same/same neutral; one down and other same bear; both down strong-bear; opposite moves (up/down, down/up) neutral. | shifts.py |
+| 8 | S/R Stocks | Tolerance 0.05 % inclusive, cooldown 600 s per (symbol, side), badge `x2`, `x3`... from the 2nd alert. The EOD run only sees the close, so EOD flags `SR_*_TOUCH` mean "close within 0.05 % of the level"; the tick scanner is for live use. | screeners.py |
+| 9 | Power Stocks | Bull: PE adds >= 2.5x CE adds, PCR >= 1, support strike is also the top PE OI-change strike. Bear mirrors. (Own rule because the docs it referred to are not in the repo.) | screeners.py |
+| 10 | Oi2Oi | Entry: price within 0.5 % of the max-PE-OI strike. SL = distance to the 2nd-highest PE OI strike below it (one strike step if none); "far" = SL >= 0.3 % of price. Room = max-CE-OI strike - spot. Skip if room < SL. Short mirrors. | screeners.py |
+| 11 | Big Bull / Bear | Max ITM call OI (strike < spot) > max call OI at/above spot = trapped writers; puts mirror. Live gate: 09:30-14:30 inclusive, once per (date, symbol, side). EOD records carry the raw condition. | screeners.py |
+| 12 | Market overview, 8 signals | PE share of positive OI-change (Nifty, BankNifty, 2 signals), PCR (Nifty, BankNifty, 2), Nifty futures premium change, 5-index premium (>= 4 of 5 same direction), sectors (>= 9 of 11 green/red), breadth (advancers among the F&O universe >= 55 / <= 45). Score = (net+8)/16*100. Labels: >= 75 Strong Bull, 60-74.99 Bull, 40-59.99 Neutral, 25.01-39.99 Bear, <= 25 Strong Bear (the brief's "Bear < 40" and "Strong Bear <= 25" overlap; strong wins). | market.py |
+| 13 | FII + Pro pulse | Net (long-short) of FII + Pro combined, day-over-day change; +1/0/-1 per item; PE up counts bear. Total >= +2 bull, <= -2 bear. DII and Client excluded. | market.py |
+| 14 | MMI | Own formula, mean of 6 parts scaled 0-1 (PCR 0.5..1.5, PE share, advancers, green sectors, overview score, pulse). Zones: < 30 fear, < 50 cautious, < 70 optimistic, else euphoria. | market.py |
+| 15 | LTP calc | new = ltp + delta*dS + 0.5*gamma*dS^2 - theta*days (theta = positive daily decay), floor 0.05. Target = full width R-S from spot, stop = half width, both in the trade direction. | market.py |
+| 16 | Backtest labels | `hit` = next close moved the flag's way, `held` = next close on the right side of the support/resistance strike. "Triple S/R support bounce %" = `TRIPLE_SR_SUPPORT.hit_pct` (also see `held_pct`). Next-day close only, no intraday path. | backtest.py |
+| 17 | Legacy files | Pre-UDiFF bhavcopy (2015+) parsed too, but those files have no underlying price: pass `spots` (from the cash bhavcopy). Volume = CONTRACTS. | adapters.py |
+| 18 | Live chain | Refresh clamped to 60-180 s, in-memory cache, browser-like headers + cookie warm-up, 3 retries with backoff. Fixture mode never touches the network. | adapters.py |
+| 19 | Isolation | Nothing outside `tools/india_edge/chain/` and `docs/` was edited. Fixtures are generated at test time (not committed). The data URLs are untested against live NSE from here (blocked). | all |

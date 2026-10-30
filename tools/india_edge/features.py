@@ -63,7 +63,8 @@ def build_features(cash: pd.DataFrame, fo: pd.DataFrame, idx: pd.DataFrame,
     fut_chg = fut["chg_oi"].unstack().reindex(index=dates, columns=close.columns)
     oi_chg_pct = fut_chg / (fut_oi - fut_chg).where((fut_oi - fut_chg) > 0) * 100
 
-    opt = fo[fo["instr"] == "STO"].assign(abs_chg=lambda d: d["chg_oi"].abs())
+    opt = fo[fo["instr"] == "STO"]
+    opt = opt.assign(abs_chg=opt["abs_chg_oi"] if "abs_chg_oi" in opt else opt["chg_oi"].abs())
     opt_abs = (opt.groupby(["date", "symbol"])["abs_chg"].sum().unstack()
                .reindex(index=dates, columns=close.columns))
     opt_base = opt_abs.shift(1).rolling(lookback, min_periods=max(5, lookback // 2)).mean()

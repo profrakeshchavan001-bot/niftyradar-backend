@@ -1,0 +1,6203 @@
+{
+ "schema": 2,
+ "notice": "Paper trading and historical statistics only. Not investment advice.",
+ "data_health": {
+  "status": "degraded",
+  "asof": "2026-10-30",
+  "trade_date": "2026-11-02",
+  "source": "real",
+  "missing": [
+   "iv.parquet (IV percentile, expected move and spread checks unavailable)",
+   "events.csv (event veto unavailable)"
+  ],
+  "warnings": [
+   "2 weekday(s) in the last 30 days have no data (holidays or missing files)",
+   "50 symbols have stale data (e.g. 3IINFOLTD, 3IINFOTECH, 4THDIM)",
+   "1949 split/bonus style adjustments applied to history",
+   "20 large one-day moves with unadjusted prices (check for corporate actions)",
+   "symbol renames merged: ZOMATO->ETERNAL, LTI->LTIM, INFRATEL->INDUSTOWER, ADANITRANS->ADANIENSOL"
+  ],
+  "inputs": {
+   "cash_rows": 2703,
+   "fo_rows": 1296,
+   "nifty_rows": 1,
+   "iv_rows": 0,
+   "events": 0
+  },
+  "repairs": {
+   "corporate_actions": [
+    {
+     "symbol": "CCAVENUE",
+     "date": "2026-10-19",
+     "factor": 10.0
+    },
+    {
+     "symbol": "ADSL",
+     "date": "2026-02-02",
+     "factor": 1.138635
+    },
+    {
+     "symbol": "AJOONI",
+     "date": "2026-02-02",
+     "factor": 1.167095
+    },
+    {
+     "symbol": "AXISILVER",
+     "date": "2026-02-02",
+     "factor": 0.887087
+    },
+    {
+     "symbol": "BBNPPGOLD",
+     "date": "2026-02-02",
+     "factor": 0.896241
+    },
+    {
+     "symbol": "BCG",
+     "date": "2026-02-02",
+     "factor": 1.141304
+    },
+    {
+     "symbol": "BDL",
+     "date": "2026-02-02",
+     "factor": 0.899818
+    },
+    {
+     "symbol": "BIOFILCHEM",
+     "date": "2026-02-02",
+     "factor": 1.199932
+    },
+    {
+     "symbol": "ESILVER",
+     "date": "2026-02-02",
+     "factor": 0.886069
+    },
+    {
+     "symbol": "EUROPRATIK",
+     "date": "2026-02-02",
+     "factor": 1.12792
+    },
+    {
+     "symbol": "GALAPREC",
+     "date": "2026-02-02",
+     "factor": 1.17673
+    },
+    {
+     "symbol": "GOKEX",
+     "date": "2026-02-02",
+     "factor": 1.107627
+    },
+    {
+     "symbol": "GROWWGOLD",
+     "date": "2026-02-02",
+     "factor": 0.898361
+    },
+    {
+     "symbol": "GROWWSLVR",
+     "date": "2026-02-02",
+     "factor": 0.858393
+    },
+    {
+     "symbol": "HAVISHA",
+     "date": "2026-02-02",
+     "factor": 1.106918
+    },
+    {
+     "symbol": "HDFCSILVER",
+     "date": "2026-02-02",
+     "factor": 0.850289
+    },
+    {
+     "symbol": "HINDCOPPER",
+     "date": "2026-02-02",
+     "factor": 0.87367
+    },
+    {
+     "symbol": "IIFL",
+     "date": "2026-02-02",
+     "factor": 0.899849
+    },
+    {
+     "symbol": "IVZINGOLD",
+     "date": "2026-02-02",
+     "factor": 0.891749
+    },
+    {
+     "symbol": "KNAGRI",
+     "date": "2026-02-02",
+     "factor": 1.111167
+    }
+   ],
+   "renames": [
+    "ZOMATO->ETERNAL",
+    "LTI->LTIM",
+    "INFRATEL->INDUSTOWER",
+    "ADANITRANS->ADANIENSOL"
+   ],
+   "suspect_jumps": [
+    {
+     "symbol": "360ONE",
+     "date": "2023-03-02",
+     "move_pct": -75.1
+    },
+    {
+     "symbol": "8KMILES",
+     "date": "2016-10-10",
+     "move_pct": -59.2
+    },
+    {
+     "symbol": "AAKASH",
+     "date": "2022-02-03",
+     "move_pct": -89.0
+    },
+    {
+     "symbol": "AARON",
+     "date": "2025-08-25",
+     "move_pct": -44.5
+    },
+    {
+     "symbol": "AARTIDRUGS",
+     "date": "2015-03-24",
+     "move_pct": -52.8
+    },
+    {
+     "symbol": "AARTIDRUGS",
+     "date": "2020-09-30",
+     "move_pct": -73.8
+    },
+    {
+     "symbol": "AARTIIND",
+     "date": "2019-09-27",
+     "move_pct": -49.3
+    },
+    {
+     "symbol": "AARTIIND",
+     "date": "2021-06-22",
+     "move_pct": -50.5
+    },
+    {
+     "symbol": "AASTHA",
+     "date": "2026-09-28",
+     "move_pct": -46.0
+    },
+    {
+     "symbol": "ABFRL",
+     "date": "2025-05-22",
+     "move_pct": -66.6
+    }
+   ],
+   "stale_symbols": [
+    "3IINFOLTD",
+    "3IINFOTECH",
+    "4THDIM",
+    "8KMILES",
+    "AARNAV",
+    "AARTISURF",
+    "AARVEEDEN",
+    "ABAN",
+    "ABCIL",
+    "ABGSHIP",
+    "ABINFRA",
+    "ABIRLANUVO",
+    "ABMINTLLTD",
+    "ABMINTLTD",
+    "ACLGATI",
+    "ACROPETAL",
+    "ACRYSIL",
+    "ACSTECH",
+    "ADANIGAS",
+    "ADHUNIK"
+   ],
+   "load_errors": []
+  }
+ },
+ "mode": "premarket",
+ "source": "real",
+ "generated_at": "2026-10-30 18:10 UTC",
+ "asof": "2026-10-30",
+ "trade_date": "2026-11-02",
+ "market": {
+  "nifty_close": 23053.1
+ },
+ "picks": [
+  {
+   "rank": 1,
+   "symbol": "PERSISTENT",
+   "sector": "IT",
+   "direction": "long",
+   "grade": "A",
+   "score": 70.9,
+   "setup": "trend",
+   "components": {
+    "quadrant": 30.0,
+    "delivery": 5.9,
+    "rs": 20.0,
+    "sector_rs": 15.0,
+    "unusual_oi": 0.0
+   },
+   "close": 6048.0,
+   "features": {
+    "quadrant": "long_buildup",
+    "price_chg_pct": 2.857142857142847,
+    "oi_chg_pct": 0.03801492949958529,
+    "deliv_pct": 54.31,
+    "deliv_ratio": 1.2942353978504875,
+    "rs": 12.654503033098987,
+    "sector_rs": 16.867210896164135,
+    "unusual_oi": 0.5252377324137385,
+    "adv_cr": 458.4688308125
+   },
+   "levels": {
+    "basis": "reference close; stop 1.5x daily ATR(14), target 2R. Intraday levels come from the 15m zone.",
+    "entry_ref": 6048.0,
+    "atr14": 205.96428571428572,
+    "stop": 5739.053571428572,
+    "target": 6665.892857142857,
+    "r_multiple": 2.0
+   },
+   "strikes": {
+    "type": "CE",
+    "atm": 6000.0,
+    "step": 250,
+    "otm1": 6250.0,
+    "expiry": "2026-11-23",
+    "note": "approximate strike interval; check the live option chain"
+   },
+   "base_rate": {
+    "grade": "A",
+    "setup": "trend",
+    "n": 4640,
+    "win_pct": 42.62931034482759,
+    "expectancy_r": -0.09763524200133221,
+    "basis": "all qualifying signals, 5-day horizon, net of 0.1R cost"
+   },
+   "checklist": [
+    {
+     "name": "OI quadrant",
+     "status": "pass",
+     "detail": "long buildup: price +2.9%, futures OI +0.0%"
+    },
+    {
+     "name": "Delivery spike",
+     "status": "fail",
+     "detail": "delivery 54% = 1.29x its 20-day average"
+    },
+    {
+     "name": "RS vs Nifty (20d)",
+     "status": "pass",
+     "detail": "+12.7 pts"
+    },
+    {
+     "name": "Sector RS",
+     "status": "pass",
+     "detail": "IT +16.9 pts"
+    },
+    {
+     "name": "Unusual option OI",
+     "status": "fail",
+     "detail": "0.5x its 20-day average"
+    },
+    {
+     "name": "Liquidity",
+     "status": "pass",
+     "detail": "20-day ADV 458 cr (min 50)"
+    },
+    {
+     "name": "Veto: chop regime",
+     "status": "pass",
+     "detail": "trend ok (ER 0.43)"
+    },
+    {
+     "name": "Veto: IV percentile",
+     "status": "unknown",
+     "detail": "IV unavailable"
+    },
+    {
+     "name": "Veto: event within 2 days",
+     "status": "pass",
+     "detail": "no event in window"
+    },
+    {
+     "name": "Veto: expiry day",
+     "status": "pass",
+     "detail": "not expiry day"
+    },
+    {
+     "name": "Veto: option spread",
+     "status": "unknown",
+     "detail": "option quote unavailable"
+    },
+    {
+     "name": "Veto: target vs expected move",
+     "status": "unknown",
+     "detail": "unknown: evaluated at the 15m trigger"
+    },
+    {
+     "name": "15m timing (OB/FVG pullback + BOS/engulfing)",
+     "status": "pending",
+     "detail": "stage Watch"
+    }
+   ],
+   "stage": "Watch",
+   "vetoed": false,
+   "candles": [
+    {
+     "time": "2026-07-08",
+     "open": 4884.8,
+     "high": 4910.0,
+     "low": 4737.0,
+     "close": 4769.5
+    },
+    {
+     "time": "2026-07-09",
+     "open": 4765.0,
+     "high": 4858.9,
+     "low": 4705.0,
+     "close": 4829.9
+    },
+    {
+     "time": "2026-07-10",
+     "open": 4926.4,
+     "high": 5065.4,
+     "low": 4903.0,
+     "close": 5053.9
+    },
+    {
+     "time": "2026-07-13",
+     "open": 5000.4,
+     "high": 5218.8,
+     "low": 4975.0,
+     "close": 5192.4
+    },
+    {
+     "time": "2026-07-14",
+     "open": 5189.9,
+     "high": 5257.0,
+     "low": 5111.1,
+     "close": 5129.1
+    },
+    {
+     "time": "2026-07-15",
+     "open": 5080.0,
+     "high": 5172.9,
+     "low": 5012.9,
+     "close": 5075.8
+    },
+    {
+     "time": "2026-07-16",
+     "open": 5075.8,
+     "high": 5210.0,
+     "low": 5050.0,
+     "close": 5059.3
+    },
+    {
+     "time": "2026-07-17",
+     "open": 5120.9,
+     "high": 5195.7,
+     "low": 5090.0,
+     "close": 5183.9
+    },
+    {
+     "time": "2026-07-20",
+     "open": 5183.9,
+     "high": 5238.0,
+     "low": 5166.0,
+     "close": 5188.7
+    },
+    {
+     "time": "2026-07-21",
+     "open": 5168.0,
+     "high": 5299.9,
+     "low": 5165.0,
+     "close": 5219.0
+    },
+    {
+     "time": "2026-07-22",
+     "open": 5195.0,
+     "high": 5195.0,
+     "low": 5067.2,
+     "close": 5098.8
+    },
+    {
+     "time": "2026-07-23",
+     "open": 5095.0,
+     "high": 5119.5,
+     "low": 4990.0,
+     "close": 5001.9
+    },
+    {
+     "time": "2026-07-24",
+     "open": 4974.1,
+     "high": 5217.8,
+     "low": 4965.1,
+     "close": 5200.5
+    },
+    {
+     "time": "2026-07-27",
+     "open": 5249.0,
+     "high": 5339.5,
+     "low": 5237.0,
+     "close": 5268.2
+    },
+    {
+     "time": "2026-07-28",
+     "open": 5335.8,
+     "high": 5515.0,
+     "low": 5335.8,
+     "close": 5428.4
+    },
+    {
+     "time": "2026-07-29",
+     "open": 5510.4,
+     "high": 5589.0,
+     "low": 5460.0,
+     "close": 5483.3
+    },
+    {
+     "time": "2026-07-30",
+     "open": 5483.3,
+     "high": 5698.0,
+     "low": 5468.4,
+     "close": 5514.7
+    },
+    {
+     "time": "2026-07-31",
+     "open": 5458.7,
+     "high": 5580.0,
+     "low": 5263.4,
+     "close": 5549.0
+    },
+    {
+     "time": "2026-08-03",
+     "open": 5533.5,
+     "high": 5575.0,
+     "low": 5319.5,
+     "close": 5575.0
+    },
+    {
+     "time": "2026-08-04",
+     "open": 5590.0,
+     "high": 5599.0,
+     "low": 5462.5,
+     "close": 5499.0
+    },
+    {
+     "time": "2026-08-05",
+     "open": 5539.0,
+     "high": 5579.0,
+     "low": 5493.0,
+     "close": 5520.0
+    },
+    {
+     "time": "2026-08-06",
+     "open": 5520.0,
+     "high": 5572.0,
+     "low": 5459.5,
+     "close": 5459.5
+    },
+    {
+     "time": "2026-08-07",
+     "open": 5470.0,
+     "high": 5594.0,
+     "low": 5448.5,
+     "close": 5475.0
+    },
+    {
+     "time": "2026-08-10",
+     "open": 5475.0,
+     "high": 5543.5,
+     "low": 5425.0,
+     "close": 5474.0
+    },
+    {
+     "time": "2026-08-11",
+     "open": 5474.0,
+     "high": 5544.0,
+     "low": 5430.5,
+     "close": 5536.0
+    },
+    {
+     "time": "2026-08-12",
+     "open": 5530.0,
+     "high": 5530.0,
+     "low": 5390.0,
+     "close": 5474.0
+    },
+    {
+     "time": "2026-08-13",
+     "open": 5470.5,
+     "high": 5529.0,
+     "low": 5406.0,
+     "close": 5523.0
+    },
+    {
+     "time": "2026-08-14",
+     "open": 5549.0,
+     "high": 5618.5,
+     "low": 5447.0,
+     "close": 5580.0
+    },
+    {
+     "time": "2026-08-17",
+     "open": 5580.5,
+     "high": 5613.0,
+     "low": 5520.0,
+     "close": 5570.0
+    },
+    {
+     "time": "2026-08-18",
+     "open": 5571.5,
+     "high": 5571.5,
+     "low": 5442.5,
+     "close": 5442.5
+    },
+    {
+     "time": "2026-08-19",
+     "open": 5520.0,
+     "high": 5577.0,
+     "low": 5475.5,
+     "close": 5510.0
+    },
+    {
+     "time": "2026-08-20",
+     "open": 5572.0,
+     "high": 5706.0,
+     "low": 5534.0,
+     "close": 5674.0
+    },
+    {
+     "time": "2026-08-21",
+     "open": 5685.0,
+     "high": 5722.0,
+     "low": 5602.0,
+     "close": 5667.5
+    },
+    {
+     "time": "2026-08-24",
+     "open": 5693.5,
+     "high": 5725.0,
+     "low": 5646.0,
+     "close": 5694.0
+    },
+    {
+     "time": "2026-08-25",
+     "open": 5687.0,
+     "high": 5687.0,
+     "low": 5570.5,
+     "close": 5655.0
+    },
+    {
+     "time": "2026-08-26",
+     "open": 5655.0,
+     "high": 5705.0,
+     "low": 5590.5,
+     "close": 5590.5
+    },
+    {
+     "time": "2026-08-27",
+     "open": 5640.0,
+     "high": 5679.5,
+     "low": 5597.0,
+     "close": 5654.0
+    },
+    {
+     "time": "2026-08-28",
+     "open": 5677.0,
+     "high": 5910.0,
+     "low": 5677.0,
+     "close": 5875.0
+    },
+    {
+     "time": "2026-08-31",
+     "open": 5855.5,
+     "high": 5855.5,
+     "low": 5593.0,
+     "close": 5594.5
+    },
+    {
+     "time": "2026-09-01",
+     "open": 5621.5,
+     "high": 5852.5,
+     "low": 5603.0,
+     "close": 5800.0
+    },
+    {
+     "time": "2026-09-02",
+     "open": 5700.0,
+     "high": 5738.0,
+     "low": 5640.5,
+     "close": 5690.0
+    },
+    {
+     "time": "2026-09-03",
+     "open": 5632.0,
+     "high": 5668.0,
+     "low": 5501.0,
+     "close": 5657.0
+    },
+    {
+     "time": "2026-09-04",
+     "open": 5680.0,
+     "high": 5724.5,
+     "low": 5634.0,
+     "close": 5643.0
+    },
+    {
+     "time": "2026-09-07",
+     "open": 5610.0,
+     "high": 5622.0,
+     "low": 5522.0,
+     "close": 5540.0
+    },
+    {
+     "time": "2026-09-08",
+     "open": 5550.0,
+     "high": 5600.0,
+     "low": 5491.0,
+     "close": 5560.0
+    },
+    {
+     "time": "2026-09-09",
+     "open": 5490.0,
+     "high": 5490.0,
+     "low": 5372.5,
+     "close": 5419.0
+    },
+    {
+     "time": "2026-09-10",
+     "open": 5404.5,
+     "high": 5560.0,
+     "low": 5370.5,
+     "close": 5509.5
+    },
+    {
+     "time": "2026-09-11",
+     "open": 5469.0,
+     "high": 5545.5,
+     "low": 5444.5,
+     "close": 5516.0
+    },
+    {
+     "time": "2026-09-15",
+     "open": 5654.0,
+     "high": 5759.0,
+     "low": 5456.5,
+     "close": 5477.5
+    },
+    {
+     "time": "2026-09-16",
+     "open": 5522.0,
+     "high": 5529.5,
+     "low": 5390.5,
+     "close": 5440.0
+    },
+    {
+     "time": "2026-09-17",
+     "open": 5410.0,
+     "high": 5502.0,
+     "low": 5405.5,
+     "close": 5473.0
+    },
+    {
+     "time": "2026-09-18",
+     "open": 5476.0,
+     "high": 5500.0,
+     "low": 5389.0,
+     "close": 5416.0
+    },
+    {
+     "time": "2026-09-21",
+     "open": 5416.0,
+     "high": 5458.0,
+     "low": 5380.5,
+     "close": 5449.0
+    },
+    {
+     "time": "2026-09-22",
+     "open": 5454.5,
+     "high": 5463.0,
+     "low": 5359.0,
+     "close": 5366.0
+    },
+    {
+     "time": "2026-09-23",
+     "open": 5400.0,
+     "high": 5413.0,
+     "low": 5213.5,
+     "close": 5240.0
+    },
+    {
+     "time": "2026-09-24",
+     "open": 5188.0,
+     "high": 5345.0,
+     "low": 5188.0,
+     "close": 5277.0
+    },
+    {
+     "time": "2026-09-25",
+     "open": 5277.0,
+     "high": 5385.0,
+     "low": 5230.0,
+     "close": 5372.0
+    },
+    {
+     "time": "2026-09-28",
+     "open": 5372.0,
+     "high": 5377.5,
+     "low": 5285.0,
+     "close": 5328.5
+    },
+    {
+     "time": "2026-09-29",
+     "open": 5328.0,
+     "high": 5348.5,
+     "low": 5162.0,
+     "close": 5162.0
+    },
+    {
+     "time": "2026-09-30",
+     "open": 5200.0,
+     "high": 5397.0,
+     "low": 5200.0,
+     "close": 5279.0
+    },
+    {
+     "time": "2026-10-01",
+     "open": 5276.0,
+     "high": 5396.0,
+     "low": 5250.5,
+     "close": 5367.0
+    },
+    {
+     "time": "2026-10-05",
+     "open": 5448.0,
+     "high": 5620.0,
+     "low": 5387.5,
+     "close": 5530.0
+    },
+    {
+     "time": "2026-10-06",
+     "open": 5520.0,
+     "high": 5553.5,
+     "low": 5463.5,
+     "close": 5521.0
+    },
+    {
+     "time": "2026-10-07",
+     "open": 5513.5,
+     "high": 5529.0,
+     "low": 5447.5,
+     "close": 5507.0
+    },
+    {
+     "time": "2026-10-08",
+     "open": 5504.5,
+     "high": 5629.0,
+     "low": 5430.0,
+     "close": 5468.0
+    },
+    {
+     "time": "2026-10-09",
+     "open": 5499.0,
+     "high": 5789.0,
+     "low": 5499.0,
+     "close": 5770.0
+    },
+    {
+     "time": "2026-10-12",
+     "open": 5770.0,
+     "high": 5830.0,
+     "low": 5736.0,
+     "close": 5787.0
+    },
+    {
+     "time": "2026-10-13",
+     "open": 5801.0,
+     "high": 6008.5,
+     "low": 5787.0,
+     "close": 5988.0
+    },
+    {
+     "time": "2026-10-14",
+     "open": 5988.0,
+     "high": 6078.0,
+     "low": 5882.5,
+     "close": 5898.0
+    },
+    {
+     "time": "2026-10-15",
+     "open": 5955.0,
+     "high": 6010.0,
+     "low": 5791.5,
+     "close": 5840.0
+    },
+    {
+     "time": "2026-10-16",
+     "open": 5600.0,
+     "high": 5755.0,
+     "low": 5492.0,
+     "close": 5741.0
+    },
+    {
+     "time": "2026-10-19",
+     "open": 5742.0,
+     "high": 5909.0,
+     "low": 5635.0,
+     "close": 5690.0
+    },
+    {
+     "time": "2026-10-21",
+     "open": 5700.0,
+     "high": 5868.0,
+     "low": 5690.0,
+     "close": 5858.5
+    },
+    {
+     "time": "2026-10-22",
+     "open": 5820.0,
+     "high": 5906.5,
+     "low": 5733.5,
+     "close": 5740.5
+    },
+    {
+     "time": "2026-10-23",
+     "open": 5810.0,
+     "high": 5914.5,
+     "low": 5674.5,
+     "close": 5727.5
+    },
+    {
+     "time": "2026-10-26",
+     "open": 5600.0,
+     "high": 5873.5,
+     "low": 5600.0,
+     "close": 5850.0
+    },
+    {
+     "time": "2026-10-27",
+     "open": 5800.0,
+     "high": 5861.0,
+     "low": 5690.0,
+     "close": 5832.5
+    },
+    {
+     "time": "2026-10-28",
+     "open": 5726.0,
+     "high": 5872.5,
+     "low": 5650.0,
+     "close": 5848.0
+    },
+    {
+     "time": "2026-10-29",
+     "open": 5845.0,
+     "high": 5905.5,
+     "low": 5800.0,
+     "close": 5880.0
+    },
+    {
+     "time": "2026-10-30",
+     "open": 5884.0,
+     "high": 6048.5,
+     "low": 5884.0,
+     "close": 6048.0
+    }
+   ],
+   "oi": [
+    {
+     "time": "2026-07-08",
+     "oi": 5087250.0,
+     "chg_oi": -241250.0
+    },
+    {
+     "time": "2026-07-09",
+     "oi": 5202750.0,
+     "chg_oi": 115500.0
+    },
+    {
+     "time": "2026-07-10",
+     "oi": 5011750.0,
+     "chg_oi": -191000.0
+    },
+    {
+     "time": "2026-07-13",
+     "oi": 5099000.0,
+     "chg_oi": 87250.0
+    },
+    {
+     "time": "2026-07-14",
+     "oi": 5055250.0,
+     "chg_oi": -43750.0
+    },
+    {
+     "time": "2026-07-15",
+     "oi": 5174875.0,
+     "chg_oi": 119625.0
+    },
+    {
+     "time": "2026-07-16",
+     "oi": 5326375.0,
+     "chg_oi": 151500.0
+    },
+    {
+     "time": "2026-07-17",
+     "oi": 5322125.0,
+     "chg_oi": -4250.0
+    },
+    {
+     "time": "2026-07-20",
+     "oi": 5240375.0,
+     "chg_oi": -81750.0
+    },
+    {
+     "time": "2026-07-21",
+     "oi": 5274000.0,
+     "chg_oi": 33625.0
+    },
+    {
+     "time": "2026-07-22",
+     "oi": 5446750.0,
+     "chg_oi": 172750.0
+    },
+    {
+     "time": "2026-07-23",
+     "oi": 5241375.0,
+     "chg_oi": -205375.0
+    },
+    {
+     "time": "2026-07-24",
+     "oi": 4948750.0,
+     "chg_oi": -292625.0
+    },
+    {
+     "time": "2026-07-27",
+     "oi": 4556250.0,
+     "chg_oi": -392500.0
+    },
+    {
+     "time": "2026-07-28",
+     "oi": 4580250.0,
+     "chg_oi": 24000.0
+    },
+    {
+     "time": "2026-07-29",
+     "oi": 3639875.0,
+     "chg_oi": 30125.0
+    },
+    {
+     "time": "2026-07-30",
+     "oi": 3682250.0,
+     "chg_oi": 42375.0
+    },
+    {
+     "time": "2026-07-31",
+     "oi": 3667625.0,
+     "chg_oi": -14625.0
+    },
+    {
+     "time": "2026-08-03",
+     "oi": 3664750.0,
+     "chg_oi": -1875.0
+    },
+    {
+     "time": "2026-08-04",
+     "oi": 3661250.0,
+     "chg_oi": -3500.0
+    },
+    {
+     "time": "2026-08-05",
+     "oi": 3571625.0,
+     "chg_oi": -89625.0
+    },
+    {
+     "time": "2026-08-06",
+     "oi": 3544750.0,
+     "chg_oi": -26875.0
+    },
+    {
+     "time": "2026-08-07",
+     "oi": 3583375.0,
+     "chg_oi": 38625.0
+    },
+    {
+     "time": "2026-08-10",
+     "oi": 3660000.0,
+     "chg_oi": 76625.0
+    },
+    {
+     "time": "2026-08-11",
+     "oi": 3599500.0,
+     "chg_oi": -60500.0
+    },
+    {
+     "time": "2026-08-12",
+     "oi": 3579625.0,
+     "chg_oi": -19875.0
+    },
+    {
+     "time": "2026-08-13",
+     "oi": 3544750.0,
+     "chg_oi": -34875.0
+    },
+    {
+     "time": "2026-08-14",
+     "oi": 3441500.0,
+     "chg_oi": -103250.0
+    },
+    {
+     "time": "2026-08-17",
+     "oi": 3439375.0,
+     "chg_oi": -2125.0
+    },
+    {
+     "time": "2026-08-18",
+     "oi": 3547500.0,
+     "chg_oi": 108125.0
+    },
+    {
+     "time": "2026-08-19",
+     "oi": 3604375.0,
+     "chg_oi": 56875.0
+    },
+    {
+     "time": "2026-08-20",
+     "oi": 3469625.0,
+     "chg_oi": -134750.0
+    },
+    {
+     "time": "2026-08-21",
+     "oi": 3371250.0,
+     "chg_oi": -98375.0
+    },
+    {
+     "time": "2026-08-24",
+     "oi": 3300875.0,
+     "chg_oi": -70375.0
+    },
+    {
+     "time": "2026-08-25",
+     "oi": 3365375.0,
+     "chg_oi": 64500.0
+    },
+    {
+     "time": "2026-08-26",
+     "oi": 3074875.0,
+     "chg_oi": 30875.0
+    },
+    {
+     "time": "2026-08-27",
+     "oi": 3086375.0,
+     "chg_oi": 11500.0
+    },
+    {
+     "time": "2026-08-28",
+     "oi": 2988750.0,
+     "chg_oi": -97625.0
+    },
+    {
+     "time": "2026-08-31",
+     "oi": 3102250.0,
+     "chg_oi": 113500.0
+    },
+    {
+     "time": "2026-09-01",
+     "oi": 3057625.0,
+     "chg_oi": -44625.0
+    },
+    {
+     "time": "2026-09-02",
+     "oi": 3079750.0,
+     "chg_oi": 22125.0
+    },
+    {
+     "time": "2026-09-03",
+     "oi": 3186375.0,
+     "chg_oi": 106625.0
+    },
+    {
+     "time": "2026-09-04",
+     "oi": 3238625.0,
+     "chg_oi": 52250.0
+    },
+    {
+     "time": "2026-09-07",
+     "oi": 3373250.0,
+     "chg_oi": 134625.0
+    },
+    {
+     "time": "2026-09-08",
+     "oi": 3416750.0,
+     "chg_oi": 43500.0
+    },
+    {
+     "time": "2026-09-09",
+     "oi": 3577250.0,
+     "chg_oi": 160500.0
+    },
+    {
+     "time": "2026-09-10",
+     "oi": 3629375.0,
+     "chg_oi": 52125.0
+    },
+    {
+     "time": "2026-09-11",
+     "oi": 3661750.0,
+     "chg_oi": 32375.0
+    },
+    {
+     "time": "2026-09-15",
+     "oi": 3523375.0,
+     "chg_oi": -138375.0
+    },
+    {
+     "time": "2026-09-16",
+     "oi": 3511000.0,
+     "chg_oi": -12375.0
+    },
+    {
+     "time": "2026-09-17",
+     "oi": 3511500.0,
+     "chg_oi": 500.0
+    },
+    {
+     "time": "2026-09-18",
+     "oi": 3533375.0,
+     "chg_oi": 21875.0
+    },
+    {
+     "time": "2026-09-21",
+     "oi": 3596750.0,
+     "chg_oi": 63375.0
+    },
+    {
+     "time": "2026-09-22",
+     "oi": 3573875.0,
+     "chg_oi": -22875.0
+    },
+    {
+     "time": "2026-09-23",
+     "oi": 3743250.0,
+     "chg_oi": 169375.0
+    },
+    {
+     "time": "2026-09-24",
+     "oi": 3617000.0,
+     "chg_oi": -126250.0
+    },
+    {
+     "time": "2026-09-25",
+     "oi": 3731500.0,
+     "chg_oi": 114500.0
+    },
+    {
+     "time": "2026-09-28",
+     "oi": 3617500.0,
+     "chg_oi": -114000.0
+    },
+    {
+     "time": "2026-09-29",
+     "oi": 3600375.0,
+     "chg_oi": -17125.0
+    },
+    {
+     "time": "2026-09-30",
+     "oi": 3168125.0,
+     "chg_oi": 43375.0
+    },
+    {
+     "time": "2026-10-01",
+     "oi": 3127125.0,
+     "chg_oi": -41000.0
+    },
+    {
+     "time": "2026-10-05",
+     "oi": 3128500.0,
+     "chg_oi": 1375.0
+    },
+    {
+     "time": "2026-10-06",
+     "oi": 3133500.0,
+     "chg_oi": 5000.0
+    },
+    {
+     "time": "2026-10-07",
+     "oi": 3138875.0,
+     "chg_oi": 5375.0
+    },
+    {
+     "time": "2026-10-08",
+     "oi": 3104625.0,
+     "chg_oi": -34250.0
+    },
+    {
+     "time": "2026-10-09",
+     "oi": 3178375.0,
+     "chg_oi": 73750.0
+    },
+    {
+     "time": "2026-10-12",
+     "oi": 3201500.0,
+     "chg_oi": 23125.0
+    },
+    {
+     "time": "2026-10-13",
+     "oi": 3324750.0,
+     "chg_oi": 123250.0
+    },
+    {
+     "time": "2026-10-14",
+     "oi": 3357500.0,
+     "chg_oi": 32750.0
+    },
+    {
+     "time": "2026-10-15",
+     "oi": 4177250.0,
+     "chg_oi": 819750.0
+    },
+    {
+     "time": "2026-10-16",
+     "oi": 4644750.0,
+     "chg_oi": 467500.0
+    },
+    {
+     "time": "2026-10-19",
+     "oi": 4512125.0,
+     "chg_oi": -132625.0
+    },
+    {
+     "time": "2026-10-21",
+     "oi": 4405000.0,
+     "chg_oi": -107125.0
+    },
+    {
+     "time": "2026-10-22",
+     "oi": 4004375.0,
+     "chg_oi": -400625.0
+    },
+    {
+     "time": "2026-10-23",
+     "oi": 4046750.0,
+     "chg_oi": 42375.0
+    },
+    {
+     "time": "2026-10-26",
+     "oi": 4017500.0,
+     "chg_oi": -29250.0
+    },
+    {
+     "time": "2026-10-27",
+     "oi": 4176000.0,
+     "chg_oi": 158500.0
+    },
+    {
+     "time": "2026-10-28",
+     "oi": 3609000.0,
+     "chg_oi": -7875.0
+    },
+    {
+     "time": "2026-10-29",
+     "oi": 3617000.0,
+     "chg_oi": 8000.0
+    },
+    {
+     "time": "2026-10-30",
+     "oi": 3618375.0,
+     "chg_oi": 1375.0
+    }
+   ],
+   "intraday": null,
+   "cause": {
+    "label": "long_buildup",
+    "confidence": 0.64,
+    "level": "medium",
+    "driver": "sector",
+    "tags": [],
+    "reason": "Long buildup: price +2.9% with futures OI +0.0% (fresh longs being added); sector-driven (sector RS +16.9 vs stock +12.7)."
+   },
+   "early": {
+    "stage": "none",
+    "side": null,
+    "flags": [],
+    "strength": 0.0,
+    "detail": "",
+    "trigger_date": null,
+    "level": null,
+    "levels": null
+   },
+   "option_plan": {
+    "symbol": "PERSISTENT",
+    "side": "long",
+    "status": "ok",
+    "notes": [
+     "IV percentile unavailable; ATM used, no veto applied",
+     "no expiry 10-15 days out; using 21 days",
+     "lot size unknown; quantity in units"
+    ],
+    "underlying": {
+     "spot": 6048.0,
+     "stop": 5739.053571428572,
+     "target": 6665.892857142857
+    },
+    "iv_percentile": null,
+    "iv_status": "unavailable",
+    "iv": null,
+    "type": "CE",
+    "strike": 6000.0,
+    "moneyness": "atm",
+    "expiry": "2026-11-23",
+    "days_to_expiry": 21,
+    "expiry_in_window": false,
+    "premium": 221.21763726110748,
+    "premium_source": "model (realised vol)",
+    "premium_stop": 84.24375831205884,
+    "premium_target": 706.425983387373,
+    "risk_per_unit": 136.97387894904864,
+    "reward_risk": 3.5423421593160302,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 73,
+    "cost": 16148.887520060845,
+    "risk_at_stop": 9999.093163280551,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 104,
+     "rate": 0.4326923076923077,
+     "up_rate": 0.3584905660377358,
+     "down_rate": 0.5098039215686274
+    },
+    "post_spike": {
+     "n": 38,
+     "avg_drift_pct": -0.1800768476007418,
+     "continuation_rate": 0.5263157894736842
+    },
+    "expiry_week": {
+     "n": 80,
+     "avg_abs_move_pct": 1.6274523126935732,
+     "other_abs_move_pct": 1.6142062128072294,
+     "ratio": 1.008205952734693,
+     "avg_move_pct": -0.38000144720396245
+    },
+    "summary": "43% of gaps fill the same day (n=104); after volume spikes the 5-day drift is -0.2% (53% continue, n=38); expiry-week moves are 1.01x a normal day"
+   }
+  },
+  {
+   "rank": 2,
+   "symbol": "DIXON",
+   "sector": "Other",
+   "direction": "short",
+   "grade": "B",
+   "score": 69.7,
+   "setup": "trend",
+   "components": {
+    "quadrant": 30.0,
+    "delivery": 0.0,
+    "rs": 20.0,
+    "sector_rs": 10.7,
+    "unusual_oi": 9.0
+   },
+   "close": 11000.0,
+   "features": {
+    "quadrant": "short_buildup",
+    "price_chg_pct": -4.247910863509752,
+    "oi_chg_pct": 1.2829197200156004,
+    "deliv_pct": 33.7,
+    "deliv_ratio": 0.8726500595577192,
+    "rs": -17.94318418790778,
+    "sector_rs": -3.5595553620079814,
+    "unusual_oi": 2.2053116090795,
+    "adv_cr": 328.311906895
+   },
+   "levels": {
+    "basis": "reference close; stop 1.5x daily ATR(14), target 2R. Intraday levels come from the 15m zone.",
+    "entry_ref": 11000.0,
+    "atr14": 378.64285714285717,
+    "stop": 11567.964285714286,
+    "target": 9864.071428571428,
+    "r_multiple": 2.0
+   },
+   "strikes": {
+    "type": "PE",
+    "atm": 11000.0,
+    "step": 250,
+    "otm1": 10750.0,
+    "expiry": "2026-11-23",
+    "note": "approximate strike interval; check the live option chain"
+   },
+   "base_rate": {
+    "grade": "B",
+    "setup": "trend",
+    "n": 23633,
+    "win_pct": 43.515423348707316,
+    "expectancy_r": -0.09012571175146557,
+    "basis": "all qualifying signals, 5-day horizon, net of 0.1R cost"
+   },
+   "checklist": [
+    {
+     "name": "OI quadrant",
+     "status": "pass",
+     "detail": "short buildup: price -4.2%, futures OI +1.3%"
+    },
+    {
+     "name": "Delivery spike",
+     "status": "fail",
+     "detail": "delivery 34% = 0.87x its 20-day average"
+    },
+    {
+     "name": "RS vs Nifty (20d)",
+     "status": "pass",
+     "detail": "-17.9 pts"
+    },
+    {
+     "name": "Sector RS",
+     "status": "pass",
+     "detail": "Other -3.6 pts"
+    },
+    {
+     "name": "Unusual option OI",
+     "status": "pass",
+     "detail": "2.2x its 20-day average"
+    },
+    {
+     "name": "Liquidity",
+     "status": "pass",
+     "detail": "20-day ADV 328 cr (min 50)"
+    },
+    {
+     "name": "Veto: chop regime",
+     "status": "pass",
+     "detail": "trend ok (ER 0.53)"
+    },
+    {
+     "name": "Veto: IV percentile",
+     "status": "unknown",
+     "detail": "IV unavailable"
+    },
+    {
+     "name": "Veto: event within 2 days",
+     "status": "pass",
+     "detail": "no event in window"
+    },
+    {
+     "name": "Veto: expiry day",
+     "status": "pass",
+     "detail": "not expiry day"
+    },
+    {
+     "name": "Veto: option spread",
+     "status": "unknown",
+     "detail": "option quote unavailable"
+    },
+    {
+     "name": "Veto: target vs expected move",
+     "status": "unknown",
+     "detail": "unknown: evaluated at the 15m trigger"
+    },
+    {
+     "name": "15m timing (OB/FVG pullback + BOS/engulfing)",
+     "status": "pending",
+     "detail": "stage Watch"
+    }
+   ],
+   "stage": "Watch",
+   "vetoed": false,
+   "candles": [
+    {
+     "time": "2026-07-08",
+     "open": 13160.0,
+     "high": 13345.0,
+     "low": 12848.0,
+     "close": 12934.0
+    },
+    {
+     "time": "2026-07-09",
+     "open": 13153.0,
+     "high": 13600.0,
+     "low": 13153.0,
+     "close": 13477.0
+    },
+    {
+     "time": "2026-07-10",
+     "open": 13875.0,
+     "high": 14030.0,
+     "low": 13362.0,
+     "close": 13421.0
+    },
+    {
+     "time": "2026-07-13",
+     "open": 13355.0,
+     "high": 13549.0,
+     "low": 13200.0,
+     "close": 13490.0
+    },
+    {
+     "time": "2026-07-14",
+     "open": 13390.0,
+     "high": 13435.0,
+     "low": 13180.0,
+     "close": 13365.0
+    },
+    {
+     "time": "2026-07-15",
+     "open": 13580.0,
+     "high": 13725.0,
+     "low": 13431.0,
+     "close": 13651.0
+    },
+    {
+     "time": "2026-07-16",
+     "open": 14101.0,
+     "high": 14685.0,
+     "low": 14101.0,
+     "close": 14507.0
+    },
+    {
+     "time": "2026-07-17",
+     "open": 14499.0,
+     "high": 14580.0,
+     "low": 14192.0,
+     "close": 14329.0
+    },
+    {
+     "time": "2026-07-20",
+     "open": 14300.0,
+     "high": 14614.0,
+     "low": 14165.0,
+     "close": 14589.0
+    },
+    {
+     "time": "2026-07-21",
+     "open": 14573.0,
+     "high": 14573.0,
+     "low": 14066.0,
+     "close": 14118.0
+    },
+    {
+     "time": "2026-07-22",
+     "open": 14139.0,
+     "high": 14210.0,
+     "low": 13650.0,
+     "close": 13882.0
+    },
+    {
+     "time": "2026-07-23",
+     "open": 13850.0,
+     "high": 14041.0,
+     "low": 13764.0,
+     "close": 13829.0
+    },
+    {
+     "time": "2026-07-24",
+     "open": 13750.0,
+     "high": 13898.0,
+     "low": 13586.0,
+     "close": 13846.0
+    },
+    {
+     "time": "2026-07-27",
+     "open": 13951.0,
+     "high": 14021.0,
+     "low": 13741.0,
+     "close": 13810.0
+    },
+    {
+     "time": "2026-07-28",
+     "open": 13800.0,
+     "high": 13938.0,
+     "low": 13719.0,
+     "close": 13903.0
+    },
+    {
+     "time": "2026-07-29",
+     "open": 13950.0,
+     "high": 14325.0,
+     "low": 13877.0,
+     "close": 14275.0
+    },
+    {
+     "time": "2026-07-30",
+     "open": 14282.0,
+     "high": 14482.0,
+     "low": 14167.0,
+     "close": 14338.0
+    },
+    {
+     "time": "2026-07-31",
+     "open": 14335.0,
+     "high": 14589.0,
+     "low": 13601.0,
+     "close": 14049.0
+    },
+    {
+     "time": "2026-08-03",
+     "open": 13875.0,
+     "high": 14085.0,
+     "low": 13579.0,
+     "close": 13892.0
+    },
+    {
+     "time": "2026-08-04",
+     "open": 13900.0,
+     "high": 14086.0,
+     "low": 13812.0,
+     "close": 13988.0
+    },
+    {
+     "time": "2026-08-05",
+     "open": 14055.0,
+     "high": 14395.0,
+     "low": 14023.0,
+     "close": 14310.0
+    },
+    {
+     "time": "2026-08-06",
+     "open": 14310.0,
+     "high": 14445.0,
+     "low": 14137.0,
+     "close": 14200.0
+    },
+    {
+     "time": "2026-08-07",
+     "open": 14200.0,
+     "high": 14294.0,
+     "low": 14050.0,
+     "close": 14200.0
+    },
+    {
+     "time": "2026-08-10",
+     "open": 14200.0,
+     "high": 14271.0,
+     "low": 14001.0,
+     "close": 14115.0
+    },
+    {
+     "time": "2026-08-11",
+     "open": 14115.0,
+     "high": 14198.0,
+     "low": 14011.0,
+     "close": 14023.0
+    },
+    {
+     "time": "2026-08-12",
+     "open": 14061.0,
+     "high": 14090.0,
+     "low": 13670.0,
+     "close": 13800.0
+    },
+    {
+     "time": "2026-08-13",
+     "open": 13840.0,
+     "high": 14065.0,
+     "low": 13645.0,
+     "close": 14035.0
+    },
+    {
+     "time": "2026-08-14",
+     "open": 14009.0,
+     "high": 14209.0,
+     "low": 13999.0,
+     "close": 14130.0
+    },
+    {
+     "time": "2026-08-17",
+     "open": 14190.0,
+     "high": 14287.0,
+     "low": 14025.0,
+     "close": 14025.0
+    },
+    {
+     "time": "2026-08-18",
+     "open": 14100.0,
+     "high": 14420.0,
+     "low": 14066.0,
+     "close": 14150.0
+    },
+    {
+     "time": "2026-08-19",
+     "open": 14149.0,
+     "high": 14550.0,
+     "low": 14026.0,
+     "close": 14462.0
+    },
+    {
+     "time": "2026-08-20",
+     "open": 14510.0,
+     "high": 14953.0,
+     "low": 14470.0,
+     "close": 14850.0
+    },
+    {
+     "time": "2026-08-21",
+     "open": 14864.0,
+     "high": 14924.0,
+     "low": 14620.0,
+     "close": 14850.0
+    },
+    {
+     "time": "2026-08-24",
+     "open": 15000.0,
+     "high": 15000.0,
+     "low": 14484.0,
+     "close": 14570.0
+    },
+    {
+     "time": "2026-08-25",
+     "open": 14529.0,
+     "high": 14990.0,
+     "low": 14400.0,
+     "close": 14990.0
+    },
+    {
+     "time": "2026-08-26",
+     "open": 14850.0,
+     "high": 14983.0,
+     "low": 14720.0,
+     "close": 14735.0
+    },
+    {
+     "time": "2026-08-27",
+     "open": 14735.0,
+     "high": 14849.0,
+     "low": 14684.0,
+     "close": 14711.0
+    },
+    {
+     "time": "2026-08-28",
+     "open": 14811.0,
+     "high": 14920.0,
+     "low": 14650.0,
+     "close": 14650.0
+    },
+    {
+     "time": "2026-08-31",
+     "open": 14650.0,
+     "high": 14850.0,
+     "low": 14601.0,
+     "close": 14850.0
+    },
+    {
+     "time": "2026-09-01",
+     "open": 14780.0,
+     "high": 14820.0,
+     "low": 14450.0,
+     "close": 14461.0
+    },
+    {
+     "time": "2026-09-02",
+     "open": 14461.0,
+     "high": 14620.0,
+     "low": 14315.0,
+     "close": 14590.0
+    },
+    {
+     "time": "2026-09-03",
+     "open": 14581.0,
+     "high": 14670.0,
+     "low": 14380.0,
+     "close": 14445.0
+    },
+    {
+     "time": "2026-09-04",
+     "open": 14445.0,
+     "high": 14463.0,
+     "low": 14070.0,
+     "close": 14240.0
+    },
+    {
+     "time": "2026-09-07",
+     "open": 14227.0,
+     "high": 14429.0,
+     "low": 13937.0,
+     "close": 14180.0
+    },
+    {
+     "time": "2026-09-08",
+     "open": 14128.0,
+     "high": 14229.0,
+     "low": 14052.0,
+     "close": 14100.0
+    },
+    {
+     "time": "2026-09-09",
+     "open": 14100.0,
+     "high": 14271.0,
+     "low": 13773.0,
+     "close": 13845.0
+    },
+    {
+     "time": "2026-09-10",
+     "open": 13845.0,
+     "high": 13867.0,
+     "low": 13355.0,
+     "close": 13500.0
+    },
+    {
+     "time": "2026-09-11",
+     "open": 13300.0,
+     "high": 13490.0,
+     "low": 12980.0,
+     "close": 13425.0
+    },
+    {
+     "time": "2026-09-15",
+     "open": 13490.0,
+     "high": 13575.0,
+     "low": 13093.0,
+     "close": 13180.0
+    },
+    {
+     "time": "2026-09-16",
+     "open": 12985.0,
+     "high": 13260.0,
+     "low": 12850.0,
+     "close": 13181.0
+    },
+    {
+     "time": "2026-09-17",
+     "open": 13200.0,
+     "high": 13495.0,
+     "low": 13176.0,
+     "close": 13290.0
+    },
+    {
+     "time": "2026-09-18",
+     "open": 13290.0,
+     "high": 13383.0,
+     "low": 13005.0,
+     "close": 13005.0
+    },
+    {
+     "time": "2026-09-21",
+     "open": 13128.0,
+     "high": 13415.0,
+     "low": 13125.0,
+     "close": 13350.0
+    },
+    {
+     "time": "2026-09-22",
+     "open": 13364.0,
+     "high": 13434.0,
+     "low": 12996.0,
+     "close": 13084.0
+    },
+    {
+     "time": "2026-09-23",
+     "open": 13084.0,
+     "high": 13250.0,
+     "low": 13055.0,
+     "close": 13200.0
+    },
+    {
+     "time": "2026-09-24",
+     "open": 13100.0,
+     "high": 13315.0,
+     "low": 13091.0,
+     "close": 13299.0
+    },
+    {
+     "time": "2026-09-25",
+     "open": 13280.0,
+     "high": 13514.0,
+     "low": 13211.0,
+     "close": 13390.0
+    },
+    {
+     "time": "2026-09-28",
+     "open": 13325.0,
+     "high": 13766.0,
+     "low": 13234.0,
+     "close": 13640.0
+    },
+    {
+     "time": "2026-09-29",
+     "open": 13640.0,
+     "high": 13686.0,
+     "low": 13250.0,
+     "close": 13250.0
+    },
+    {
+     "time": "2026-09-30",
+     "open": 13300.0,
+     "high": 13425.0,
+     "low": 13100.0,
+     "close": 13100.0
+    },
+    {
+     "time": "2026-10-01",
+     "open": 13151.0,
+     "high": 13290.0,
+     "low": 12651.0,
+     "close": 12700.0
+    },
+    {
+     "time": "2026-10-05",
+     "open": 12729.0,
+     "high": 12899.0,
+     "low": 12692.0,
+     "close": 12748.0
+    },
+    {
+     "time": "2026-10-06",
+     "open": 12751.0,
+     "high": 13039.0,
+     "low": 12660.0,
+     "close": 13015.0
+    },
+    {
+     "time": "2026-10-07",
+     "open": 13030.0,
+     "high": 13072.0,
+     "low": 12897.0,
+     "close": 13024.0
+    },
+    {
+     "time": "2026-10-08",
+     "open": 13060.0,
+     "high": 13070.0,
+     "low": 12632.0,
+     "close": 12650.0
+    },
+    {
+     "time": "2026-10-09",
+     "open": 12730.0,
+     "high": 12875.0,
+     "low": 12602.0,
+     "close": 12774.0
+    },
+    {
+     "time": "2026-10-12",
+     "open": 12838.0,
+     "high": 12878.0,
+     "low": 12610.0,
+     "close": 12660.0
+    },
+    {
+     "time": "2026-10-13",
+     "open": 12708.0,
+     "high": 12805.0,
+     "low": 12581.0,
+     "close": 12740.0
+    },
+    {
+     "time": "2026-10-14",
+     "open": 12760.0,
+     "high": 12948.0,
+     "low": 12662.0,
+     "close": 12820.0
+    },
+    {
+     "time": "2026-10-15",
+     "open": 12820.0,
+     "high": 12953.0,
+     "low": 12666.0,
+     "close": 12666.0
+    },
+    {
+     "time": "2026-10-16",
+     "open": 12770.0,
+     "high": 12850.0,
+     "low": 12268.0,
+     "close": 12340.0
+    },
+    {
+     "time": "2026-10-19",
+     "open": 12400.0,
+     "high": 12495.0,
+     "low": 12084.0,
+     "close": 12100.0
+    },
+    {
+     "time": "2026-10-21",
+     "open": 12175.0,
+     "high": 12179.0,
+     "low": 11581.0,
+     "close": 11689.0
+    },
+    {
+     "time": "2026-10-22",
+     "open": 11670.0,
+     "high": 11805.0,
+     "low": 11421.0,
+     "close": 11594.0
+    },
+    {
+     "time": "2026-10-23",
+     "open": 11625.0,
+     "high": 11689.0,
+     "low": 11100.0,
+     "close": 11191.0
+    },
+    {
+     "time": "2026-10-26",
+     "open": 11108.0,
+     "high": 11278.0,
+     "low": 11022.0,
+     "close": 11161.0
+    },
+    {
+     "time": "2026-10-27",
+     "open": 11200.0,
+     "high": 11321.0,
+     "low": 11115.0,
+     "close": 11233.0
+    },
+    {
+     "time": "2026-10-28",
+     "open": 11235.0,
+     "high": 11522.0,
+     "low": 11121.0,
+     "close": 11400.0
+    },
+    {
+     "time": "2026-10-29",
+     "open": 11400.0,
+     "high": 11589.0,
+     "low": 11361.0,
+     "close": 11488.0
+    },
+    {
+     "time": "2026-10-30",
+     "open": 11500.0,
+     "high": 11513.0,
+     "low": 10932.0,
+     "close": 11000.0
+    }
+   ],
+   "oi": [
+    {
+     "time": "2026-07-08",
+     "oi": 2604400.0,
+     "chg_oi": -68700.0
+    },
+    {
+     "time": "2026-07-09",
+     "oi": 2560400.0,
+     "chg_oi": -44000.0
+    },
+    {
+     "time": "2026-07-10",
+     "oi": 2582000.0,
+     "chg_oi": 21600.0
+    },
+    {
+     "time": "2026-07-13",
+     "oi": 2621950.0,
+     "chg_oi": 39950.0
+    },
+    {
+     "time": "2026-07-14",
+     "oi": 2684100.0,
+     "chg_oi": 62150.0
+    },
+    {
+     "time": "2026-07-15",
+     "oi": 2690050.0,
+     "chg_oi": 5950.0
+    },
+    {
+     "time": "2026-07-16",
+     "oi": 2556450.0,
+     "chg_oi": -133600.0
+    },
+    {
+     "time": "2026-07-17",
+     "oi": 2591400.0,
+     "chg_oi": 34950.0
+    },
+    {
+     "time": "2026-07-20",
+     "oi": 2645300.0,
+     "chg_oi": 53900.0
+    },
+    {
+     "time": "2026-07-21",
+     "oi": 2779850.0,
+     "chg_oi": 134550.0
+    },
+    {
+     "time": "2026-07-22",
+     "oi": 2779100.0,
+     "chg_oi": -750.0
+    },
+    {
+     "time": "2026-07-23",
+     "oi": 2502150.0,
+     "chg_oi": -276950.0
+    },
+    {
+     "time": "2026-07-24",
+     "oi": 2406500.0,
+     "chg_oi": -95650.0
+    },
+    {
+     "time": "2026-07-27",
+     "oi": 2460550.0,
+     "chg_oi": 54050.0
+    },
+    {
+     "time": "2026-07-28",
+     "oi": 2415200.0,
+     "chg_oi": -45350.0
+    },
+    {
+     "time": "2026-07-29",
+     "oi": 2381600.0,
+     "chg_oi": 120750.0
+    },
+    {
+     "time": "2026-07-30",
+     "oi": 2401600.0,
+     "chg_oi": 20000.0
+    },
+    {
+     "time": "2026-07-31",
+     "oi": 2643050.0,
+     "chg_oi": 241450.0
+    },
+    {
+     "time": "2026-08-03",
+     "oi": 2834850.0,
+     "chg_oi": 191800.0
+    },
+    {
+     "time": "2026-08-04",
+     "oi": 2818800.0,
+     "chg_oi": -16050.0
+    },
+    {
+     "time": "2026-08-05",
+     "oi": 2741700.0,
+     "chg_oi": -77100.0
+    },
+    {
+     "time": "2026-08-06",
+     "oi": 2780250.0,
+     "chg_oi": 38550.0
+    },
+    {
+     "time": "2026-08-07",
+     "oi": 2773000.0,
+     "chg_oi": -7250.0
+    },
+    {
+     "time": "2026-08-10",
+     "oi": 2826550.0,
+     "chg_oi": 53550.0
+    },
+    {
+     "time": "2026-08-11",
+     "oi": 2858700.0,
+     "chg_oi": 32150.0
+    },
+    {
+     "time": "2026-08-12",
+     "oi": 2966850.0,
+     "chg_oi": 108150.0
+    },
+    {
+     "time": "2026-08-13",
+     "oi": 2861300.0,
+     "chg_oi": -105550.0
+    },
+    {
+     "time": "2026-08-14",
+     "oi": 2825250.0,
+     "chg_oi": -36050.0
+    },
+    {
+     "time": "2026-08-17",
+     "oi": 2861250.0,
+     "chg_oi": 36000.0
+    },
+    {
+     "time": "2026-08-18",
+     "oi": 2894350.0,
+     "chg_oi": 33100.0
+    },
+    {
+     "time": "2026-08-19",
+     "oi": 2909750.0,
+     "chg_oi": 15400.0
+    },
+    {
+     "time": "2026-08-20",
+     "oi": 2536000.0,
+     "chg_oi": -373750.0
+    },
+    {
+     "time": "2026-08-21",
+     "oi": 2714200.0,
+     "chg_oi": 178200.0
+    },
+    {
+     "time": "2026-08-24",
+     "oi": 3478150.0,
+     "chg_oi": 763950.0
+    },
+    {
+     "time": "2026-08-25",
+     "oi": 3267750.0,
+     "chg_oi": -210400.0
+    },
+    {
+     "time": "2026-08-26",
+     "oi": 3172900.0,
+     "chg_oi": 104700.0
+    },
+    {
+     "time": "2026-08-27",
+     "oi": 3174650.0,
+     "chg_oi": 1750.0
+    },
+    {
+     "time": "2026-08-28",
+     "oi": 3103900.0,
+     "chg_oi": -70750.0
+    },
+    {
+     "time": "2026-08-31",
+     "oi": 3091700.0,
+     "chg_oi": -12200.0
+    },
+    {
+     "time": "2026-09-01",
+     "oi": 3120900.0,
+     "chg_oi": 29200.0
+    },
+    {
+     "time": "2026-09-02",
+     "oi": 3046700.0,
+     "chg_oi": -74200.0
+    },
+    {
+     "time": "2026-09-03",
+     "oi": 3208550.0,
+     "chg_oi": 161850.0
+    },
+    {
+     "time": "2026-09-04",
+     "oi": 3321850.0,
+     "chg_oi": 113300.0
+    },
+    {
+     "time": "2026-09-07",
+     "oi": 3266350.0,
+     "chg_oi": -55500.0
+    },
+    {
+     "time": "2026-09-08",
+     "oi": 3315500.0,
+     "chg_oi": 49150.0
+    },
+    {
+     "time": "2026-09-09",
+     "oi": 3452150.0,
+     "chg_oi": 136650.0
+    },
+    {
+     "time": "2026-09-10",
+     "oi": 3533200.0,
+     "chg_oi": 81050.0
+    },
+    {
+     "time": "2026-09-11",
+     "oi": 3472450.0,
+     "chg_oi": -60750.0
+    },
+    {
+     "time": "2026-09-15",
+     "oi": 3440500.0,
+     "chg_oi": -31950.0
+    },
+    {
+     "time": "2026-09-16",
+     "oi": 3298050.0,
+     "chg_oi": -142450.0
+    },
+    {
+     "time": "2026-09-17",
+     "oi": 3314150.0,
+     "chg_oi": 16100.0
+    },
+    {
+     "time": "2026-09-18",
+     "oi": 3303600.0,
+     "chg_oi": -10550.0
+    },
+    {
+     "time": "2026-09-21",
+     "oi": 3297200.0,
+     "chg_oi": -6400.0
+    },
+    {
+     "time": "2026-09-22",
+     "oi": 3441500.0,
+     "chg_oi": 144300.0
+    },
+    {
+     "time": "2026-09-23",
+     "oi": 3414750.0,
+     "chg_oi": -26750.0
+    },
+    {
+     "time": "2026-09-24",
+     "oi": 3131900.0,
+     "chg_oi": -282850.0
+    },
+    {
+     "time": "2026-09-25",
+     "oi": 3007700.0,
+     "chg_oi": -124200.0
+    },
+    {
+     "time": "2026-09-28",
+     "oi": 2938250.0,
+     "chg_oi": -69450.0
+    },
+    {
+     "time": "2026-09-29",
+     "oi": 2851550.0,
+     "chg_oi": -86700.0
+    },
+    {
+     "time": "2026-09-30",
+     "oi": 2635800.0,
+     "chg_oi": 37500.0
+    },
+    {
+     "time": "2026-10-01",
+     "oi": 2654600.0,
+     "chg_oi": 18800.0
+    },
+    {
+     "time": "2026-10-05",
+     "oi": 2633300.0,
+     "chg_oi": -21300.0
+    },
+    {
+     "time": "2026-10-06",
+     "oi": 2623900.0,
+     "chg_oi": -9400.0
+    },
+    {
+     "time": "2026-10-07",
+     "oi": 2646450.0,
+     "chg_oi": 22550.0
+    },
+    {
+     "time": "2026-10-08",
+     "oi": 2685450.0,
+     "chg_oi": 39000.0
+    },
+    {
+     "time": "2026-10-09",
+     "oi": 2714900.0,
+     "chg_oi": 29450.0
+    },
+    {
+     "time": "2026-10-12",
+     "oi": 2792400.0,
+     "chg_oi": 77500.0
+    },
+    {
+     "time": "2026-10-13",
+     "oi": 2845400.0,
+     "chg_oi": 53000.0
+    },
+    {
+     "time": "2026-10-14",
+     "oi": 2839450.0,
+     "chg_oi": -5950.0
+    },
+    {
+     "time": "2026-10-15",
+     "oi": 2776850.0,
+     "chg_oi": -62600.0
+    },
+    {
+     "time": "2026-10-16",
+     "oi": 2937850.0,
+     "chg_oi": 161000.0
+    },
+    {
+     "time": "2026-10-19",
+     "oi": 3013500.0,
+     "chg_oi": 75650.0
+    },
+    {
+     "time": "2026-10-21",
+     "oi": 3125350.0,
+     "chg_oi": 111850.0
+    },
+    {
+     "time": "2026-10-22",
+     "oi": 2717600.0,
+     "chg_oi": -407750.0
+    },
+    {
+     "time": "2026-10-23",
+     "oi": 2763600.0,
+     "chg_oi": 46000.0
+    },
+    {
+     "time": "2026-10-26",
+     "oi": 2758950.0,
+     "chg_oi": -4650.0
+    },
+    {
+     "time": "2026-10-27",
+     "oi": 2721500.0,
+     "chg_oi": -37450.0
+    },
+    {
+     "time": "2026-10-28",
+     "oi": 2440850.0,
+     "chg_oi": 13950.0
+    },
+    {
+     "time": "2026-10-29",
+     "oi": 2435850.0,
+     "chg_oi": -5000.0
+    },
+    {
+     "time": "2026-10-30",
+     "oi": 2467100.0,
+     "chg_oi": 31250.0
+    }
+   ],
+   "intraday": null,
+   "cause": {
+    "label": "fresh_shorts",
+    "confidence": 0.7,
+    "level": "high",
+    "driver": "stock",
+    "tags": [],
+    "reason": "Fresh shorts: price -4.2% with futures OI +1.3% (fresh shorts being added); stock-specific (stock RS -17.9 vs sector -3.6)."
+   },
+   "early": {
+    "stage": "trigger",
+    "side": "short",
+    "flags": [
+     "rs_divergence",
+     "squeeze"
+    ],
+    "strength": 0.7,
+    "detail": "short breakout of the 20-session range at 11022.00 on 2026-10-30 after rs divergence, squeeze",
+    "trigger_date": "2026-10-30",
+    "level": 11022.0,
+    "levels": {
+     "entry_ref": 11000.0,
+     "stop": 11567.964285714286,
+     "target": 9864.071428571428,
+     "atr14": 378.64285714285717
+    }
+   },
+   "option_plan": {
+    "symbol": "DIXON",
+    "side": "short",
+    "status": "ok",
+    "notes": [
+     "IV percentile unavailable; ATM used, no veto applied",
+     "no expiry 10-15 days out; using 21 days",
+     "lot size unknown; quantity in units"
+    ],
+    "underlying": {
+     "spot": 11000.0,
+     "stop": 11567.964285714286,
+     "target": 9864.071428571428
+    },
+    "iv_percentile": null,
+    "iv_status": "unavailable",
+    "iv": null,
+    "type": "PE",
+    "strike": 11000.0,
+    "moneyness": "atm",
+    "expiry": "2026-11-23",
+    "days_to_expiry": 21,
+    "expiry_in_window": false,
+    "premium": 296.48969985423446,
+    "premium_source": "model (realised vol)",
+    "premium_stop": 107.53525530917341,
+    "premium_target": 1116.7744070410026,
+    "risk_per_unit": 188.95444454506105,
+    "reward_risk": 4.341177097801212,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 52,
+    "cost": 15417.464392420192,
+    "risk_at_stop": 9825.631116343175,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 83,
+     "rate": 0.46987951807228917,
+     "up_rate": 0.4375,
+     "down_rate": 0.5142857142857142
+    },
+    "post_spike": {
+     "n": 35,
+     "avg_drift_pct": 0.4686460318477253,
+     "continuation_rate": 0.4857142857142857
+    },
+    "expiry_week": {
+     "n": 80,
+     "avg_abs_move_pct": 1.7666885016915157,
+     "other_abs_move_pct": 1.792066337931525,
+     "ratio": 0.9858387852598686,
+     "avg_move_pct": -0.44082374798376883
+    },
+    "summary": "47% of gaps fill the same day (n=83); after volume spikes the 5-day drift is +0.5% (49% continue, n=35); expiry-week moves are 0.99x a normal day"
+   }
+  },
+  {
+   "rank": 3,
+   "symbol": "NESTLEIND",
+   "sector": "FMCG",
+   "direction": "short",
+   "grade": "B",
+   "score": 68.0,
+   "setup": "trend",
+   "components": {
+    "quadrant": 30.0,
+    "delivery": 3.0,
+    "rs": 20.0,
+    "sector_rs": 15.0,
+    "unusual_oi": 0.0
+   },
+   "close": 1167.0,
+   "features": {
+    "quadrant": "short_buildup",
+    "price_chg_pct": -1.8172640080767244,
+    "oi_chg_pct": 0.3430465618254702,
+    "deliv_pct": 63.85,
+    "deliv_ratio": 1.1496322437184348,
+    "rs": -12.828680371113876,
+    "sector_rs": -5.446981596479224,
+    "unusual_oi": 0.30357406010801063,
+    "adv_cr": 272.9645552245
+   },
+   "levels": {
+    "basis": "reference close; stop 1.5x daily ATR(14), target 2R. Intraday levels come from the 15m zone.",
+    "entry_ref": 1167.0,
+    "atr14": 41.14999999999999,
+    "stop": 1228.725,
+    "target": 1043.55,
+    "r_multiple": 2.0
+   },
+   "strikes": {
+    "type": "PE",
+    "atm": 1150.0,
+    "step": 50,
+    "otm1": 1100.0,
+    "expiry": "2026-11-23",
+    "note": "approximate strike interval; check the live option chain"
+   },
+   "base_rate": {
+    "grade": "B",
+    "setup": "trend",
+    "n": 23633,
+    "win_pct": 43.515423348707316,
+    "expectancy_r": -0.09012571175146557,
+    "basis": "all qualifying signals, 5-day horizon, net of 0.1R cost"
+   },
+   "checklist": [
+    {
+     "name": "OI quadrant",
+     "status": "pass",
+     "detail": "short buildup: price -1.8%, futures OI +0.3%"
+    },
+    {
+     "name": "Delivery spike",
+     "status": "fail",
+     "detail": "delivery 64% = 1.15x its 20-day average"
+    },
+    {
+     "name": "RS vs Nifty (20d)",
+     "status": "pass",
+     "detail": "-12.8 pts"
+    },
+    {
+     "name": "Sector RS",
+     "status": "pass",
+     "detail": "FMCG -5.4 pts"
+    },
+    {
+     "name": "Unusual option OI",
+     "status": "fail",
+     "detail": "0.3x its 20-day average"
+    },
+    {
+     "name": "Liquidity",
+     "status": "pass",
+     "detail": "20-day ADV 273 cr (min 50)"
+    },
+    {
+     "name": "Veto: chop regime",
+     "status": "pass",
+     "detail": "trend ok (ER 0.33)"
+    },
+    {
+     "name": "Veto: IV percentile",
+     "status": "unknown",
+     "detail": "IV unavailable"
+    },
+    {
+     "name": "Veto: event within 2 days",
+     "status": "pass",
+     "detail": "no event in window"
+    },
+    {
+     "name": "Veto: expiry day",
+     "status": "pass",
+     "detail": "not expiry day"
+    },
+    {
+     "name": "Veto: option spread",
+     "status": "unknown",
+     "detail": "option quote unavailable"
+    },
+    {
+     "name": "Veto: target vs expected move",
+     "status": "unknown",
+     "detail": "unknown: evaluated at the 15m trigger"
+    },
+    {
+     "name": "15m timing (OB/FVG pullback + BOS/engulfing)",
+     "status": "pending",
+     "detail": "stage Watch"
+    }
+   ],
+   "stage": "Watch",
+   "vetoed": false,
+   "candles": [
+    {
+     "time": "2026-07-08",
+     "open": 1460.0,
+     "high": 1479.9,
+     "low": 1441.7,
+     "close": 1450.5
+    },
+    {
+     "time": "2026-07-09",
+     "open": 1452.0,
+     "high": 1481.0,
+     "low": 1452.0,
+     "close": 1463.2
+    },
+    {
+     "time": "2026-07-10",
+     "open": 1467.0,
+     "high": 1471.3,
+     "low": 1448.3,
+     "close": 1455.2
+    },
+    {
+     "time": "2026-07-13",
+     "open": 1452.3,
+     "high": 1452.3,
+     "low": 1420.1,
+     "close": 1427.0
+    },
+    {
+     "time": "2026-07-14",
+     "open": 1418.5,
+     "high": 1448.7,
+     "low": 1418.5,
+     "close": 1427.1
+    },
+    {
+     "time": "2026-07-15",
+     "open": 1431.8,
+     "high": 1442.0,
+     "low": 1419.6,
+     "close": 1424.4
+    },
+    {
+     "time": "2026-07-16",
+     "open": 1427.9,
+     "high": 1436.3,
+     "low": 1417.8,
+     "close": 1423.5
+    },
+    {
+     "time": "2026-07-17",
+     "open": 1416.0,
+     "high": 1429.2,
+     "low": 1405.1,
+     "close": 1427.2
+    },
+    {
+     "time": "2026-07-20",
+     "open": 1436.0,
+     "high": 1456.0,
+     "low": 1420.6,
+     "close": 1446.3
+    },
+    {
+     "time": "2026-07-21",
+     "open": 1451.5,
+     "high": 1464.4,
+     "low": 1447.0,
+     "close": 1451.9
+    },
+    {
+     "time": "2026-07-22",
+     "open": 1460.3,
+     "high": 1510.0,
+     "low": 1454.0,
+     "close": 1493.6
+    },
+    {
+     "time": "2026-07-23",
+     "open": 1500.1,
+     "high": 1503.5,
+     "low": 1441.3,
+     "close": 1447.9
+    },
+    {
+     "time": "2026-07-24",
+     "open": 1439.8,
+     "high": 1467.8,
+     "low": 1431.0,
+     "close": 1443.5
+    },
+    {
+     "time": "2026-07-27",
+     "open": 1451.0,
+     "high": 1461.5,
+     "low": 1435.3,
+     "close": 1446.1
+    },
+    {
+     "time": "2026-07-28",
+     "open": 1454.6,
+     "high": 1507.2,
+     "low": 1448.5,
+     "close": 1491.8
+    },
+    {
+     "time": "2026-07-29",
+     "open": 1499.0,
+     "high": 1515.8,
+     "low": 1487.6,
+     "close": 1503.3
+    },
+    {
+     "time": "2026-07-30",
+     "open": 1503.3,
+     "high": 1532.6,
+     "low": 1497.0,
+     "close": 1520.7
+    },
+    {
+     "time": "2026-07-31",
+     "open": 1529.0,
+     "high": 1529.0,
+     "low": 1497.5,
+     "close": 1509.6
+    },
+    {
+     "time": "2026-08-03",
+     "open": 1509.5,
+     "high": 1530.0,
+     "low": 1505.4,
+     "close": 1530.0
+    },
+    {
+     "time": "2026-08-04",
+     "open": 1523.0,
+     "high": 1535.9,
+     "low": 1448.3,
+     "close": 1520.0
+    },
+    {
+     "time": "2026-08-05",
+     "open": 1510.0,
+     "high": 1524.6,
+     "low": 1488.1,
+     "close": 1520.0
+    },
+    {
+     "time": "2026-08-06",
+     "open": 1531.9,
+     "high": 1535.0,
+     "low": 1518.2,
+     "close": 1535.0
+    },
+    {
+     "time": "2026-08-07",
+     "open": 1523.0,
+     "high": 1553.0,
+     "low": 1520.0,
+     "close": 1540.0
+    },
+    {
+     "time": "2026-08-10",
+     "open": 1534.1,
+     "high": 1547.5,
+     "low": 1520.0,
+     "close": 1528.6
+    },
+    {
+     "time": "2026-08-11",
+     "open": 1531.4,
+     "high": 1541.0,
+     "low": 1491.3,
+     "close": 1493.2
+    },
+    {
+     "time": "2026-08-12",
+     "open": 1503.0,
+     "high": 1515.7,
+     "low": 1495.3,
+     "close": 1507.0
+    },
+    {
+     "time": "2026-08-13",
+     "open": 1513.2,
+     "high": 1520.9,
+     "low": 1494.8,
+     "close": 1506.9
+    },
+    {
+     "time": "2026-08-14",
+     "open": 1506.9,
+     "high": 1515.8,
+     "low": 1496.1,
+     "close": 1499.1
+    },
+    {
+     "time": "2026-08-17",
+     "open": 1500.0,
+     "high": 1503.7,
+     "low": 1468.5,
+     "close": 1470.0
+    },
+    {
+     "time": "2026-08-18",
+     "open": 1478.0,
+     "high": 1479.8,
+     "low": 1453.0,
+     "close": 1462.5
+    },
+    {
+     "time": "2026-08-19",
+     "open": 1462.4,
+     "high": 1481.3,
+     "low": 1457.1,
+     "close": 1465.0
+    },
+    {
+     "time": "2026-08-20",
+     "open": 1482.0,
+     "high": 1482.0,
+     "low": 1454.6,
+     "close": 1458.0
+    },
+    {
+     "time": "2026-08-21",
+     "open": 1465.0,
+     "high": 1485.4,
+     "low": 1449.0,
+     "close": 1477.1
+    },
+    {
+     "time": "2026-08-24",
+     "open": 1478.7,
+     "high": 1483.4,
+     "low": 1457.1,
+     "close": 1471.3
+    },
+    {
+     "time": "2026-08-25",
+     "open": 1471.3,
+     "high": 1479.0,
+     "low": 1458.8,
+     "close": 1479.0
+    },
+    {
+     "time": "2026-08-26",
+     "open": 1476.0,
+     "high": 1479.0,
+     "low": 1450.8,
+     "close": 1451.5
+    },
+    {
+     "time": "2026-08-27",
+     "open": 1451.5,
+     "high": 1465.0,
+     "low": 1440.3,
+     "close": 1450.0
+    },
+    {
+     "time": "2026-08-28",
+     "open": 1454.4,
+     "high": 1456.5,
+     "low": 1438.0,
+     "close": 1454.6
+    },
+    {
+     "time": "2026-08-31",
+     "open": 1445.1,
+     "high": 1496.5,
+     "low": 1427.6,
+     "close": 1496.5
+    },
+    {
+     "time": "2026-09-01",
+     "open": 1514.8,
+     "high": 1514.8,
+     "low": 1436.0,
+     "close": 1438.2
+    },
+    {
+     "time": "2026-09-02",
+     "open": 1425.0,
+     "high": 1428.0,
+     "low": 1411.0,
+     "close": 1425.0
+    },
+    {
+     "time": "2026-09-03",
+     "open": 1424.1,
+     "high": 1424.1,
+     "low": 1407.0,
+     "close": 1416.0
+    },
+    {
+     "time": "2026-09-04",
+     "open": 1415.0,
+     "high": 1420.0,
+     "low": 1402.5,
+     "close": 1410.5
+    },
+    {
+     "time": "2026-09-07",
+     "open": 1401.0,
+     "high": 1405.7,
+     "low": 1392.9,
+     "close": 1398.0
+    },
+    {
+     "time": "2026-09-08",
+     "open": 1397.4,
+     "high": 1415.1,
+     "low": 1392.9,
+     "close": 1400.5
+    },
+    {
+     "time": "2026-09-09",
+     "open": 1400.5,
+     "high": 1405.9,
+     "low": 1389.2,
+     "close": 1393.0
+    },
+    {
+     "time": "2026-09-10",
+     "open": 1396.8,
+     "high": 1402.8,
+     "low": 1377.7,
+     "close": 1386.2
+    },
+    {
+     "time": "2026-09-11",
+     "open": 1376.7,
+     "high": 1401.2,
+     "low": 1373.5,
+     "close": 1383.3
+    },
+    {
+     "time": "2026-09-15",
+     "open": 1383.3,
+     "high": 1395.0,
+     "low": 1362.0,
+     "close": 1362.0
+    },
+    {
+     "time": "2026-09-16",
+     "open": 1369.2,
+     "high": 1397.0,
+     "low": 1368.7,
+     "close": 1384.5
+    },
+    {
+     "time": "2026-09-17",
+     "open": 1384.5,
+     "high": 1391.7,
+     "low": 1370.1,
+     "close": 1370.6
+    },
+    {
+     "time": "2026-09-18",
+     "open": 1372.1,
+     "high": 1390.0,
+     "low": 1332.8,
+     "close": 1372.4
+    },
+    {
+     "time": "2026-09-21",
+     "open": 1360.0,
+     "high": 1390.0,
+     "low": 1360.0,
+     "close": 1385.0
+    },
+    {
+     "time": "2026-09-22",
+     "open": 1382.2,
+     "high": 1392.9,
+     "low": 1363.9,
+     "close": 1363.9
+    },
+    {
+     "time": "2026-09-23",
+     "open": 1370.0,
+     "high": 1387.2,
+     "low": 1361.6,
+     "close": 1387.2
+    },
+    {
+     "time": "2026-09-24",
+     "open": 1355.7,
+     "high": 1386.0,
+     "low": 1350.2,
+     "close": 1351.0
+    },
+    {
+     "time": "2026-09-25",
+     "open": 1357.0,
+     "high": 1362.6,
+     "low": 1348.3,
+     "close": 1362.6
+    },
+    {
+     "time": "2026-09-28",
+     "open": 1350.0,
+     "high": 1356.8,
+     "low": 1343.9,
+     "close": 1346.0
+    },
+    {
+     "time": "2026-09-29",
+     "open": 1341.0,
+     "high": 1349.1,
+     "low": 1333.6,
+     "close": 1345.7
+    },
+    {
+     "time": "2026-09-30",
+     "open": 1341.5,
+     "high": 1345.5,
+     "low": 1310.0,
+     "close": 1310.0
+    },
+    {
+     "time": "2026-10-01",
+     "open": 1301.9,
+     "high": 1320.9,
+     "low": 1295.0,
+     "close": 1307.7
+    },
+    {
+     "time": "2026-10-05",
+     "open": 1305.4,
+     "high": 1311.3,
+     "low": 1292.9,
+     "close": 1297.1
+    },
+    {
+     "time": "2026-10-06",
+     "open": 1303.6,
+     "high": 1341.4,
+     "low": 1293.4,
+     "close": 1341.4
+    },
+    {
+     "time": "2026-10-07",
+     "open": 1326.3,
+     "high": 1336.6,
+     "low": 1313.1,
+     "close": 1324.0
+    },
+    {
+     "time": "2026-10-08",
+     "open": 1319.6,
+     "high": 1345.2,
+     "low": 1311.8,
+     "close": 1319.0
+    },
+    {
+     "time": "2026-10-09",
+     "open": 1321.2,
+     "high": 1346.8,
+     "low": 1314.3,
+     "close": 1333.0
+    },
+    {
+     "time": "2026-10-12",
+     "open": 1336.0,
+     "high": 1342.8,
+     "low": 1316.0,
+     "close": 1324.7
+    },
+    {
+     "time": "2026-10-13",
+     "open": 1311.0,
+     "high": 1354.5,
+     "low": 1306.9,
+     "close": 1334.0
+    },
+    {
+     "time": "2026-10-14",
+     "open": 1336.0,
+     "high": 1383.2,
+     "low": 1336.0,
+     "close": 1383.2
+    },
+    {
+     "time": "2026-10-15",
+     "open": 1380.0,
+     "high": 1385.9,
+     "low": 1260.5,
+     "close": 1275.8
+    },
+    {
+     "time": "2026-10-16",
+     "open": 1289.7,
+     "high": 1289.7,
+     "low": 1250.3,
+     "close": 1265.5
+    },
+    {
+     "time": "2026-10-19",
+     "open": 1264.5,
+     "high": 1264.9,
+     "low": 1238.5,
+     "close": 1242.7
+    },
+    {
+     "time": "2026-10-21",
+     "open": 1242.7,
+     "high": 1251.6,
+     "low": 1205.5,
+     "close": 1223.9
+    },
+    {
+     "time": "2026-10-22",
+     "open": 1210.0,
+     "high": 1210.0,
+     "low": 1181.3,
+     "close": 1189.9
+    },
+    {
+     "time": "2026-10-23",
+     "open": 1189.0,
+     "high": 1194.4,
+     "low": 1156.2,
+     "close": 1175.0
+    },
+    {
+     "time": "2026-10-26",
+     "open": 1171.3,
+     "high": 1178.7,
+     "low": 1157.7,
+     "close": 1173.5
+    },
+    {
+     "time": "2026-10-27",
+     "open": 1169.0,
+     "high": 1180.5,
+     "low": 1160.0,
+     "close": 1180.5
+    },
+    {
+     "time": "2026-10-28",
+     "open": 1173.1,
+     "high": 1173.1,
+     "low": 1147.4,
+     "close": 1168.0
+    },
+    {
+     "time": "2026-10-29",
+     "open": 1163.4,
+     "high": 1188.6,
+     "low": 1153.0,
+     "close": 1188.6
+    },
+    {
+     "time": "2026-10-30",
+     "open": 1181.0,
+     "high": 1185.0,
+     "low": 1165.0,
+     "close": 1167.0
+    }
+   ],
+   "oi": [
+    {
+     "time": "2026-07-08",
+     "oi": 11857000.0,
+     "chg_oi": -503500.0
+    },
+    {
+     "time": "2026-07-09",
+     "oi": 11813000.0,
+     "chg_oi": -44000.0
+    },
+    {
+     "time": "2026-07-10",
+     "oi": 11821000.0,
+     "chg_oi": 8000.0
+    },
+    {
+     "time": "2026-07-13",
+     "oi": 12077500.0,
+     "chg_oi": 256500.0
+    },
+    {
+     "time": "2026-07-14",
+     "oi": 12221000.0,
+     "chg_oi": 143500.0
+    },
+    {
+     "time": "2026-07-15",
+     "oi": 12138500.0,
+     "chg_oi": -82500.0
+    },
+    {
+     "time": "2026-07-16",
+     "oi": 12260500.0,
+     "chg_oi": 122000.0
+    },
+    {
+     "time": "2026-07-17",
+     "oi": 12346000.0,
+     "chg_oi": 85500.0
+    },
+    {
+     "time": "2026-07-20",
+     "oi": 12677000.0,
+     "chg_oi": 331000.0
+    },
+    {
+     "time": "2026-07-21",
+     "oi": 12921000.0,
+     "chg_oi": 244000.0
+    },
+    {
+     "time": "2026-07-22",
+     "oi": 13766000.0,
+     "chg_oi": 845000.0
+    },
+    {
+     "time": "2026-07-23",
+     "oi": 13590500.0,
+     "chg_oi": -175500.0
+    },
+    {
+     "time": "2026-07-24",
+     "oi": 13246500.0,
+     "chg_oi": -344000.0
+    },
+    {
+     "time": "2026-07-27",
+     "oi": 13113000.0,
+     "chg_oi": -133500.0
+    },
+    {
+     "time": "2026-07-28",
+     "oi": 12139500.0,
+     "chg_oi": -973500.0
+    },
+    {
+     "time": "2026-07-29",
+     "oi": 10728000.0,
+     "chg_oi": -389000.0
+    },
+    {
+     "time": "2026-07-30",
+     "oi": 10178500.0,
+     "chg_oi": -549500.0
+    },
+    {
+     "time": "2026-07-31",
+     "oi": 9769000.0,
+     "chg_oi": -409500.0
+    },
+    {
+     "time": "2026-08-03",
+     "oi": 9698000.0,
+     "chg_oi": -71000.0
+    },
+    {
+     "time": "2026-08-04",
+     "oi": 9204000.0,
+     "chg_oi": -494000.0
+    },
+    {
+     "time": "2026-08-05",
+     "oi": 8914000.0,
+     "chg_oi": -290000.0
+    },
+    {
+     "time": "2026-08-06",
+     "oi": 9077500.0,
+     "chg_oi": 163500.0
+    },
+    {
+     "time": "2026-08-07",
+     "oi": 9274500.0,
+     "chg_oi": 197000.0
+    },
+    {
+     "time": "2026-08-10",
+     "oi": 9291500.0,
+     "chg_oi": 17000.0
+    },
+    {
+     "time": "2026-08-11",
+     "oi": 9272000.0,
+     "chg_oi": -19500.0
+    },
+    {
+     "time": "2026-08-12",
+     "oi": 9646500.0,
+     "chg_oi": 374500.0
+    },
+    {
+     "time": "2026-08-13",
+     "oi": 9811000.0,
+     "chg_oi": 164500.0
+    },
+    {
+     "time": "2026-08-14",
+     "oi": 9814500.0,
+     "chg_oi": 3500.0
+    },
+    {
+     "time": "2026-08-17",
+     "oi": 9806500.0,
+     "chg_oi": -8000.0
+    },
+    {
+     "time": "2026-08-18",
+     "oi": 9854500.0,
+     "chg_oi": 48000.0
+    },
+    {
+     "time": "2026-08-19",
+     "oi": 10445500.0,
+     "chg_oi": 591000.0
+    },
+    {
+     "time": "2026-08-20",
+     "oi": 10004000.0,
+     "chg_oi": -441500.0
+    },
+    {
+     "time": "2026-08-21",
+     "oi": 9927500.0,
+     "chg_oi": -76500.0
+    },
+    {
+     "time": "2026-08-24",
+     "oi": 9917500.0,
+     "chg_oi": -10000.0
+    },
+    {
+     "time": "2026-08-25",
+     "oi": 10379000.0,
+     "chg_oi": 461500.0
+    },
+    {
+     "time": "2026-08-26",
+     "oi": 10002000.0,
+     "chg_oi": 367000.0
+    },
+    {
+     "time": "2026-08-27",
+     "oi": 9988500.0,
+     "chg_oi": -13500.0
+    },
+    {
+     "time": "2026-08-28",
+     "oi": 10007500.0,
+     "chg_oi": 19000.0
+    },
+    {
+     "time": "2026-08-31",
+     "oi": 10052500.0,
+     "chg_oi": 45000.0
+    },
+    {
+     "time": "2026-09-01",
+     "oi": 9772000.0,
+     "chg_oi": -280500.0
+    },
+    {
+     "time": "2026-09-02",
+     "oi": 9658500.0,
+     "chg_oi": -113500.0
+    },
+    {
+     "time": "2026-09-03",
+     "oi": 9584000.0,
+     "chg_oi": -74500.0
+    },
+    {
+     "time": "2026-09-04",
+     "oi": 9557000.0,
+     "chg_oi": -27000.0
+    },
+    {
+     "time": "2026-09-07",
+     "oi": 9504500.0,
+     "chg_oi": -52500.0
+    },
+    {
+     "time": "2026-09-08",
+     "oi": 9605000.0,
+     "chg_oi": 100500.0
+    },
+    {
+     "time": "2026-09-09",
+     "oi": 9627000.0,
+     "chg_oi": 22000.0
+    },
+    {
+     "time": "2026-09-10",
+     "oi": 9614500.0,
+     "chg_oi": -12500.0
+    },
+    {
+     "time": "2026-09-11",
+     "oi": 9451500.0,
+     "chg_oi": -163000.0
+    },
+    {
+     "time": "2026-09-15",
+     "oi": 9348500.0,
+     "chg_oi": -103000.0
+    },
+    {
+     "time": "2026-09-16",
+     "oi": 9233500.0,
+     "chg_oi": -115000.0
+    },
+    {
+     "time": "2026-09-17",
+     "oi": 9418000.0,
+     "chg_oi": 184500.0
+    },
+    {
+     "time": "2026-09-18",
+     "oi": 10073000.0,
+     "chg_oi": 655000.0
+    },
+    {
+     "time": "2026-09-21",
+     "oi": 9875000.0,
+     "chg_oi": -198000.0
+    },
+    {
+     "time": "2026-09-22",
+     "oi": 9954500.0,
+     "chg_oi": 79500.0
+    },
+    {
+     "time": "2026-09-23",
+     "oi": 10153000.0,
+     "chg_oi": 198500.0
+    },
+    {
+     "time": "2026-09-24",
+     "oi": 10286500.0,
+     "chg_oi": 133500.0
+    },
+    {
+     "time": "2026-09-25",
+     "oi": 10055000.0,
+     "chg_oi": -231500.0
+    },
+    {
+     "time": "2026-09-28",
+     "oi": 9936500.0,
+     "chg_oi": -118500.0
+    },
+    {
+     "time": "2026-09-29",
+     "oi": 10441500.0,
+     "chg_oi": 505000.0
+    },
+    {
+     "time": "2026-09-30",
+     "oi": 10449500.0,
+     "chg_oi": 319500.0
+    },
+    {
+     "time": "2026-10-01",
+     "oi": 10706000.0,
+     "chg_oi": 256500.0
+    },
+    {
+     "time": "2026-10-05",
+     "oi": 11199000.0,
+     "chg_oi": 493000.0
+    },
+    {
+     "time": "2026-10-06",
+     "oi": 11675500.0,
+     "chg_oi": 476500.0
+    },
+    {
+     "time": "2026-10-07",
+     "oi": 11520500.0,
+     "chg_oi": -155000.0
+    },
+    {
+     "time": "2026-10-08",
+     "oi": 11524000.0,
+     "chg_oi": 3500.0
+    },
+    {
+     "time": "2026-10-09",
+     "oi": 11997000.0,
+     "chg_oi": 473000.0
+    },
+    {
+     "time": "2026-10-12",
+     "oi": 12217000.0,
+     "chg_oi": 220000.0
+    },
+    {
+     "time": "2026-10-13",
+     "oi": 13231500.0,
+     "chg_oi": 1014500.0
+    },
+    {
+     "time": "2026-10-14",
+     "oi": 12708000.0,
+     "chg_oi": -523500.0
+    },
+    {
+     "time": "2026-10-15",
+     "oi": 14186000.0,
+     "chg_oi": 1478000.0
+    },
+    {
+     "time": "2026-10-16",
+     "oi": 13569500.0,
+     "chg_oi": -616500.0
+    },
+    {
+     "time": "2026-10-19",
+     "oi": 13426000.0,
+     "chg_oi": -143500.0
+    },
+    {
+     "time": "2026-10-21",
+     "oi": 13172000.0,
+     "chg_oi": -254000.0
+    },
+    {
+     "time": "2026-10-22",
+     "oi": 13112000.0,
+     "chg_oi": -60000.0
+    },
+    {
+     "time": "2026-10-23",
+     "oi": 13322000.0,
+     "chg_oi": 210000.0
+    },
+    {
+     "time": "2026-10-26",
+     "oi": 13403000.0,
+     "chg_oi": 81000.0
+    },
+    {
+     "time": "2026-10-27",
+     "oi": 13333500.0,
+     "chg_oi": -69500.0
+    },
+    {
+     "time": "2026-10-28",
+     "oi": 12518500.0,
+     "chg_oi": 44500.0
+    },
+    {
+     "time": "2026-10-29",
+     "oi": 12972000.0,
+     "chg_oi": 453500.0
+    },
+    {
+     "time": "2026-10-30",
+     "oi": 13016500.0,
+     "chg_oi": 44500.0
+    }
+   ],
+   "intraday": null,
+   "cause": {
+    "label": "fresh_shorts",
+    "confidence": 0.6,
+    "level": "medium",
+    "driver": "stock",
+    "tags": [],
+    "reason": "Fresh shorts: price -1.8% with futures OI +0.3% (fresh shorts being added); stock-specific (stock RS -12.8 vs sector -5.4)."
+   },
+   "early": {
+    "stage": "none",
+    "side": null,
+    "flags": [],
+    "strength": 0.0,
+    "detail": "",
+    "trigger_date": null,
+    "level": null,
+    "levels": null
+   },
+   "option_plan": {
+    "symbol": "NESTLEIND",
+    "side": "short",
+    "status": "ok",
+    "notes": [
+     "IV percentile unavailable; ATM used, no veto applied",
+     "no expiry 10-15 days out; using 21 days",
+     "lot size unknown; quantity in units"
+    ],
+    "underlying": {
+     "spot": 1167.0,
+     "stop": 1228.725,
+     "target": 1043.55
+    },
+    "iv_percentile": null,
+    "iv_status": "unavailable",
+    "iv": null,
+    "type": "PE",
+    "strike": 1150.0,
+    "moneyness": "atm",
+    "expiry": "2026-11-23",
+    "days_to_expiry": 21,
+    "expiry_in_window": false,
+    "premium": 32.55599727239246,
+    "premium_source": "model (realised vol)",
+    "premium_stop": 14.034030175861403,
+    "premium_target": 110.05502143744093,
+    "risk_per_unit": 18.521967096531057,
+    "reward_risk": 4.184168115683733,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 539,
+    "cost": 17547.682529819536,
+    "risk_at_stop": 9983.34026503024,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 29,
+     "rate": 0.4827586206896552,
+     "up_rate": 0.7142857142857143,
+     "down_rate": 0.26666666666666666
+    },
+    "post_spike": {
+     "n": 26,
+     "avg_drift_pct": -0.0016802039915852025,
+     "continuation_rate": 0.5769230769230769
+    },
+    "expiry_week": {
+     "n": 80,
+     "avg_abs_move_pct": 0.7821204064072027,
+     "other_abs_move_pct": 1.1122726928881739,
+     "ratio": 0.7031732518545575,
+     "avg_move_pct": 0.12750300996093838
+    },
+    "summary": "48% of gaps fill the same day (n=29); after volume spikes the 5-day drift is -0.0% (58% continue, n=26); expiry-week moves are 0.70x a normal day"
+   }
+  },
+  {
+   "rank": 4,
+   "symbol": "TECHM",
+   "sector": "IT",
+   "direction": "long",
+   "grade": "B",
+   "score": 67.9,
+   "setup": "trend",
+   "components": {
+    "quadrant": 30.0,
+    "delivery": 2.9,
+    "rs": 20.0,
+    "sector_rs": 15.0,
+    "unusual_oi": 0.0
+   },
+   "close": 1790.8,
+   "features": {
+    "quadrant": "long_buildup",
+    "price_chg_pct": 1.198010849909581,
+    "oi_chg_pct": 1.7451028489329643,
+    "deliv_pct": 57.18,
+    "deliv_ratio": 1.1474439371895853,
+    "rs": 15.593911843027296,
+    "sector_rs": 16.867210896164135,
+    "unusual_oi": 0.28957706709225955,
+    "adv_cr": 728.8447360935
+   },
+   "levels": {
+    "basis": "reference close; stop 1.5x daily ATR(14), target 2R. Intraday levels come from the 15m zone.",
+    "entry_ref": 1790.8,
+    "atr14": 64.05000000000003,
+    "stop": 1694.725,
+    "target": 1982.95,
+    "r_multiple": 2.0
+   },
+   "strikes": {
+    "type": "CE",
+    "atm": 1800.0,
+    "step": 50,
+    "otm1": 1850.0,
+    "expiry": "2026-11-23",
+    "note": "approximate strike interval; check the live option chain"
+   },
+   "base_rate": {
+    "grade": "B",
+    "setup": "trend",
+    "n": 23633,
+    "win_pct": 43.515423348707316,
+    "expectancy_r": -0.09012571175146557,
+    "basis": "all qualifying signals, 5-day horizon, net of 0.1R cost"
+   },
+   "checklist": [
+    {
+     "name": "OI quadrant",
+     "status": "pass",
+     "detail": "long buildup: price +1.2%, futures OI +1.7%"
+    },
+    {
+     "name": "Delivery spike",
+     "status": "fail",
+     "detail": "delivery 57% = 1.15x its 20-day average"
+    },
+    {
+     "name": "RS vs Nifty (20d)",
+     "status": "pass",
+     "detail": "+15.6 pts"
+    },
+    {
+     "name": "Sector RS",
+     "status": "pass",
+     "detail": "IT +16.9 pts"
+    },
+    {
+     "name": "Unusual option OI",
+     "status": "fail",
+     "detail": "0.3x its 20-day average"
+    },
+    {
+     "name": "Liquidity",
+     "status": "pass",
+     "detail": "20-day ADV 729 cr (min 50)"
+    },
+    {
+     "name": "Veto: chop regime",
+     "status": "pass",
+     "detail": "trend ok (ER 0.42)"
+    },
+    {
+     "name": "Veto: IV percentile",
+     "status": "unknown",
+     "detail": "IV unavailable"
+    },
+    {
+     "name": "Veto: event within 2 days",
+     "status": "pass",
+     "detail": "no event in window"
+    },
+    {
+     "name": "Veto: expiry day",
+     "status": "pass",
+     "detail": "not expiry day"
+    },
+    {
+     "name": "Veto: option spread",
+     "status": "unknown",
+     "detail": "option quote unavailable"
+    },
+    {
+     "name": "Veto: target vs expected move",
+     "status": "unknown",
+     "detail": "unknown: evaluated at the 15m trigger"
+    },
+    {
+     "name": "15m timing (OB/FVG pullback + BOS/engulfing)",
+     "status": "pending",
+     "detail": "stage Watch"
+    }
+   ],
+   "stage": "Watch",
+   "vetoed": false,
+   "candles": [
+    {
+     "time": "2026-07-08",
+     "open": 1441.0,
+     "high": 1452.9,
+     "low": 1422.8,
+     "close": 1428.8
+    },
+    {
+     "time": "2026-07-09",
+     "open": 1426.0,
+     "high": 1436.3,
+     "low": 1399.0,
+     "close": 1426.3
+    },
+    {
+     "time": "2026-07-10",
+     "open": 1448.0,
+     "high": 1478.9,
+     "low": 1445.3,
+     "close": 1454.8
+    },
+    {
+     "time": "2026-07-13",
+     "open": 1444.2,
+     "high": 1524.8,
+     "low": 1444.2,
+     "close": 1504.5
+    },
+    {
+     "time": "2026-07-14",
+     "open": 1509.0,
+     "high": 1519.9,
+     "low": 1480.0,
+     "close": 1484.3
+    },
+    {
+     "time": "2026-07-15",
+     "open": 1465.2,
+     "high": 1507.0,
+     "low": 1453.0,
+     "close": 1498.7
+    },
+    {
+     "time": "2026-07-16",
+     "open": 1510.0,
+     "high": 1538.3,
+     "low": 1504.2,
+     "close": 1510.3
+    },
+    {
+     "time": "2026-07-17",
+     "open": 1540.0,
+     "high": 1585.0,
+     "low": 1527.3,
+     "close": 1572.9
+    },
+    {
+     "time": "2026-07-20",
+     "open": 1577.6,
+     "high": 1608.0,
+     "low": 1572.4,
+     "close": 1576.4
+    },
+    {
+     "time": "2026-07-21",
+     "open": 1577.0,
+     "high": 1614.6,
+     "low": 1572.0,
+     "close": 1576.3
+    },
+    {
+     "time": "2026-07-22",
+     "open": 1574.1,
+     "high": 1574.1,
+     "low": 1551.6,
+     "close": 1560.6
+    },
+    {
+     "time": "2026-07-23",
+     "open": 1550.0,
+     "high": 1567.6,
+     "low": 1539.0,
+     "close": 1555.8
+    },
+    {
+     "time": "2026-07-24",
+     "open": 1549.0,
+     "high": 1579.8,
+     "low": 1531.1,
+     "close": 1559.5
+    },
+    {
+     "time": "2026-07-27",
+     "open": 1576.0,
+     "high": 1599.6,
+     "low": 1571.0,
+     "close": 1575.0
+    },
+    {
+     "time": "2026-07-28",
+     "open": 1599.0,
+     "high": 1643.9,
+     "low": 1595.8,
+     "close": 1635.2
+    },
+    {
+     "time": "2026-07-29",
+     "open": 1661.0,
+     "high": 1673.0,
+     "low": 1640.1,
+     "close": 1644.2
+    },
+    {
+     "time": "2026-07-30",
+     "open": 1649.0,
+     "high": 1686.6,
+     "low": 1638.1,
+     "close": 1669.0
+    },
+    {
+     "time": "2026-07-31",
+     "open": 1620.0,
+     "high": 1661.5,
+     "low": 1610.5,
+     "close": 1651.3
+    },
+    {
+     "time": "2026-08-03",
+     "open": 1663.4,
+     "high": 1670.0,
+     "low": 1634.3,
+     "close": 1649.0
+    },
+    {
+     "time": "2026-08-04",
+     "open": 1652.9,
+     "high": 1659.0,
+     "low": 1640.1,
+     "close": 1648.5
+    },
+    {
+     "time": "2026-08-05",
+     "open": 1663.0,
+     "high": 1664.8,
+     "low": 1639.0,
+     "close": 1650.0
+    },
+    {
+     "time": "2026-08-06",
+     "open": 1655.0,
+     "high": 1670.0,
+     "low": 1631.0,
+     "close": 1632.2
+    },
+    {
+     "time": "2026-08-07",
+     "open": 1639.8,
+     "high": 1681.5,
+     "low": 1634.3,
+     "close": 1635.0
+    },
+    {
+     "time": "2026-08-10",
+     "open": 1644.0,
+     "high": 1665.9,
+     "low": 1630.8,
+     "close": 1640.0
+    },
+    {
+     "time": "2026-08-11",
+     "open": 1645.9,
+     "high": 1660.3,
+     "low": 1640.0,
+     "close": 1643.0
+    },
+    {
+     "time": "2026-08-12",
+     "open": 1654.0,
+     "high": 1657.0,
+     "low": 1622.1,
+     "close": 1625.0
+    },
+    {
+     "time": "2026-08-13",
+     "open": 1634.7,
+     "high": 1652.8,
+     "low": 1626.3,
+     "close": 1639.0
+    },
+    {
+     "time": "2026-08-14",
+     "open": 1635.0,
+     "high": 1652.0,
+     "low": 1614.4,
+     "close": 1632.8
+    },
+    {
+     "time": "2026-08-17",
+     "open": 1621.0,
+     "high": 1638.9,
+     "low": 1604.2,
+     "close": 1610.0
+    },
+    {
+     "time": "2026-08-18",
+     "open": 1605.0,
+     "high": 1608.0,
+     "low": 1579.9,
+     "close": 1592.0
+    },
+    {
+     "time": "2026-08-19",
+     "open": 1601.5,
+     "high": 1610.7,
+     "low": 1575.8,
+     "close": 1589.8
+    },
+    {
+     "time": "2026-08-20",
+     "open": 1601.6,
+     "high": 1610.0,
+     "low": 1588.7,
+     "close": 1592.1
+    },
+    {
+     "time": "2026-08-21",
+     "open": 1592.1,
+     "high": 1602.0,
+     "low": 1576.5,
+     "close": 1584.0
+    },
+    {
+     "time": "2026-08-24",
+     "open": 1580.1,
+     "high": 1599.0,
+     "low": 1574.1,
+     "close": 1584.0
+    },
+    {
+     "time": "2026-08-25",
+     "open": 1588.1,
+     "high": 1599.9,
+     "low": 1562.0,
+     "close": 1599.9
+    },
+    {
+     "time": "2026-08-26",
+     "open": 1607.5,
+     "high": 1614.9,
+     "low": 1565.8,
+     "close": 1571.0
+    },
+    {
+     "time": "2026-08-27",
+     "open": 1571.6,
+     "high": 1600.0,
+     "low": 1571.6,
+     "close": 1585.0
+    },
+    {
+     "time": "2026-08-28",
+     "open": 1600.0,
+     "high": 1642.0,
+     "low": 1598.0,
+     "close": 1640.9
+    },
+    {
+     "time": "2026-08-31",
+     "open": 1640.0,
+     "high": 1640.9,
+     "low": 1609.1,
+     "close": 1628.0
+    },
+    {
+     "time": "2026-09-01",
+     "open": 1630.0,
+     "high": 1649.0,
+     "low": 1613.7,
+     "close": 1638.0
+    },
+    {
+     "time": "2026-09-02",
+     "open": 1630.0,
+     "high": 1637.2,
+     "low": 1604.5,
+     "close": 1623.0
+    },
+    {
+     "time": "2026-09-03",
+     "open": 1623.0,
+     "high": 1625.6,
+     "low": 1592.0,
+     "close": 1598.0
+    },
+    {
+     "time": "2026-09-04",
+     "open": 1605.1,
+     "high": 1623.4,
+     "low": 1586.9,
+     "close": 1596.9
+    },
+    {
+     "time": "2026-09-07",
+     "open": 1575.1,
+     "high": 1593.6,
+     "low": 1545.3,
+     "close": 1564.0
+    },
+    {
+     "time": "2026-09-08",
+     "open": 1556.1,
+     "high": 1569.9,
+     "low": 1541.4,
+     "close": 1559.0
+    },
+    {
+     "time": "2026-09-09",
+     "open": 1531.0,
+     "high": 1531.0,
+     "low": 1498.0,
+     "close": 1508.0
+    },
+    {
+     "time": "2026-09-10",
+     "open": 1511.9,
+     "high": 1544.7,
+     "low": 1498.1,
+     "close": 1525.8
+    },
+    {
+     "time": "2026-09-11",
+     "open": 1519.3,
+     "high": 1557.3,
+     "low": 1518.6,
+     "close": 1541.0
+    },
+    {
+     "time": "2026-09-15",
+     "open": 1588.0,
+     "high": 1633.2,
+     "low": 1575.9,
+     "close": 1575.9
+    },
+    {
+     "time": "2026-09-16",
+     "open": 1578.2,
+     "high": 1589.2,
+     "low": 1548.0,
+     "close": 1558.0
+    },
+    {
+     "time": "2026-09-17",
+     "open": 1545.1,
+     "high": 1569.7,
+     "low": 1538.0,
+     "close": 1561.0
+    },
+    {
+     "time": "2026-09-18",
+     "open": 1558.3,
+     "high": 1561.2,
+     "low": 1523.1,
+     "close": 1537.1
+    },
+    {
+     "time": "2026-09-21",
+     "open": 1529.0,
+     "high": 1560.6,
+     "low": 1525.1,
+     "close": 1558.5
+    },
+    {
+     "time": "2026-09-22",
+     "open": 1553.7,
+     "high": 1558.7,
+     "low": 1530.9,
+     "close": 1551.6
+    },
+    {
+     "time": "2026-09-23",
+     "open": 1540.0,
+     "high": 1558.0,
+     "low": 1539.3,
+     "close": 1557.0
+    },
+    {
+     "time": "2026-09-24",
+     "open": 1549.9,
+     "high": 1576.2,
+     "low": 1543.0,
+     "close": 1543.0
+    },
+    {
+     "time": "2026-09-25",
+     "open": 1540.0,
+     "high": 1554.7,
+     "low": 1526.6,
+     "close": 1548.0
+    },
+    {
+     "time": "2026-09-28",
+     "open": 1548.0,
+     "high": 1557.0,
+     "low": 1526.8,
+     "close": 1542.2
+    },
+    {
+     "time": "2026-09-29",
+     "open": 1542.3,
+     "high": 1557.5,
+     "low": 1510.5,
+     "close": 1510.5
+    },
+    {
+     "time": "2026-09-30",
+     "open": 1524.6,
+     "high": 1559.5,
+     "low": 1518.0,
+     "close": 1524.0
+    },
+    {
+     "time": "2026-10-01",
+     "open": 1540.0,
+     "high": 1554.8,
+     "low": 1512.0,
+     "close": 1533.0
+    },
+    {
+     "time": "2026-10-05",
+     "open": 1543.7,
+     "high": 1561.0,
+     "low": 1509.7,
+     "close": 1535.9
+    },
+    {
+     "time": "2026-10-06",
+     "open": 1536.0,
+     "high": 1540.8,
+     "low": 1495.0,
+     "close": 1504.5
+    },
+    {
+     "time": "2026-10-07",
+     "open": 1504.0,
+     "high": 1513.0,
+     "low": 1486.2,
+     "close": 1491.1
+    },
+    {
+     "time": "2026-10-08",
+     "open": 1495.0,
+     "high": 1525.0,
+     "low": 1490.0,
+     "close": 1496.2
+    },
+    {
+     "time": "2026-10-09",
+     "open": 1500.0,
+     "high": 1536.6,
+     "low": 1496.2,
+     "close": 1514.1
+    },
+    {
+     "time": "2026-10-12",
+     "open": 1498.0,
+     "high": 1498.0,
+     "low": 1442.5,
+     "close": 1471.0
+    },
+    {
+     "time": "2026-10-13",
+     "open": 1479.5,
+     "high": 1543.5,
+     "low": 1479.5,
+     "close": 1543.5
+    },
+    {
+     "time": "2026-10-14",
+     "open": 1540.0,
+     "high": 1581.7,
+     "low": 1538.2,
+     "close": 1575.2
+    },
+    {
+     "time": "2026-10-15",
+     "open": 1600.0,
+     "high": 1650.0,
+     "low": 1596.1,
+     "close": 1650.0
+    },
+    {
+     "time": "2026-10-16",
+     "open": 1712.0,
+     "high": 1797.0,
+     "low": 1690.1,
+     "close": 1790.0
+    },
+    {
+     "time": "2026-10-19",
+     "open": 1760.0,
+     "high": 1796.0,
+     "low": 1752.7,
+     "close": 1779.1
+    },
+    {
+     "time": "2026-10-21",
+     "open": 1795.2,
+     "high": 1834.7,
+     "low": 1790.0,
+     "close": 1834.7
+    },
+    {
+     "time": "2026-10-22",
+     "open": 1829.0,
+     "high": 1844.1,
+     "low": 1784.8,
+     "close": 1829.1
+    },
+    {
+     "time": "2026-10-23",
+     "open": 1837.4,
+     "high": 1845.0,
+     "low": 1780.2,
+     "close": 1790.0
+    },
+    {
+     "time": "2026-10-26",
+     "open": 1760.5,
+     "high": 1807.0,
+     "low": 1754.6,
+     "close": 1795.0
+    },
+    {
+     "time": "2026-10-27",
+     "open": 1784.0,
+     "high": 1811.4,
+     "low": 1761.0,
+     "close": 1811.4
+    },
+    {
+     "time": "2026-10-28",
+     "open": 1775.0,
+     "high": 1794.5,
+     "low": 1733.2,
+     "close": 1776.6
+    },
+    {
+     "time": "2026-10-29",
+     "open": 1781.8,
+     "high": 1800.0,
+     "low": 1760.5,
+     "close": 1769.6
+    },
+    {
+     "time": "2026-10-30",
+     "open": 1774.0,
+     "high": 1813.4,
+     "low": 1773.6,
+     "close": 1790.8
+    }
+   ],
+   "oi": [
+    {
+     "time": "2026-07-08",
+     "oi": 22412400.0,
+     "chg_oi": 250800.0
+    },
+    {
+     "time": "2026-07-09",
+     "oi": 22466400.0,
+     "chg_oi": 54000.0
+    },
+    {
+     "time": "2026-07-10",
+     "oi": 22778400.0,
+     "chg_oi": 312000.0
+    },
+    {
+     "time": "2026-07-13",
+     "oi": 23088000.0,
+     "chg_oi": 309600.0
+    },
+    {
+     "time": "2026-07-14",
+     "oi": 24091200.0,
+     "chg_oi": 1003200.0
+    },
+    {
+     "time": "2026-07-15",
+     "oi": 25435200.0,
+     "chg_oi": 1344000.0
+    },
+    {
+     "time": "2026-07-16",
+     "oi": 25270200.0,
+     "chg_oi": -165000.0
+    },
+    {
+     "time": "2026-07-17",
+     "oi": 25685400.0,
+     "chg_oi": 415200.0
+    },
+    {
+     "time": "2026-07-20",
+     "oi": 24870000.0,
+     "chg_oi": -815400.0
+    },
+    {
+     "time": "2026-07-21",
+     "oi": 24977400.0,
+     "chg_oi": 107400.0
+    },
+    {
+     "time": "2026-07-22",
+     "oi": 25207800.0,
+     "chg_oi": 230400.0
+    },
+    {
+     "time": "2026-07-23",
+     "oi": 22521000.0,
+     "chg_oi": -2686800.0
+    },
+    {
+     "time": "2026-07-24",
+     "oi": 20655000.0,
+     "chg_oi": -1866000.0
+    },
+    {
+     "time": "2026-07-27",
+     "oi": 19911600.0,
+     "chg_oi": -743400.0
+    },
+    {
+     "time": "2026-07-28",
+     "oi": 20251200.0,
+     "chg_oi": 339600.0
+    },
+    {
+     "time": "2026-07-29",
+     "oi": 17838000.0,
+     "chg_oi": 136200.0
+    },
+    {
+     "time": "2026-07-30",
+     "oi": 18424200.0,
+     "chg_oi": 586200.0
+    },
+    {
+     "time": "2026-07-31",
+     "oi": 18166200.0,
+     "chg_oi": -258000.0
+    },
+    {
+     "time": "2026-08-03",
+     "oi": 17355600.0,
+     "chg_oi": -810600.0
+    },
+    {
+     "time": "2026-08-04",
+     "oi": 17361000.0,
+     "chg_oi": 5400.0
+    },
+    {
+     "time": "2026-08-05",
+     "oi": 17437800.0,
+     "chg_oi": 76800.0
+    },
+    {
+     "time": "2026-08-06",
+     "oi": 17529600.0,
+     "chg_oi": 91800.0
+    },
+    {
+     "time": "2026-08-07",
+     "oi": 18391800.0,
+     "chg_oi": 862200.0
+    },
+    {
+     "time": "2026-08-10",
+     "oi": 18222600.0,
+     "chg_oi": -169200.0
+    },
+    {
+     "time": "2026-08-11",
+     "oi": 18095400.0,
+     "chg_oi": -127200.0
+    },
+    {
+     "time": "2026-08-12",
+     "oi": 17992800.0,
+     "chg_oi": -102600.0
+    },
+    {
+     "time": "2026-08-13",
+     "oi": 18199800.0,
+     "chg_oi": 207000.0
+    },
+    {
+     "time": "2026-08-14",
+     "oi": 18791400.0,
+     "chg_oi": 591600.0
+    },
+    {
+     "time": "2026-08-17",
+     "oi": 18964800.0,
+     "chg_oi": 173400.0
+    },
+    {
+     "time": "2026-08-18",
+     "oi": 19432800.0,
+     "chg_oi": 468000.0
+    },
+    {
+     "time": "2026-08-19",
+     "oi": 19739400.0,
+     "chg_oi": 306600.0
+    },
+    {
+     "time": "2026-08-20",
+     "oi": 19440600.0,
+     "chg_oi": -298800.0
+    },
+    {
+     "time": "2026-08-21",
+     "oi": 19545000.0,
+     "chg_oi": 104400.0
+    },
+    {
+     "time": "2026-08-24",
+     "oi": 19219800.0,
+     "chg_oi": -325200.0
+    },
+    {
+     "time": "2026-08-25",
+     "oi": 19362000.0,
+     "chg_oi": 142200.0
+    },
+    {
+     "time": "2026-08-26",
+     "oi": 17745600.0,
+     "chg_oi": 102000.0
+    },
+    {
+     "time": "2026-08-27",
+     "oi": 17880600.0,
+     "chg_oi": 135000.0
+    },
+    {
+     "time": "2026-08-28",
+     "oi": 18269400.0,
+     "chg_oi": 388800.0
+    },
+    {
+     "time": "2026-08-31",
+     "oi": 18458400.0,
+     "chg_oi": 189000.0
+    },
+    {
+     "time": "2026-09-01",
+     "oi": 18675600.0,
+     "chg_oi": 217200.0
+    },
+    {
+     "time": "2026-09-02",
+     "oi": 18653400.0,
+     "chg_oi": -22200.0
+    },
+    {
+     "time": "2026-09-03",
+     "oi": 18799200.0,
+     "chg_oi": 145800.0
+    },
+    {
+     "time": "2026-09-04",
+     "oi": 18799200.0,
+     "chg_oi": 0.0
+    },
+    {
+     "time": "2026-09-07",
+     "oi": 19590000.0,
+     "chg_oi": 790800.0
+    },
+    {
+     "time": "2026-09-08",
+     "oi": 19935000.0,
+     "chg_oi": 345000.0
+    },
+    {
+     "time": "2026-09-09",
+     "oi": 20660400.0,
+     "chg_oi": 725400.0
+    },
+    {
+     "time": "2026-09-10",
+     "oi": 21011400.0,
+     "chg_oi": 351000.0
+    },
+    {
+     "time": "2026-09-11",
+     "oi": 20760600.0,
+     "chg_oi": -250800.0
+    },
+    {
+     "time": "2026-09-15",
+     "oi": 20455800.0,
+     "chg_oi": -304800.0
+    },
+    {
+     "time": "2026-09-16",
+     "oi": 20305800.0,
+     "chg_oi": -150000.0
+    },
+    {
+     "time": "2026-09-17",
+     "oi": 21162000.0,
+     "chg_oi": 856200.0
+    },
+    {
+     "time": "2026-09-18",
+     "oi": 21502200.0,
+     "chg_oi": 340200.0
+    },
+    {
+     "time": "2026-09-21",
+     "oi": 21900600.0,
+     "chg_oi": 398400.0
+    },
+    {
+     "time": "2026-09-22",
+     "oi": 21888000.0,
+     "chg_oi": -12600.0
+    },
+    {
+     "time": "2026-09-23",
+     "oi": 21341400.0,
+     "chg_oi": -546600.0
+    },
+    {
+     "time": "2026-09-24",
+     "oi": 21232800.0,
+     "chg_oi": -108600.0
+    },
+    {
+     "time": "2026-09-25",
+     "oi": 21101400.0,
+     "chg_oi": -131400.0
+    },
+    {
+     "time": "2026-09-28",
+     "oi": 20419800.0,
+     "chg_oi": -681600.0
+    },
+    {
+     "time": "2026-09-29",
+     "oi": 20733000.0,
+     "chg_oi": 313200.0
+    },
+    {
+     "time": "2026-09-30",
+     "oi": 17322000.0,
+     "chg_oi": 320400.0
+    },
+    {
+     "time": "2026-10-01",
+     "oi": 17730000.0,
+     "chg_oi": 408000.0
+    },
+    {
+     "time": "2026-10-05",
+     "oi": 17569800.0,
+     "chg_oi": -160200.0
+    },
+    {
+     "time": "2026-10-06",
+     "oi": 17933400.0,
+     "chg_oi": 363600.0
+    },
+    {
+     "time": "2026-10-07",
+     "oi": 17734200.0,
+     "chg_oi": -199200.0
+    },
+    {
+     "time": "2026-10-08",
+     "oi": 17534400.0,
+     "chg_oi": -199800.0
+    },
+    {
+     "time": "2026-10-09",
+     "oi": 17359800.0,
+     "chg_oi": -174600.0
+    },
+    {
+     "time": "2026-10-12",
+     "oi": 18436200.0,
+     "chg_oi": 1076400.0
+    },
+    {
+     "time": "2026-10-13",
+     "oi": 18908400.0,
+     "chg_oi": 472200.0
+    },
+    {
+     "time": "2026-10-14",
+     "oi": 20128200.0,
+     "chg_oi": 1219800.0
+    },
+    {
+     "time": "2026-10-15",
+     "oi": 20107800.0,
+     "chg_oi": -20400.0
+    },
+    {
+     "time": "2026-10-16",
+     "oi": 18863400.0,
+     "chg_oi": -1244400.0
+    },
+    {
+     "time": "2026-10-19",
+     "oi": 18766200.0,
+     "chg_oi": -97200.0
+    },
+    {
+     "time": "2026-10-21",
+     "oi": 18627000.0,
+     "chg_oi": -139200.0
+    },
+    {
+     "time": "2026-10-22",
+     "oi": 18973800.0,
+     "chg_oi": 346800.0
+    },
+    {
+     "time": "2026-10-23",
+     "oi": 19220400.0,
+     "chg_oi": 246600.0
+    },
+    {
+     "time": "2026-10-26",
+     "oi": 19137000.0,
+     "chg_oi": -83400.0
+    },
+    {
+     "time": "2026-10-27",
+     "oi": 19917600.0,
+     "chg_oi": 780600.0
+    },
+    {
+     "time": "2026-10-28",
+     "oi": 16662600.0,
+     "chg_oi": -253200.0
+    },
+    {
+     "time": "2026-10-29",
+     "oi": 17122200.0,
+     "chg_oi": 459600.0
+    },
+    {
+     "time": "2026-10-30",
+     "oi": 17421000.0,
+     "chg_oi": 298800.0
+    }
+   ],
+   "intraday": null,
+   "cause": {
+    "label": "long_buildup",
+    "confidence": 0.63,
+    "level": "medium",
+    "driver": "sector",
+    "tags": [],
+    "reason": "Long buildup: price +1.2% with futures OI +1.7% (fresh longs being added); sector-driven (sector RS +16.9 vs stock +15.6)."
+   },
+   "early": {
+    "stage": "none",
+    "side": null,
+    "flags": [],
+    "strength": 0.0,
+    "detail": "",
+    "trigger_date": null,
+    "level": null,
+    "levels": null
+   },
+   "option_plan": {
+    "symbol": "TECHM",
+    "side": "long",
+    "status": "ok",
+    "notes": [
+     "IV percentile unavailable; ATM used, no veto applied",
+     "no expiry 10-15 days out; using 21 days",
+     "lot size unknown; quantity in units"
+    ],
+    "underlying": {
+     "spot": 1790.8,
+     "stop": 1694.725,
+     "target": 1982.95
+    },
+    "iv_percentile": null,
+    "iv_status": "unavailable",
+    "iv": null,
+    "type": "CE",
+    "strike": 1800.0,
+    "moneyness": "atm",
+    "expiry": "2026-11-23",
+    "days_to_expiry": 21,
+    "expiry_in_window": false,
+    "premium": 72.4179916067801,
+    "premium_source": "model (realised vol)",
+    "premium_stop": 32.84105409117444,
+    "premium_target": 206.88310139025566,
+    "risk_per_unit": 39.576937515605664,
+    "reward_risk": 3.3975622729892714,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 252,
+    "cost": 18249.333884908585,
+    "risk_at_stop": 9973.388253932628,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 81,
+     "rate": 0.38271604938271603,
+     "up_rate": 0.2727272727272727,
+     "down_rate": 0.4583333333333333
+    },
+    "post_spike": {
+     "n": 32,
+     "avg_drift_pct": 0.8328773105888125,
+     "continuation_rate": 0.59375
+    },
+    "expiry_week": {
+     "n": 80,
+     "avg_abs_move_pct": 1.3052662421790195,
+     "other_abs_move_pct": 1.2716844385517634,
+     "ratio": 1.026407340224671,
+     "avg_move_pct": -0.13779508939931753
+    },
+    "summary": "38% of gaps fill the same day (n=81); after volume spikes the 5-day drift is +0.8% (59% continue, n=32); expiry-week moves are 1.03x a normal day"
+   }
+  },
+  {
+   "rank": 5,
+   "symbol": "TATASTEEL",
+   "sector": "Metals",
+   "direction": "short",
+   "grade": "B",
+   "score": 66.7,
+   "setup": "trend",
+   "components": {
+    "quadrant": 30.0,
+    "delivery": 1.7,
+    "rs": 20.0,
+    "sector_rs": 15.0,
+    "unusual_oi": 0.0
+   },
+   "close": 167.6,
+   "features": {
+    "quadrant": "short_buildup",
+    "price_chg_pct": -1.0976041543727222,
+    "oi_chg_pct": 0.06167334794602748,
+    "deliv_pct": 53.31,
+    "deliv_ratio": 1.0852902555959323,
+    "rs": -10.97396291326844,
+    "sector_rs": -9.669613029950327,
+    "unusual_oi": 0.5053705759802393,
+    "adv_cr": 390.2542193953
+   },
+   "levels": {
+    "basis": "reference close; stop 1.5x daily ATR(14), target 2R. Intraday levels come from the 15m zone.",
+    "entry_ref": 167.6,
+    "atr14": 3.990000000000001,
+    "stop": 173.585,
+    "target": 155.63,
+    "r_multiple": 2.0
+   },
+   "strikes": {
+    "type": "PE",
+    "atm": 170.0,
+    "step": 5,
+    "otm1": 165.0,
+    "expiry": "2026-11-23",
+    "note": "approximate strike interval; check the live option chain"
+   },
+   "base_rate": {
+    "grade": "B",
+    "setup": "trend",
+    "n": 23633,
+    "win_pct": 43.515423348707316,
+    "expectancy_r": -0.09012571175146557,
+    "basis": "all qualifying signals, 5-day horizon, net of 0.1R cost"
+   },
+   "checklist": [
+    {
+     "name": "OI quadrant",
+     "status": "pass",
+     "detail": "short buildup: price -1.1%, futures OI +0.1%"
+    },
+    {
+     "name": "Delivery spike",
+     "status": "fail",
+     "detail": "delivery 53% = 1.09x its 20-day average"
+    },
+    {
+     "name": "RS vs Nifty (20d)",
+     "status": "pass",
+     "detail": "-11.0 pts"
+    },
+    {
+     "name": "Sector RS",
+     "status": "pass",
+     "detail": "Metals -9.7 pts"
+    },
+    {
+     "name": "Unusual option OI",
+     "status": "fail",
+     "detail": "0.5x its 20-day average"
+    },
+    {
+     "name": "Liquidity",
+     "status": "pass",
+     "detail": "20-day ADV 390 cr (min 50)"
+    },
+    {
+     "name": "Veto: chop regime",
+     "status": "pass",
+     "detail": "trend ok (ER 0.43)"
+    },
+    {
+     "name": "Veto: IV percentile",
+     "status": "unknown",
+     "detail": "IV unavailable"
+    },
+    {
+     "name": "Veto: event within 2 days",
+     "status": "pass",
+     "detail": "no event in window"
+    },
+    {
+     "name": "Veto: expiry day",
+     "status": "pass",
+     "detail": "not expiry day"
+    },
+    {
+     "name": "Veto: option spread",
+     "status": "unknown",
+     "detail": "option quote unavailable"
+    },
+    {
+     "name": "Veto: target vs expected move",
+     "status": "unknown",
+     "detail": "unknown: evaluated at the 15m trigger"
+    },
+    {
+     "name": "15m timing (OB/FVG pullback + BOS/engulfing)",
+     "status": "pending",
+     "detail": "stage Watch"
+    }
+   ],
+   "stage": "Watch",
+   "vetoed": false,
+   "candles": [
+    {
+     "time": "2026-07-08",
+     "open": 187.66,
+     "high": 189.79,
+     "low": 186.52,
+     "close": 188.2
+    },
+    {
+     "time": "2026-07-09",
+     "open": 189.5,
+     "high": 189.87,
+     "low": 186.62,
+     "close": 187.91
+    },
+    {
+     "time": "2026-07-10",
+     "open": 189.68,
+     "high": 193.3,
+     "low": 188.74,
+     "close": 191.19
+    },
+    {
+     "time": "2026-07-13",
+     "open": 189.0,
+     "high": 189.27,
+     "low": 185.4,
+     "close": 187.11
+    },
+    {
+     "time": "2026-07-14",
+     "open": 186.7,
+     "high": 190.35,
+     "low": 186.7,
+     "close": 188.27
+    },
+    {
+     "time": "2026-07-15",
+     "open": 188.74,
+     "high": 189.33,
+     "low": 184.81,
+     "close": 185.26
+    },
+    {
+     "time": "2026-07-16",
+     "open": 186.5,
+     "high": 186.75,
+     "low": 184.91,
+     "close": 185.49
+    },
+    {
+     "time": "2026-07-17",
+     "open": 185.2,
+     "high": 186.59,
+     "low": 183.41,
+     "close": 185.89
+    },
+    {
+     "time": "2026-07-20",
+     "open": 186.68,
+     "high": 187.19,
+     "low": 185.76,
+     "close": 186.41
+    },
+    {
+     "time": "2026-07-21",
+     "open": 186.75,
+     "high": 188.1,
+     "low": 184.7,
+     "close": 187.24
+    },
+    {
+     "time": "2026-07-22",
+     "open": 187.99,
+     "high": 187.99,
+     "low": 184.91,
+     "close": 186.53
+    },
+    {
+     "time": "2026-07-23",
+     "open": 186.0,
+     "high": 186.0,
+     "low": 183.5,
+     "close": 184.23
+    },
+    {
+     "time": "2026-07-24",
+     "open": 183.41,
+     "high": 183.52,
+     "low": 181.2,
+     "close": 182.67
+    },
+    {
+     "time": "2026-07-27",
+     "open": 183.6,
+     "high": 184.89,
+     "low": 183.33,
+     "close": 184.25
+    },
+    {
+     "time": "2026-07-28",
+     "open": 184.31,
+     "high": 185.14,
+     "low": 182.01,
+     "close": 182.63
+    },
+    {
+     "time": "2026-07-29",
+     "open": 183.5,
+     "high": 188.67,
+     "low": 183.04,
+     "close": 187.27
+    },
+    {
+     "time": "2026-07-30",
+     "open": 188.01,
+     "high": 188.99,
+     "low": 186.1,
+     "close": 186.92
+    },
+    {
+     "time": "2026-07-31",
+     "open": 188.25,
+     "high": 191.84,
+     "low": 186.31,
+     "close": 189.69
+    },
+    {
+     "time": "2026-08-03",
+     "open": 192.94,
+     "high": 193.5,
+     "low": 188.49,
+     "close": 191.0
+    },
+    {
+     "time": "2026-08-04",
+     "open": 190.7,
+     "high": 192.6,
+     "low": 189.0,
+     "close": 190.95
+    },
+    {
+     "time": "2026-08-05",
+     "open": 192.25,
+     "high": 192.99,
+     "low": 189.84,
+     "close": 192.99
+    },
+    {
+     "time": "2026-08-06",
+     "open": 193.45,
+     "high": 193.65,
+     "low": 188.99,
+     "close": 189.3
+    },
+    {
+     "time": "2026-08-07",
+     "open": 189.41,
+     "high": 189.69,
+     "low": 186.75,
+     "close": 187.55
+    },
+    {
+     "time": "2026-08-10",
+     "open": 187.56,
+     "high": 192.35,
+     "low": 187.55,
+     "close": 190.24
+    },
+    {
+     "time": "2026-08-11",
+     "open": 190.24,
+     "high": 190.56,
+     "low": 186.78,
+     "close": 188.25
+    },
+    {
+     "time": "2026-08-12",
+     "open": 188.35,
+     "high": 188.88,
+     "low": 183.6,
+     "close": 186.2
+    },
+    {
+     "time": "2026-08-13",
+     "open": 186.2,
+     "high": 186.66,
+     "low": 183.46,
+     "close": 184.85
+    },
+    {
+     "time": "2026-08-14",
+     "open": 184.0,
+     "high": 184.19,
+     "low": 180.0,
+     "close": 183.5
+    },
+    {
+     "time": "2026-08-17",
+     "open": 183.5,
+     "high": 186.35,
+     "low": 182.06,
+     "close": 186.0
+    },
+    {
+     "time": "2026-08-18",
+     "open": 186.34,
+     "high": 187.11,
+     "low": 184.33,
+     "close": 185.5
+    },
+    {
+     "time": "2026-08-19",
+     "open": 184.16,
+     "high": 184.95,
+     "low": 182.5,
+     "close": 184.0
+    },
+    {
+     "time": "2026-08-20",
+     "open": 185.0,
+     "high": 185.6,
+     "low": 182.95,
+     "close": 183.5
+    },
+    {
+     "time": "2026-08-21",
+     "open": 184.4,
+     "high": 184.94,
+     "low": 182.0,
+     "close": 183.0
+    },
+    {
+     "time": "2026-08-24",
+     "open": 184.15,
+     "high": 186.3,
+     "low": 183.06,
+     "close": 186.3
+    },
+    {
+     "time": "2026-08-25",
+     "open": 186.3,
+     "high": 187.27,
+     "low": 183.5,
+     "close": 186.94
+    },
+    {
+     "time": "2026-08-26",
+     "open": 186.49,
+     "high": 189.95,
+     "low": 184.29,
+     "close": 188.01
+    },
+    {
+     "time": "2026-08-27",
+     "open": 188.05,
+     "high": 190.25,
+     "low": 186.5,
+     "close": 186.8
+    },
+    {
+     "time": "2026-08-28",
+     "open": 187.6,
+     "high": 188.79,
+     "low": 184.08,
+     "close": 186.5
+    },
+    {
+     "time": "2026-08-31",
+     "open": 185.35,
+     "high": 185.82,
+     "low": 181.4,
+     "close": 184.35
+    },
+    {
+     "time": "2026-09-01",
+     "open": 183.7,
+     "high": 188.68,
+     "low": 182.12,
+     "close": 184.07
+    },
+    {
+     "time": "2026-09-02",
+     "open": 182.5,
+     "high": 184.06,
+     "low": 181.44,
+     "close": 183.85
+    },
+    {
+     "time": "2026-09-03",
+     "open": 184.11,
+     "high": 187.65,
+     "low": 182.0,
+     "close": 184.2
+    },
+    {
+     "time": "2026-09-04",
+     "open": 184.2,
+     "high": 189.9,
+     "low": 182.84,
+     "close": 188.79
+    },
+    {
+     "time": "2026-09-07",
+     "open": 189.0,
+     "high": 190.24,
+     "low": 184.37,
+     "close": 185.61
+    },
+    {
+     "time": "2026-09-08",
+     "open": 185.9,
+     "high": 186.5,
+     "low": 183.61,
+     "close": 184.15
+    },
+    {
+     "time": "2026-09-09",
+     "open": 184.8,
+     "high": 190.26,
+     "low": 183.41,
+     "close": 188.75
+    },
+    {
+     "time": "2026-09-10",
+     "open": 189.0,
+     "high": 189.0,
+     "low": 185.0,
+     "close": 186.78
+    },
+    {
+     "time": "2026-09-11",
+     "open": 184.0,
+     "high": 184.24,
+     "low": 180.79,
+     "close": 183.0
+    },
+    {
+     "time": "2026-09-15",
+     "open": 186.1,
+     "high": 186.49,
+     "low": 182.38,
+     "close": 183.65
+    },
+    {
+     "time": "2026-09-16",
+     "open": 183.65,
+     "high": 185.4,
+     "low": 180.28,
+     "close": 183.0
+    },
+    {
+     "time": "2026-09-17",
+     "open": 183.0,
+     "high": 189.49,
+     "low": 182.87,
+     "close": 187.29
+    },
+    {
+     "time": "2026-09-18",
+     "open": 186.4,
+     "high": 187.96,
+     "low": 185.54,
+     "close": 185.54
+    },
+    {
+     "time": "2026-09-21",
+     "open": 184.55,
+     "high": 186.87,
+     "low": 183.34,
+     "close": 183.4
+    },
+    {
+     "time": "2026-09-22",
+     "open": 183.6,
+     "high": 185.49,
+     "low": 183.1,
+     "close": 184.97
+    },
+    {
+     "time": "2026-09-23",
+     "open": 184.88,
+     "high": 191.5,
+     "low": 184.87,
+     "close": 190.82
+    },
+    {
+     "time": "2026-09-24",
+     "open": 188.21,
+     "high": 191.8,
+     "low": 187.72,
+     "close": 188.02
+    },
+    {
+     "time": "2026-09-25",
+     "open": 188.57,
+     "high": 190.34,
+     "low": 187.01,
+     "close": 187.97
+    },
+    {
+     "time": "2026-09-28",
+     "open": 187.55,
+     "high": 188.58,
+     "low": 185.25,
+     "close": 186.3
+    },
+    {
+     "time": "2026-09-29",
+     "open": 184.78,
+     "high": 189.0,
+     "low": 184.24,
+     "close": 188.0
+    },
+    {
+     "time": "2026-09-30",
+     "open": 189.0,
+     "high": 189.55,
+     "low": 184.3,
+     "close": 184.3
+    },
+    {
+     "time": "2026-10-01",
+     "open": 184.37,
+     "high": 186.55,
+     "low": 175.75,
+     "close": 178.0
+    },
+    {
+     "time": "2026-10-05",
+     "open": 179.28,
+     "high": 181.28,
+     "low": 177.02,
+     "close": 178.14
+    },
+    {
+     "time": "2026-10-06",
+     "open": 178.25,
+     "high": 180.38,
+     "low": 177.0,
+     "close": 178.69
+    },
+    {
+     "time": "2026-10-07",
+     "open": 177.79,
+     "high": 178.25,
+     "low": 174.6,
+     "close": 175.64
+    },
+    {
+     "time": "2026-10-08",
+     "open": 176.3,
+     "high": 176.4,
+     "low": 170.54,
+     "close": 171.96
+    },
+    {
+     "time": "2026-10-09",
+     "open": 171.0,
+     "high": 174.44,
+     "low": 170.23,
+     "close": 173.8
+    },
+    {
+     "time": "2026-10-12",
+     "open": 174.8,
+     "high": 177.25,
+     "low": 172.0,
+     "close": 172.24
+    },
+    {
+     "time": "2026-10-13",
+     "open": 172.35,
+     "high": 175.0,
+     "low": 171.66,
+     "close": 175.0
+    },
+    {
+     "time": "2026-10-14",
+     "open": 175.5,
+     "high": 175.84,
+     "low": 173.5,
+     "close": 174.49
+    },
+    {
+     "time": "2026-10-15",
+     "open": 174.55,
+     "high": 176.85,
+     "low": 172.64,
+     "close": 176.4
+    },
+    {
+     "time": "2026-10-16",
+     "open": 176.6,
+     "high": 178.2,
+     "low": 174.86,
+     "close": 175.5
+    },
+    {
+     "time": "2026-10-19",
+     "open": 175.5,
+     "high": 176.4,
+     "low": 173.87,
+     "close": 174.04
+    },
+    {
+     "time": "2026-10-21",
+     "open": 175.0,
+     "high": 176.18,
+     "low": 170.6,
+     "close": 172.45
+    },
+    {
+     "time": "2026-10-22",
+     "open": 170.5,
+     "high": 172.33,
+     "low": 168.1,
+     "close": 172.33
+    },
+    {
+     "time": "2026-10-23",
+     "open": 170.9,
+     "high": 171.35,
+     "low": 163.41,
+     "close": 167.67
+    },
+    {
+     "time": "2026-10-26",
+     "open": 167.67,
+     "high": 169.94,
+     "low": 165.51,
+     "close": 169.94
+    },
+    {
+     "time": "2026-10-27",
+     "open": 169.19,
+     "high": 172.45,
+     "low": 168.2,
+     "close": 171.42
+    },
+    {
+     "time": "2026-10-28",
+     "open": 170.65,
+     "high": 170.99,
+     "low": 168.09,
+     "close": 169.27
+    },
+    {
+     "time": "2026-10-29",
+     "open": 168.71,
+     "high": 169.65,
+     "low": 167.91,
+     "close": 169.46
+    },
+    {
+     "time": "2026-10-30",
+     "open": 168.5,
+     "high": 168.69,
+     "low": 167.21,
+     "close": 167.6
+    }
+   ],
+   "oi": [
+    {
+     "time": "2026-07-08",
+     "oi": 206747750.0,
+     "chg_oi": -5511000.0
+    },
+    {
+     "time": "2026-07-09",
+     "oi": 208340000.0,
+     "chg_oi": 1592250.0
+    },
+    {
+     "time": "2026-07-10",
+     "oi": 209456500.0,
+     "chg_oi": 1116500.0
+    },
+    {
+     "time": "2026-07-13",
+     "oi": 214467000.0,
+     "chg_oi": 5010500.0
+    },
+    {
+     "time": "2026-07-14",
+     "oi": 210969000.0,
+     "chg_oi": -3498000.0
+    },
+    {
+     "time": "2026-07-15",
+     "oi": 211296250.0,
+     "chg_oi": 327250.0
+    },
+    {
+     "time": "2026-07-16",
+     "oi": 209646250.0,
+     "chg_oi": -1650000.0
+    },
+    {
+     "time": "2026-07-17",
+     "oi": 206602000.0,
+     "chg_oi": -3044250.0
+    },
+    {
+     "time": "2026-07-20",
+     "oi": 205818250.0,
+     "chg_oi": -783750.0
+    },
+    {
+     "time": "2026-07-21",
+     "oi": 210377750.0,
+     "chg_oi": 4559500.0
+    },
+    {
+     "time": "2026-07-22",
+     "oi": 211535500.0,
+     "chg_oi": 1157750.0
+    },
+    {
+     "time": "2026-07-23",
+     "oi": 210020250.0,
+     "chg_oi": -1515250.0
+    },
+    {
+     "time": "2026-07-24",
+     "oi": 209478500.0,
+     "chg_oi": -541750.0
+    },
+    {
+     "time": "2026-07-27",
+     "oi": 209481250.0,
+     "chg_oi": 2750.0
+    },
+    {
+     "time": "2026-07-28",
+     "oi": 211640000.0,
+     "chg_oi": 2158750.0
+    },
+    {
+     "time": "2026-07-29",
+     "oi": 192651250.0,
+     "chg_oi": 654500.0
+    },
+    {
+     "time": "2026-07-30",
+     "oi": 191545750.0,
+     "chg_oi": -1105500.0
+    },
+    {
+     "time": "2026-07-31",
+     "oi": 200513500.0,
+     "chg_oi": 8967750.0
+    },
+    {
+     "time": "2026-08-03",
+     "oi": 204960250.0,
+     "chg_oi": 4446750.0
+    },
+    {
+     "time": "2026-08-04",
+     "oi": 206241750.0,
+     "chg_oi": 1281500.0
+    },
+    {
+     "time": "2026-08-05",
+     "oi": 211257750.0,
+     "chg_oi": 5016000.0
+    },
+    {
+     "time": "2026-08-06",
+     "oi": 217178500.0,
+     "chg_oi": 5920750.0
+    },
+    {
+     "time": "2026-08-07",
+     "oi": 217129000.0,
+     "chg_oi": -49500.0
+    },
+    {
+     "time": "2026-08-10",
+     "oi": 218828500.0,
+     "chg_oi": 1699500.0
+    },
+    {
+     "time": "2026-08-11",
+     "oi": 222461250.0,
+     "chg_oi": 3632750.0
+    },
+    {
+     "time": "2026-08-12",
+     "oi": 225398250.0,
+     "chg_oi": 2937000.0
+    },
+    {
+     "time": "2026-08-13",
+     "oi": 228439750.0,
+     "chg_oi": 3041500.0
+    },
+    {
+     "time": "2026-08-14",
+     "oi": 229097000.0,
+     "chg_oi": 657250.0
+    },
+    {
+     "time": "2026-08-17",
+     "oi": 227958500.0,
+     "chg_oi": -1138500.0
+    },
+    {
+     "time": "2026-08-18",
+     "oi": 230983500.0,
+     "chg_oi": 3025000.0
+    },
+    {
+     "time": "2026-08-19",
+     "oi": 233810500.0,
+     "chg_oi": 2827000.0
+    },
+    {
+     "time": "2026-08-20",
+     "oi": 242511500.0,
+     "chg_oi": 8701000.0
+    },
+    {
+     "time": "2026-08-21",
+     "oi": 250115250.0,
+     "chg_oi": 7603750.0
+    },
+    {
+     "time": "2026-08-24",
+     "oi": 254751750.0,
+     "chg_oi": 4636500.0
+    },
+    {
+     "time": "2026-08-25",
+     "oi": 262344500.0,
+     "chg_oi": 7592750.0
+    },
+    {
+     "time": "2026-08-26",
+     "oi": 248072000.0,
+     "chg_oi": 1812250.0
+    },
+    {
+     "time": "2026-08-27",
+     "oi": 253731500.0,
+     "chg_oi": 5659500.0
+    },
+    {
+     "time": "2026-08-28",
+     "oi": 265342000.0,
+     "chg_oi": 11610500.0
+    },
+    {
+     "time": "2026-08-31",
+     "oi": 267289000.0,
+     "chg_oi": 1947000.0
+    },
+    {
+     "time": "2026-09-01",
+     "oi": 265630750.0,
+     "chg_oi": -1658250.0
+    },
+    {
+     "time": "2026-09-02",
+     "oi": 266340250.0,
+     "chg_oi": 709500.0
+    },
+    {
+     "time": "2026-09-03",
+     "oi": 265823250.0,
+     "chg_oi": -517000.0
+    },
+    {
+     "time": "2026-09-04",
+     "oi": 275580250.0,
+     "chg_oi": 9757000.0
+    },
+    {
+     "time": "2026-09-07",
+     "oi": 278894000.0,
+     "chg_oi": 3313750.0
+    },
+    {
+     "time": "2026-09-08",
+     "oi": 282906250.0,
+     "chg_oi": 4012250.0
+    },
+    {
+     "time": "2026-09-09",
+     "oi": 290743750.0,
+     "chg_oi": 7837500.0
+    },
+    {
+     "time": "2026-09-10",
+     "oi": 290477000.0,
+     "chg_oi": -266750.0
+    },
+    {
+     "time": "2026-09-11",
+     "oi": 287207250.0,
+     "chg_oi": -3269750.0
+    },
+    {
+     "time": "2026-09-15",
+     "oi": 289049750.0,
+     "chg_oi": 1842500.0
+    },
+    {
+     "time": "2026-09-16",
+     "oi": 295182250.0,
+     "chg_oi": 6132500.0
+    },
+    {
+     "time": "2026-09-17",
+     "oi": 306193250.0,
+     "chg_oi": 11011000.0
+    },
+    {
+     "time": "2026-09-18",
+     "oi": 304537750.0,
+     "chg_oi": -1655500.0
+    },
+    {
+     "time": "2026-09-21",
+     "oi": 305390250.0,
+     "chg_oi": 852500.0
+    },
+    {
+     "time": "2026-09-22",
+     "oi": 309900250.0,
+     "chg_oi": 4510000.0
+    },
+    {
+     "time": "2026-09-23",
+     "oi": 321142250.0,
+     "chg_oi": 11242000.0
+    },
+    {
+     "time": "2026-09-24",
+     "oi": 324431250.0,
+     "chg_oi": 3289000.0
+    },
+    {
+     "time": "2026-09-25",
+     "oi": 328861500.0,
+     "chg_oi": 4430250.0
+    },
+    {
+     "time": "2026-09-28",
+     "oi": 326447000.0,
+     "chg_oi": -2414500.0
+    },
+    {
+     "time": "2026-09-29",
+     "oi": 331793000.0,
+     "chg_oi": 5346000.0
+    },
+    {
+     "time": "2026-09-30",
+     "oi": 316673500.0,
+     "chg_oi": 3803250.0
+    },
+    {
+     "time": "2026-10-01",
+     "oi": 313948250.0,
+     "chg_oi": -2725250.0
+    },
+    {
+     "time": "2026-10-05",
+     "oi": 315859500.0,
+     "chg_oi": 1911250.0
+    },
+    {
+     "time": "2026-10-06",
+     "oi": 317757000.0,
+     "chg_oi": 1897500.0
+    },
+    {
+     "time": "2026-10-07",
+     "oi": 319264000.0,
+     "chg_oi": 1507000.0
+    },
+    {
+     "time": "2026-10-08",
+     "oi": 322143250.0,
+     "chg_oi": 2879250.0
+    },
+    {
+     "time": "2026-10-09",
+     "oi": 322550250.0,
+     "chg_oi": 407000.0
+    },
+    {
+     "time": "2026-10-12",
+     "oi": 323878500.0,
+     "chg_oi": 1328250.0
+    },
+    {
+     "time": "2026-10-13",
+     "oi": 322583250.0,
+     "chg_oi": -1295250.0
+    },
+    {
+     "time": "2026-10-14",
+     "oi": 319495000.0,
+     "chg_oi": -3088250.0
+    },
+    {
+     "time": "2026-10-15",
+     "oi": 317201500.0,
+     "chg_oi": -2293500.0
+    },
+    {
+     "time": "2026-10-16",
+     "oi": 330794750.0,
+     "chg_oi": 13593250.0
+    },
+    {
+     "time": "2026-10-19",
+     "oi": 334246000.0,
+     "chg_oi": 3451250.0
+    },
+    {
+     "time": "2026-10-21",
+     "oi": 335951000.0,
+     "chg_oi": 1705000.0
+    },
+    {
+     "time": "2026-10-22",
+     "oi": 336633000.0,
+     "chg_oi": 682000.0
+    },
+    {
+     "time": "2026-10-23",
+     "oi": 337174750.0,
+     "chg_oi": 541750.0
+    },
+    {
+     "time": "2026-10-26",
+     "oi": 338285750.0,
+     "chg_oi": 1111000.0
+    },
+    {
+     "time": "2026-10-27",
+     "oi": 349981500.0,
+     "chg_oi": 11695750.0
+    },
+    {
+     "time": "2026-10-28",
+     "oi": 328682750.0,
+     "chg_oi": 2439250.0
+    },
+    {
+     "time": "2026-10-29",
+     "oi": 329964250.0,
+     "chg_oi": 1281500.0
+    },
+    {
+     "time": "2026-10-30",
+     "oi": 330167750.0,
+     "chg_oi": 203500.0
+    }
+   ],
+   "intraday": null,
+   "cause": {
+    "label": "fresh_shorts",
+    "confidence": 0.56,
+    "level": "medium",
+    "driver": "sector",
+    "tags": [],
+    "reason": "Fresh shorts: price -1.1% with futures OI +0.1% (fresh shorts being added); sector-driven (sector RS -9.7 vs stock -11.0)."
+   },
+   "early": {
+    "stage": "accumulation",
+    "side": "short",
+    "flags": [
+     "squeeze",
+     "volume_dry_up"
+    ],
+    "strength": 0.6,
+    "detail": "NR7 (narrowest range of 7 sessions); 3-day volume 0.58x the 20-day average next to the 20-day low",
+    "trigger_date": null,
+    "level": null,
+    "levels": {
+     "entry_ref": 167.6,
+     "stop": 173.585,
+     "target": 155.63,
+     "atr14": 3.990000000000001
+    }
+   },
+   "option_plan": {
+    "symbol": "TATASTEEL",
+    "side": "short",
+    "status": "ok",
+    "notes": [
+     "IV percentile unavailable; ATM used, no veto applied",
+     "no expiry 10-15 days out; using 21 days",
+     "lot size unknown; quantity in units"
+    ],
+    "underlying": {
+     "spot": 167.6,
+     "stop": 173.585,
+     "target": 155.63
+    },
+    "iv_percentile": null,
+    "iv_status": "unavailable",
+    "iv": null,
+    "type": "PE",
+    "strike": 170.0,
+    "moneyness": "atm",
+    "expiry": "2026-11-23",
+    "days_to_expiry": 21,
+    "expiry_in_window": false,
+    "premium": 4.426707731614826,
+    "premium_source": "model (realised vol)",
+    "premium_stop": 1.8287462697945216,
+    "premium_target": 13.875277509210633,
+    "risk_per_unit": 2.5979614618203044,
+    "reward_risk": 3.6369168351617933,
+    "risk_pct": 1.0,
+    "risk_amt": 10000.0,
+    "lot_size": null,
+    "lots": null,
+    "qty": 3849,
+    "cost": 17038.398058985465,
+    "risk_at_stop": 9999.553666546351,
+    "basis": "underlying reference levels (1.5x daily ATR stop, 2R target); intraday levels refine at the 15m trigger"
+   },
+   "profile": {
+    "sessions": 500,
+    "gap_fill": {
+     "n": 75,
+     "rate": 0.38666666666666666,
+     "up_rate": 0.36585365853658536,
+     "down_rate": 0.4117647058823529
+    },
+    "post_spike": {
+     "n": 23,
+     "avg_drift_pct": 0.22203788442457373,
+     "continuation_rate": 0.5652173913043478
+    },
+    "expiry_week": {
+     "n": 80,
+     "avg_abs_move_pct": 1.0476825088903798,
+     "other_abs_move_pct": 1.2773512330672638,
+     "ratio": 0.8201992386812924,
+     "avg_move_pct": 0.12895049365330188
+    },
+    "summary": "39% of gaps fill the same day (n=75); after volume spikes the 5-day drift is +0.2% (57% continue, n=23); expiry-week moves are 0.82x a normal day"
+   }
+  }
+ ],
+ "alerts": [],
+ "paper": {
+  "summary": {
+   "capital_start": 1000000,
+   "equity": 1009742.2977991706,
+   "total_pnl": 9742.297799170581,
+   "day_pnl": 0.0,
+   "closed_trades": 2,
+   "open_trades": 0,
+   "win_pct": 50.0,
+   "avg_r": 0.5,
+   "profit_factor": 1.974276501847787,
+   "max_drawdown": 0.0,
+   "kill_switch": false
+  },
+  "open": [],
+  "recent": [
+   {
+    "id": 1,
+    "trade_date": "2026-10-30",
+    "symbol": "KOTAKBANK",
+    "side": "long",
+    "grade": "B",
+    "setup": "trend",
+    "score": 67.6,
+    "trigger": "engulfing",
+    "entry_ts": "2026-10-30 13:30:00",
+    "entry": 459.92174225049615,
+    "stop": 458.3573617053058,
+    "target": 463.0505033408769,
+    "qty": 6392,
+    "risk_amt": 10000.0,
+    "exit_ts": "2026-10-30 13:45:00",
+    "exit": 458.3573617053058,
+    "exit_reason": "stop",
+    "pnl": -9999.520444856873,
+    "r": -1.0,
+    "status": "closed",
+    "cause": "long_buildup",
+    "early_stage": "trigger"
+   },
+   {
+    "id": 2,
+    "trade_date": "2026-10-30",
+    "symbol": "PERSISTENT",
+    "side": "long",
+    "grade": "B",
+    "setup": "trend",
+    "score": 67.5,
+    "trigger": "engulfing",
+    "entry_ts": "2026-10-30 14:00:00",
+    "entry": 5929.982748859482,
+    "stop": 5881.595939437846,
+    "target": 6026.756367702754,
+    "qty": 204,
+    "risk_amt": 9900.004795551431,
+    "exit_ts": "2026-10-30 15:15:00",
+    "exit": 6026.756367702754,
+    "exit_reason": "target",
+    "pnl": 19741.818244027454,
+    "r": 2.0,
+    "status": "closed",
+    "cause": "long_buildup",
+    "early_stage": "accumulation"
+   }
+  ],
+  "equity": [
+   990000.4795551432,
+   1009742.2977991706
+  ]
+ },
+ "base_rates": {
+  "asof": "2026-10-30",
+  "basis": "all qualifying signals, 5-day horizon, net of 0.1R cost",
+  "overall": {
+   "n": 87559,
+   "win_pct": 42.904784202651925,
+   "expectancy_r": -0.10062876101493619
+  },
+  "by_grade": {
+   "A": {
+    "n": 4841,
+    "win_pct": 42.739103491014255,
+    "expectancy_r": -0.09529127001920294
+   },
+   "B": {
+    "n": 33324,
+    "win_pct": 42.98703637018365,
+    "expectancy_r": -0.09830339139398331
+   },
+   "C": {
+    "n": 49394,
+    "win_pct": 42.86553022634328,
+    "expectancy_r": -0.1027207035820289
+   }
+  },
+  "by_grade_setup": {
+   "A|index": {
+    "n": 16,
+    "win_pct": 62.5,
+    "expectancy_r": 0.37359150335914126
+   },
+   "A|pullback": {
+    "n": 185,
+    "win_pct": 43.78378378378379,
+    "expectancy_r": -0.07705394232716878
+   },
+   "A|trend": {
+    "n": 4640,
+    "win_pct": 42.62931034482759,
+    "expectancy_r": -0.09763524200133221
+   },
+   "B|index": {
+    "n": 1908,
+    "win_pct": 44.49685534591195,
+    "expectancy_r": -0.06291428327188764
+   },
+   "B|pullback": {
+    "n": 7783,
+    "win_pct": 41.01246306051651,
+    "expectancy_r": -0.13181046081304795
+   },
+   "B|trend": {
+    "n": 23633,
+    "win_pct": 43.515423348707316,
+    "expectancy_r": -0.09012571175146557
+   },
+   "C|index": {
+    "n": 5979,
+    "win_pct": 43.468807492891784,
+    "expectancy_r": -0.09046800722475844
+   },
+   "C|pullback": {
+    "n": 23937,
+    "win_pct": 42.57425742574257,
+    "expectancy_r": -0.11253780280906131
+   },
+   "C|trend": {
+    "n": 19478,
+    "win_pct": 43.038299620084196,
+    "expectancy_r": -0.09441733400212568
+   }
+  }
+ }
+}

@@ -23,23 +23,11 @@ First-time backfill (optional, bigger history): `.venv\Scripts\python data\fetch
 
 Run the tests: `.venv\Scripts\python -m unittest discover -s tests`
 
-## Windows Task Scheduler, 10:30 pm IST
+## Windows Task Scheduler, weekdays 7:30 pm IST
 
-1. Open Task Scheduler, **Create Task** (not Basic Task). Name: `IndiaEdge Layer1`.
-2. **Triggers** > New > Daily, start time `22:30:00`. (PC clock must be IST; if not, convert.) Optionally limit to Mon-Fri via Weekly.
-3. **Actions** > New > Start a program:
-   - Program: `C:\path\to\niftyradar-backend\tools\india_edge\.venv\Scripts\python.exe`
-   - Arguments: `run_scanner.py`
-   - Start in: `C:\path\to\niftyradar-backend\tools\india_edge`
-4. **Settings**: tick "Run task as soon as possible after a scheduled start is missed".
-
-Or one line from an admin prompt:
-
-```powershell
-schtasks /Create /TN "IndiaEdge Layer1" /SC DAILY /ST 22:30 /TR "cmd /c cd /d C:\path\to\niftyradar-backend\tools\india_edge && .venv\Scripts\python.exe run_scanner.py"
-```
-
-NSE usually publishes bhavcopy by about 7 pm IST, so 10:30 pm is safe.
+`daily_pipeline.bat` runs download → scanner → `out/morning_desk.json` and logs to `logs/pipeline.log`.
+Exact `schtasks` command, verification, manual jobs and data notes: [docs/INDIA-EDGE-RUNBOOK.md](docs/INDIA-EDGE-RUNBOOK.md).
+Latest backtest: [docs/BACKTEST-REPORT-2026-10-30.md](docs/BACKTEST-REPORT-2026-10-30.md).
 
 ## Outputs
 
@@ -65,3 +53,26 @@ Sector map: `sectors.json` (no sector map existed in the repo; edit freely, unma
 - Data URLs are NSE archive files (`sec_bhavdata_full`, UDiFF `BhavCopy_NSE_FO`, `ind_close_all`). If NSE changes a format, `data/fetch.py` fails loudly per day and keeps the rest.
 - Holidays: a 404 older than 4 days is remembered in `data/.missing.json`.
 - `pyarrow` (parquet) and `pyyaml` (config) are added to the requirements next to pandas/numpy/requests.
+
+## Backtest
+
+```powershell
+.venv\Scripts\python data\fetch.py --from 2015-01-01 --to 2026-10-28   # long run; restartable, skips stored days
+.venv\Scripts\python backtest\run.py --train --test
+```
+
+Signals are produced as-of each day (data up to that close), top 5 of grade A/B, entry next open, stop 1.5x ATR(14), target 2R, exit at day-5 close, cost 0.1R, 1% risk. Train 2015-01-01 to 2022-12-31 (weights tuned on a coarse grid, best expectancy with at least 200 trades, saved to `config_tuned.yaml`); test 2023-01-01 to today with those weights untouched. `config.yaml` is never modified. Output: `backtest/out/report_<date>.md` (by grade, setup, direction) and `backtest/out/equity.csv`.
+
+Caveats: same-day stop and target counts as stop; prices are not adjusted for splits/bonus (rare outliers); pre-July-2024 F&O files use NSE's older format (handled in `fetch.py`); a day whose files NSE does not serve is logged and skipped.
+
+## Layers 2/3, paper bot, Morning Desk
+
+See `docs/INDIA-EDGE-RUNBOOK.md` (repo root). Quick tour on the synthetic fixtures:
+
+```powershell
+.venv\Scripts\python run_daily.py --replay 40
+.venv\Scripts\python weekly_review.py
+.venv\Scripts\python audit_lookahead.py
+```
+
+Settings for Layer 2/3 and the paper bot are in `config_exec.yaml`. `DATA_DIR` switches every script from the fixtures to real bhavcopy.

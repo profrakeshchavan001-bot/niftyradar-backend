@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Morning Desk</title>
+<meta name="description" content="Layer 1 top-5 desk with levels, OI, logic checklist and paper P&L. Paper trading and statistics only.">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#14181f;--mute:#5b6572;--line:#dde1e7;--accent:#1a5fb4;
+--up:#0a7d4f;--down:#c0392b;--warn:#a35f00;--chip:#eef1f5;--grid:#eceff3}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1116;--panel:#171b22;--ink:#e6e9ee;
+--mute:#98a2b0;--line:#272d37;--accent:#6aa4f0;--up:#3fbf8a;--down:#ee7767;--warn:#e0a458;--chip:#222833;--grid:#1f2530}}
+:root[data-theme="dark"]{--bg:#0e1116;--panel:#171b22;--ink:#e6e9ee;--mute:#98a2b0;--line:#272d37;--accent:#6aa4f0;
+--up:#3fbf8a;--down:#ee7767;--warn:#e0a458;--chip:#222833;--grid:#1f2530}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+h1{font-size:22px;margin:0}
+.sub{color:var(--mute);font-size:13px}
+.notice{background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--mute);margin-bottom:12px}
+.grid{display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.grid>*,.two>*{min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.panel h2{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:0 0 10px}
+.picks{display:flex;flex-direction:column;gap:8px}
+.pick{all:unset;display:block;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel)}
+.pick:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pick[aria-selected="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sym{font-weight:650;font-size:16px}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--chip);font-size:12px;font-weight:600;border:1px solid var(--line)}
+.g-A{color:var(--up)}.g-B{color:var(--warn)}.g-C{color:var(--mute)}
+.long{color:var(--up)}.short{color:var(--down)}
+.stage{font-size:12px;color:var(--mute)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}
+.kv div{background:var(--chip);border-radius:8px;padding:8px 10px}
+.kv b{display:block;font-size:12px;color:var(--mute);font-weight:600}
+.kv span{font-size:16px;font-weight:650}
+.chart{width:100%;height:300px}
+.chart.small{height:150px}
+.tabs{display:flex;gap:6px;margin:6px 0}
+.tab{all:unset;cursor:pointer;padding:4px 12px;border-radius:6px;border:1px solid var(--line);font-size:13px}
+.tab[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tab[disabled]{opacity:.4;cursor:default}
+ul.check{list-style:none;padding:0;margin:0}
+ul.check li{display:grid;grid-template-columns:78px 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+ul.check li:first-child{border-top:0}
+.st{font-weight:650;font-size:12px;text-transform:uppercase}
+.st.pass{color:var(--up)}.st.fail{color:var(--down)}.st.pending{color:var(--warn)}.st.unknown{color:var(--mute)}
+.detail{color:var(--mute)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:5px 6px;border-top:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-weight:600;border-top:0}
+td.num,th.num{text-align:right}
+.scroll{overflow-x:auto}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+@media (max-width:860px){.two{grid-template-columns:1fr}}
+pre.log{margin:0;white-space:pre-wrap;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--mute);max-height:220px;overflow:auto}
+#err{display:none;border:1px solid var(--down);color:var(--down);border-radius:8px;padding:12px;margin-bottom:12px}
+footer{color:var(--mute);font-size:12px;margin-top:16px}
+.sr{position:absolute;left:-9999px}
+.health{border-left:4px solid var(--warn)}
+.health.ok{border-left-color:var(--up)}.health.bad{border-left-color:var(--down)}
+.health ul{margin:6px 0 0;padding-left:18px}
+.extras{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.extras .kv{margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Morning Desk</h1><div class="sub" id="meta">Loading…</div></div>
+    <div class="sub"><button class="tab" id="theme" type="button">Toggle theme</button></div>
+  </header>
+  <div class="notice" id="notice">Paper trading and historical statistics only. Not investment advice.</div>
+  <div class="notice health" id="health" hidden></div>
+  <div id="err" role="alert"></div>
+  <div class="grid">
+    <aside class="panel"><h2>Top 5 selection</h2><div class="picks" id="picks" role="tablist" aria-label="Top five picks"></div></aside>
+    <main id="detail" class="panel" aria-live="polite"><p class="sub">Select a pick.</p></main>
+  </div>
+  <div class="two">
+    <section class="panel"><h2>Paper account</h2><div id="paper"></div></section>
+    <section class="panel"><h2>Alert log (stage Watch → Ready → Go)</h2><pre class="log" id="alerts"></pre></section>
+  </div>
+  <footer id="foot"></footer>
+</div>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+(function () {
+  "use strict";
+  var DESK = null, SEL = 0, VIEW = "daily", charts = [];
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = String(text);
+    return e;
+  }
+  function fx(n, d) { return (n === null || n === undefined || isNaN(n)) ? "n/a" : Number(n).toFixed(d === undefined ? 2 : d); }
+  function sgn(n, d) { return (n === null || n === undefined || isNaN(n)) ? "n/a" : (n >= 0 ? "+" : "") + Number(n).toFixed(d === undefined ? 1 : d); }
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function tsec(s) {            // "YYYY-MM-DD HH:MM[:SS]" wall-clock IST -> UTC seconds (charts then show IST)
+    var m = /(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)/.exec(String(s));
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 1000 : null;
+  }
+
+  function showError(msg) { var e = $("err"); e.style.display = "block"; e.textContent = msg; }
+
+  function load() {
+    if (window.MORNING_DESK) { return Promise.resolve(window.MORNING_DESK); }
+    return fetch("morning_desk.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) {
+      if (!r.ok) { throw new Error("morning_desk.json: HTTP " + r.status); }
+      return r.json();
+    });
+  }
+
+  function killCharts() { charts.forEach(function (c) { try { c.remove(); } catch (e) {} }); charts = []; }
+
+  function chartOpts(h) {
+    return { height: h, layout: { background: { type: "solid", color: css("--panel") }, textColor: css("--mute") },
+      grid: { vertLines: { color: css("--grid") }, horzLines: { color: css("--grid") } },
+      rightPriceScale: { borderColor: css("--line") }, timeScale: { borderColor: css("--line"), timeVisible: true, secondsVisible: false },
+      crosshair: { mode: 0 } };
+  }
+
+  function renderPicks() {
+    var box = $("picks"); box.textContent = "";
+    DESK.picks.forEach(function (p, i) {
+      var b = el("button", "pick"); b.type = "button"; b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", i === SEL ? "true" : "false");
+      var r1 = el("div", "row");
+      r1.appendChild(el("span", "sym", p.rank + ". " + p.symbol));
+      var g = el("span", "chip g-" + p.grade, "Grade " + p.grade); r1.appendChild(g);
+      var r2 = el("div", "row");
+      var d = el("span", p.direction, p.direction.toUpperCase() + " · " + p.setup); r2.appendChild(d);
+      r2.appendChild(el("span", "stage", "score " + fx(p.score, 0)));
+      var r3 = el("div", "stage", "Stage: " + p.stage + (p.vetoed ? " (vetoed)" : ""));
+      b.appendChild(r1); b.appendChild(r2); b.appendChild(r3);
+      b.addEventListener("click", function () { SEL = i; VIEW = "daily"; renderPicks(); renderDetail(); });
+      box.appendChild(b);
+    });
+    if (!DESK.picks.length) { box.appendChild(el("p", "sub", "No qualifying stocks for this date.")); }
+  }
+
+  function kv(parent, label, value) {
+    var d = el("div"); d.appendChild(el("b", null, label)); d.appendChild(el("span", null, value)); parent.appendChild(d);
+  }
+
+  function renderDetail() {
+    killCharts();
+    var root = $("detail"); root.textContent = "";
+    var p = DESK.picks[SEL];
+    if (!p) { root.appendChild(el("p", "sub", "Nothing selected.")); return; }
+    var h = el("div", "row");
+    var t = el("div"); t.appendChild(el("span", "sym", p.symbol)); t.appendChild(document.createTextNode(" "));
+    t.appendChild(el("span", p.direction, p.direction.toUpperCase())); t.appendChild(document.createTextNode(" "));
+    t.appendChild(el("span", "chip g-" + p.grade, "Grade " + p.grade + " · " + fx(p.score, 0) + "/100"));
+    h.appendChild(t); h.appendChild(el("span", "sub", p.sector + " · " + p.setup + " setup"));
+    root.appendChild(h);
+
+    var lv = p.levels, k = el("div", "kv");
+    kv(k, "Reference close", fx(lv.entry_ref));
+    kv(k, "Stop (1.5x ATR)", fx(lv.stop));
+    kv(k, "Target (2R)", fx(lv.target));
+    kv(k, "Option idea", p.strikes.type + " " + fx(p.strikes.atm, 1) + (p.strikes.expiry ? " · exp " + p.strikes.expiry : ""));
+    var br = p.base_rate;
+    kv(k, "Base rate (" + br.grade + "/" + br.setup + ")", br.win_pct === null ? "n/a" : fx(br.win_pct, 1) + "% win · " + sgn(br.expectancy_r, 2) + "R · n=" + br.n);
+    kv(k, "Stage", p.stage);
+    root.appendChild(k);
+    root.appendChild(el("div", "sub", lv.basis + " Strike interval is approximate; check the live option chain."));
+    extras(root, p);
+
+    var tabs = el("div", "tabs");
+    ["daily", "intraday"].forEach(function (v) {
+      var b = el("button", "tab", v === "daily" ? "Daily" : "15-min (trade day)"); b.type = "button";
+      b.setAttribute("aria-pressed", VIEW === v ? "true" : "false");
+      if (v === "intraday" && !p.intraday) { b.disabled = true; }
+      b.addEventListener("click", function () { VIEW = v; renderDetail(); });
+      tabs.appendChild(b);
+    });
+    root.appendChild(tabs);
+    var c1 = el("div", "chart"); c1.id = "chart-main"; root.appendChild(c1);
+    var oiTitle = el("h2", null, "Futures open interest"); oiTitle.style.marginTop = "12px"; root.appendChild(oiTitle);
+    var c2 = el("div", "chart small"); c2.id = "chart-oi"; root.appendChild(c2);
+    drawCharts(p, c1, c2);
+
+    var ct = el("h2", null, "Logic checklist"); ct.style.marginTop = "14px"; root.appendChild(ct);
+    var ul = el("ul", "check");
+    var label = { pass: "Pass", fail: "Fail", pending: "Pending", unknown: "Unknown" };
+    p.checklist.forEach(function (c) {
+      var li = el("li"); li.appendChild(el("span", "st " + c.status, label[c.status] || c.status));
+      var d = el("div"); d.appendChild(el("div", null, c.name)); d.appendChild(el("div", "detail", c.detail)); li.appendChild(d);
+      ul.appendChild(li);
+    });
+    root.appendChild(ul);
+    var ft = el("h2", null, "Why it ranked"); ft.style.marginTop = "14px"; root.appendChild(ft);
+    var comp = p.components || {}, line = Object.keys(comp).map(function (n) { return n.replace("_", " ") + " " + fx(comp[n], 1); }).join(" · ");
+    root.appendChild(el("div", "detail", line));
+  }
+
+  function extras(root, p) {
+    var box = el("div", "extras");
+    if (p.cause && p.cause.label) {
+      var r = el("div", "row"); r.appendChild(el("b", null, "Why it moved"));
+      r.appendChild(el("span", "chip", p.cause.label.replace(/_/g, " ") + " · " + fx(p.cause.confidence * 100, 0) + "% (" + p.cause.level + ")"));
+      box.appendChild(r); box.appendChild(el("div", "detail", p.cause.reason));
+    }
+    if (p.profile && p.profile.summary) { box.appendChild(el("div", "sub", "Stock habits: " + p.profile.summary + ".")); }
+    if (p.early && p.early.stage) {
+      var line = "Early stage: " + p.early.stage;
+      if (p.early.flags && p.early.flags.length) { line += " (" + p.early.flags.join(", ").replace(/_/g, " ") + ")"; }
+      box.appendChild(el("div", "detail", line));
+      if (p.early.detail && p.early.stage !== "none") { box.appendChild(el("div", "sub", p.early.detail)); }
+    }
+    var o = p.option_plan;
+    if (o && o.type) {
+      var k = el("div", "kv");
+      kv(k, "Contract", o.type + " " + fx(o.strike, 1) + " (" + o.moneyness + ") · exp " + o.expiry + " · " + o.days_to_expiry + "d");
+      if (o.premium !== undefined && o.premium !== null) {
+        kv(k, "Premium (" + (o.premium_source || "?") + ")", fx(o.premium));
+        kv(k, "Premium SL / target", fx(o.premium_stop) + " / " + fx(o.premium_target));
+        kv(k, "Size", (o.lots !== null && o.lots !== undefined ? o.lots + " lots · " : "") + o.qty + " units · risk " + fx(o.risk_at_stop, 0));
+      }
+      kv(k, "IV percentile", o.iv_percentile === null || o.iv_percentile === undefined ? "unavailable" : fx(o.iv_percentile, 0));
+      box.appendChild(k);
+    }
+    if (o && o.notes && o.notes.length) { box.appendChild(el("div", "sub", "Option plan notes: " + o.notes.join("; ") + ".")); }
+    root.appendChild(box);
+  }
+
+  function renderHealth(h) {
+    var box = $("health");
+    if (!h || !h.status) { box.hidden = true; return; }
+    box.hidden = false; box.textContent = ""; box.className = "notice health " + h.status;
+    box.appendChild(el("b", null, "Data health: " + h.status));
+    var items = (h.missing || []).map(function (m) { return "Missing: " + m; }).concat((h.warnings || []).map(function (w) { return "Note: " + w; }));
+    if (!items.length) { box.appendChild(document.createTextNode(" · all inputs present")); return; }
+    var ul = el("ul"); items.forEach(function (t) { ul.appendChild(el("li", null, t)); }); box.appendChild(ul);
+  }
+
+  function drawCharts(p, c1, c2) {
+    if (typeof LightweightCharts === "undefined") {
+      c1.textContent = "Chart library did not load (offline or CDN blocked). Levels and checklist are still valid.";
+      c1.className = "sub"; c2.style.display = "none"; return;
+    }
+    var up = css("--up"), down = css("--down");
+    var main = LightweightCharts.createChart(c1, chartOpts(300)); charts.push(main);
+    var cs = main.addCandlestickSeries({ upColor: up, downColor: down, borderUpColor: up, borderDownColor: down, wickUpColor: up, wickDownColor: down });
+    var intra = VIEW === "intraday" && p.intraday;
+    cs.setData(intra ? p.intraday.candles : p.candles);
+    function line(price, color, title) { if (price !== null && price !== undefined && !intra) { cs.createPriceLine({ price: price, color: color, lineStyle: 2, lineWidth: 1, axisLabelVisible: true, title: title }); } }
+    line(p.levels.stop, down, "SL"); line(p.levels.target, up, "TGT"); line(p.levels.entry_ref, css("--mute"), "ref");
+    if (intra && p.intraday.markers.length && cs.setMarkers) {
+      var mk = [];
+      p.intraday.markers.forEach(function (m) {
+        var s = tsec(m.ts); if (s === null) { return; }
+        var isLong = m.side === "long", entry = m.kind === "entry";
+        mk.push({ time: s, position: (entry === isLong) ? "belowBar" : "aboveBar", color: entry ? css("--accent") : css("--warn"),
+          shape: (entry === isLong) ? "arrowUp" : "arrowDown", text: entry ? "paper entry" : "exit " + (m.reason || "") });
+      });
+      mk.sort(function (a, b) { return a.time - b.time; }); cs.setMarkers(mk);
+    }
+    main.timeScale().fitContent();
+
+    var oi = LightweightCharts.createChart(c2, chartOpts(150)); charts.push(oi);
+    var h = oi.addHistogramSeries({ priceScaleId: "chg", priceFormat: { type: "volume" } });
+    oi.priceScale("chg").applyOptions({ scaleMargins: { top: 0.65, bottom: 0 } });
+    h.setData(p.oi.map(function (r) { return { time: r.time, value: r.chg_oi, color: r.chg_oi >= 0 ? up : down }; }));
+    var l = oi.addLineSeries({ color: css("--accent"), lineWidth: 2, priceFormat: { type: "volume" } });
+    l.setData(p.oi.map(function (r) { return { time: r.time, value: r.oi }; }));
+    oi.timeScale().fitContent();
+    function resize() { charts.forEach(function (c, i) { c.applyOptions({ width: (i ? c2 : c1).clientWidth }); }); }
+    resize(); window.addEventListener("resize", resize);
+  }
+
+  function renderPaper() {
+    var s = DESK.paper.summary, root = $("paper"); root.textContent = "";
+    var k = el("div", "kv");
+    kv(k, "Equity", fx(s.equity, 0)); kv(k, "Total P&L", sgn(s.total_pnl, 0));
+    kv(k, "Closed trades", s.closed_trades); kv(k, "Win rate", s.win_pct === null ? "n/a" : fx(s.win_pct, 1) + "%");
+    kv(k, "Avg R", s.avg_r === null ? "n/a" : sgn(s.avg_r, 2)); kv(k, "Profit factor", s.profit_factor === null ? "n/a" : fx(s.profit_factor, 2));
+    kv(k, "Max drawdown", fx(s.max_drawdown, 0)); kv(k, "Kill-switch", s.kill_switch ? "ACTIVE" : "off");
+    root.appendChild(k);
+    var eq = DESK.paper.equity || [];
+    if (eq.length > 1) {
+      var W = 560, H = 80, mn = Math.min.apply(null, eq), mx = Math.max.apply(null, eq), rg = (mx - mn) || 1;
+      var pts = eq.map(function (v, i) { return (i * W / (eq.length - 1)).toFixed(1) + "," + (H - 6 - (v - mn) / rg * (H - 12)).toFixed(1); }).join(" ");
+      var ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("width", "100%"); svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "Paper equity curve, " + eq.length + " closed trades");
+      var pl = document.createElementNS(ns, "polyline"); pl.setAttribute("points", pts); pl.setAttribute("fill", "none");
+      pl.setAttribute("stroke", eq[eq.length - 1] >= eq[0] ? css("--up") : css("--down")); pl.setAttribute("stroke-width", "2");
+      svg.appendChild(pl); root.appendChild(svg);
+    }
+    var rec = DESK.paper.recent || [];
+    if (rec.length) {
+      var wrap = el("div", "scroll"), tb = el("table"), hd = el("tr");
+      ["Date", "Symbol", "Side", "Entry", "Exit", "Reason", "R", "P&L"].forEach(function (c, i) { hd.appendChild(el("th", i > 2 && i !== 5 ? "num" : "", c)); });
+      tb.appendChild(hd);
+      rec.slice().reverse().forEach(function (t) {
+        var tr = el("tr");
+        [[t.trade_date], [t.symbol], [t.side], [fx(t.entry), 1], [fx(t.exit), 1], [t.exit_reason], [sgn(t.r, 2), 1], [sgn(t.pnl, 0), 1]]
+          .forEach(function (c) { tr.appendChild(el("td", c[1] ? "num" : "", c[0])); });
+        tb.appendChild(tr);
+      });
+      wrap.appendChild(tb); root.appendChild(wrap);
+    } else { root.appendChild(el("p", "sub", "No closed paper trades yet.")); }
+  }
+
+  function renderAlerts() {
+    var a = DESK.alerts || [];
+    $("alerts").textContent = a.length ? a.map(function (e) { return (e.ts || "pre-market") + "  " + e.text; }).join("\n") : "No alerts for this desk.";
+  }
+
+  function boot(d) {
+    DESK = d; renderHealth(d.data_health);
+    $("meta").textContent = "Signals as of " + d.asof + " close · trade day " + d.trade_date + " · mode " + d.mode + " · data " + d.source +
+      " · Nifty 50 " + fx((d.market || {}).nifty_close, 0);
+    $("notice").textContent = d.notice;
+    $("foot").textContent = "Generated " + d.generated_at + ". Statistics on historical data, not a recommendation. Paper account is simulated.";
+    renderPicks(); renderDetail(); renderPaper(); renderAlerts();
+  }
+
+  $("theme").addEventListener("click", function () {
+    var r = document.documentElement, cur = r.getAttribute("data-theme");
+    var dark = cur ? cur === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    r.setAttribute("data-theme", dark ? "light" : "dark");
+    if (DESK) { renderDetail(); }
+  });
+
+  load().then(boot).catch(function (e) {
+    showError("Could not load morning_desk.json (" + e.message + "). Serve this folder over http (for example: python -m http.server) " +
+      "or deploy it to Netlify; opening the file directly blocks the data request.");
+    $("meta").textContent = "No data";
+  });
+})();
+</script>
+</body>
+</html>
