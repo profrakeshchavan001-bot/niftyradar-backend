@@ -7,6 +7,7 @@ for the next session (indicative prices = last settle), (c) hypothetical exits t
     python paper_forward.py                 # surviving strategies only (from backtest/options_real_stats.json)
     python paper_forward.py --all           # research mode: log every strategy, labelled with its verdict
     python paper_forward.py --no-fetch      # skip the NSE refresh (offline)
+    python paper_forward.py --symbol BANKNIFTY   # same, BANKNIFTY rules (verdicts from options_real_banknifty_stats.json)
 Task Scheduler: run run_paper_forward.bat once a day after ~19:45 IST (bhavcopy is published by then).
 """
 from __future__ import annotations
@@ -28,8 +29,9 @@ import options_real as R  # noqa: E402
 from common import DATA_DIR  # noqa: E402
 
 LEDGER = ROOT / "out" / "cc8_paper_ledger.csv"
-STATS = ROOT / "backtest" / "options_real_stats.json"
-COLS = ["logged_at", "asof", "strategy", "verdict", "kind", "detail"]
+STATS = {"NIFTY": ROOT / "backtest" / "options_real_stats.json",
+         "BANKNIFTY": ROOT / "backtest" / "options_real_banknifty_stats.json"}
+COLS = ["logged_at", "asof", "symbol", "strategy", "verdict", "kind", "detail"]
 
 
 def refresh(days_back=12):
@@ -38,7 +40,7 @@ def refresh(days_back=12):
         import fetch_idxopt
         start = (pd.Timestamp.today().normalize() - pd.Timedelta(days=days_back)).strftime("%Y-%m-%d")
         fetch_idxopt.main(["--from", start])
-    except Exception as exc:  # noqa: BLE001
+    except (Exception, SystemExit) as exc:  # noqa: BLE001  (argparse/NSE failures must never stop the logger)
         print(f"refresh skipped: {type(exc).__name__}: {exc}")
 
 
@@ -105,14 +107,21 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--no-fetch", action="store_true")
+    ap.add_argument("--symbol", default="NIFTY", choices=sorted(STATS))
     a = ap.parse_args(argv)
+    R.configure(a.symbol, 2.0)
     if not a.no_fetch:
         refresh()
         try:
-            append_tail_ohlc()
+            if a.symbol == "NIFTY":
+                append_tail_ohlc()
+            else:
+                import build_banknifty_spot
+                build_banknifty_spot.main()
         except Exception as exc:  # noqa: BLE001
             print(f"ohlc tail skipped: {exc}")
-    stats = json.loads(STATS.read_text(encoding="utf-8")) if STATS.exists() else {"strategies": {}}
+    sf = STATS[a.symbol]
+    stats = json.loads(sf.read_text(encoding="utf-8")) if sf.exists() else {"strategies": {}}
     verdicts = {k: v.get("verdict", "unknown") for k, v in stats["strategies"].items()}
     names = list(R.DEFAULTS) if a.all else [k for k, v in verdicts.items() if v == "survives"]
     days = R.trading_days()
@@ -140,14 +149,17 @@ def main(argv=None):
                      "detail": json.dumps(plan) if plan else "rules give no entry for the next session"})
     LEDGER.parent.mkdir(exist_ok=True)
     now = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
-    new = pd.DataFrame([{**r, "logged_at": now, "asof": str(asof.date())} for r in rows])[COLS]
+    new = pd.DataFrame([{**r, "logged_at": now, "asof": str(asof.date()), "symbol": a.symbol} for r in rows])[COLS]
     if LEDGER.exists():
         old = pd.read_csv(LEDGER, dtype=str)
-        key = lambda d: d.asof + "|" + d.strategy + "|" + d.kind + "|" + d.detail  # noqa: E731
+        if "symbol" not in old:
+            old["symbol"] = "NIFTY"
+        key = lambda d: d["asof"] + "|" + d["symbol"] + "|" + d["strategy"] + "|" + d["kind"] + "|" + d["detail"]  # noqa: E731
         new = new[~key(new).isin(set(key(old)))]
-        new = pd.concat([old, new])
+        new = pd.concat([old[COLS], new])
     new.to_csv(LEDGER, index=False)
-    print(f"paper ledger updated: asof {asof.date()}, {len(rows)} rows -> {LEDGER}")
+    print(f"paper ledger updated: {a.symbol} asof {asof.date()}, {len(rows)} rows -> {LEDGER}")
+    return new
 
 
 if __name__ == "__main__":

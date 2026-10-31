@@ -31,6 +31,22 @@ RATE, DIV = oy.RATE, oy.DIV
 COST_MULT = 2.0
 LONG_ADD = oy.LONG_ADD
 TRAIN_END = pd.Timestamp("2022-12-31")
+SYMBOL = "NIFTY"
+SPOT_FILE = "nifty50_ohlc.csv"
+STRIKE_STEP = 50.0
+
+
+def configure(symbol="NIFTY", cost_mult=2.0):
+    """Switch the study to another index (NIFTY / BANKNIFTY) and cost multiplier. Rupee rules stay frozen; the lot is
+    chosen so the notional is comparable to 1 Nifty lot (75 x ~20k = 1.5M; BANKNIFTY 30 x ~45k = 1.35M)."""
+    global SYMBOL, SPOT_FILE, STRIKE_STEP, LOT, COST_MULT
+    SYMBOL, COST_MULT = symbol, cost_mult
+    if symbol == "BANKNIFTY":
+        SPOT_FILE, STRIKE_STEP, LOT = "banknifty_ohlc.csv", 100.0, 30
+    else:
+        SPOT_FILE, STRIKE_STEP, LOT = "nifty50_ohlc.csv", 50.0, 75
+    oy.LOT = LOT
+    spot_table.cache_clear()
 
 
 def cost(px, sell):
@@ -66,7 +82,7 @@ def iv_delta(price, S, K, T, call):
 # ------------------------------------------------------------------ data
 @lru_cache(maxsize=1)
 def spot_table() -> pd.DataFrame:
-    return pd.read_csv(DATA_DIR / "nifty" / "nifty50_ohlc.csv", parse_dates=["date"]).set_index("date")
+    return pd.read_csv(DATA_DIR / "nifty" / SPOT_FILE, parse_dates=["date"]).set_index("date")
 
 
 class Day:
@@ -77,7 +93,7 @@ class Day:
         sp = spot_table().loc[d]
         self.S_open, self.S_close = float(sp.open), float(sp.close)
         df = pd.read_parquet(DATA_DIR / "idxopt" / f"{d:%Y-%m-%d}.parquet")
-        df = df[(df.symbol == "NIFTY") & (df.kind == "O")].copy()
+        df = df[(df.symbol == SYMBOL) & (df.kind == "O")].copy()
         df["expiry"] = pd.to_datetime(df.expiry)
         df["cp"] = df.opt_type
         # On expiry day the bhavcopy stamps the index settlement value in the settle column of EVERY strike (not the
@@ -410,7 +426,7 @@ def enter_calendar(prev, day, E1, P):
 
 def calendar_adjust(pos, day, month_adj):
     shorts = [L for L in pos.legs if L.side < 0]
-    if len(shorts) != 2 or abs(shorts[0].K - shorts[1].K) <= 50:
+    if len(shorts) != 2 or abs(shorts[0].K - shorts[1].K) <= STRIKE_STEP:
         return
     key = (day.date.year, day.date.month)
     if month_adj.get(key, 0) >= 4:
@@ -474,11 +490,11 @@ def trading_days():
     return [d for d in spot_table().index if f"{d:%Y-%m-%d}" in have]
 
 
-def main(names=None):
+def main(names=None, tag=""):
     days = trading_days()
     res = {"generated": str(pd.Timestamp.now().date()), "first": str(days[0].date()), "last": str(days[-1].date()),
            "n_days": len(days), "train": "entries to 2022-12-31", "test": "entries from 2023-01-01",
-           "cost_multiplier": COST_MULT, "lot": LOT, "strategies": {}}
+           "cost_multiplier": COST_MULT, "lot": LOT, "symbol": SYMBOL, "strategies": {}}
     outdir = HERE / "results"
     outdir.mkdir(exist_ok=True)
     all_tr = []
@@ -489,10 +505,18 @@ def main(names=None):
         res["strategies"][name] = ev
         all_tr += trades
         print(name, ev["train"], ev["test"], ev["verdict"], flush=True)
-    pd.DataFrame(all_tr).to_csv(outdir / "options_real_trades.csv", index=False)
-    (outdir / "options_real.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+    pd.DataFrame(all_tr).to_csv(outdir / f"options_real{tag}_trades.csv", index=False)
+    (outdir / f"options_real{tag}.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
     return res
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or None)
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("names", nargs="*")
+    ap.add_argument("--symbol", default="NIFTY")
+    ap.add_argument("--cost", type=float, default=2.0)
+    a = ap.parse_args()
+    configure(a.symbol, a.cost)
+    tag = "" if (a.symbol == "NIFTY" and a.cost == 2.0) else f"_{a.symbol.lower()}_x{a.cost:g}"
+    main(a.names or None, tag)

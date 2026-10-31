@@ -142,7 +142,7 @@ def main():
     sens = sensitivity()
     sens.to_csv(HERE / "results" / "options_real_sensitivity.csv", index=False)
     extra["sensitivity_rows"] = sens.to_dict("records")
-    extra["heatmaps"] = heatmaps(sens, HERE.parents[1] / "docs" / "img")
+    extra["heatmaps"] = heatmaps(sens, HERE.parents[2] / "docs" / "img")
     (HERE / "options_real_extra.json").write_text(json.dumps(extra, indent=1, default=str), encoding="utf-8")
     print(json.dumps({"capital": extra["capital"], "regimes": extra["regimes"]["thresholds_from_train"]}, indent=1))
 
