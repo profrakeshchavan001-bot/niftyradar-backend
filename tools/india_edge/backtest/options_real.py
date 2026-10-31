@@ -257,7 +257,7 @@ def finish(pos, name, day, why, trades):
                    "credit_inr": round(pos.credit_inr, 2), "days_held": (day.date - pos.entry_date).days,
                    "open_fallbacks": pos.open_fallbacks, "stale_marks": pos.stale_marks,
                    "spot_entry": pos.meta.get("spot_entry"), "spot_exit": day.S_close,
-                   "margin_est": pos.meta.get("margin_est")})
+                   "margin_est": pos.meta.get("margin_est"), "expiry": pos.meta.get("E")})
 
 
 DEFAULTS = {
@@ -290,6 +290,7 @@ def run(name, days, params=None):
     skipped = 0
     month_adj = {}
     prev = None
+    sess_idx = {d: k for k, d in enumerate(days)}
     for i, d in enumerate(days):
         try:
             day = Day(d)
@@ -302,7 +303,11 @@ def run(name, days, params=None):
         if prev is not None and (name.startswith("strangle") or not book):
             pos = None
             if name in ("condor", "strangle_d18", "strangle_p100"):
-                if P.get("weekly"):  # any listed expiry, DTE counted from the fill day (0 = expiry-day entry)
+                if "entry_pick" in P:  # null test: one pre-drawn fill day per expiry
+                    cand = [e for e in prev.expiries if P["entry_pick"].get(e) == d]
+                elif P.get("entry_tdays") is not None:  # N SESSIONS before the (real, listed) expiry
+                    cand = [e for e in prev.expiries if _sess_pos(e, sess_idx, days) - i == P["entry_tdays"]]
+                elif P.get("weekly"):  # any listed expiry, DTE counted from the fill day (0 = expiry-day entry)
                     cand = [e for e in prev.expiries if P["entry_lo"] <= (e - d).days <= P["entry_hi"]]
                 else:
                     cand = [e for e in monthly_expiries(prev.expiries) if P["dte_lo"] <= (e - prev.date).days <= P["dte_hi"]]
@@ -357,6 +362,17 @@ def run(name, days, params=None):
         prev = day
     LAST_STATE.update({"book": book, "done": done, "prev": prev, "params": P})
     return trades, pd.Series(equity), {"skipped": skipped, "open_at_end": len(book)}
+
+
+def _sess_pos(e, sess_idx, days):
+    """Session index of expiry e. Past the last stored session (live use) weekdays are counted instead, because the NSE
+    holiday calendar is not in the data (indicative only); returns -inf for dates that are neither."""
+    if e in sess_idx:
+        return sess_idx[e]
+    last = days[-1]
+    if e > last:
+        return len(days) - 1 + int(np.busday_count(last.date(), e.date()))
+    return -10 ** 9
 
 
 def date_exit(name, pos, day, P, days, i, g):

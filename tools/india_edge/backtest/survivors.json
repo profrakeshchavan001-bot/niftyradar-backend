@@ -1,0 +1,7 @@
+{
+ "note": "Variants the paper-forward logger runs. Only the 2-trading-day Nifty strangle passed Study 3 (Benjamini-Hochberg q<0.05 and the random-entry null). BANKNIFTY monthly condor did not (raw p 0.08, 4 of 15 random-entry draws beat it, interval includes zero) and is NOT listed. Passing is evidence from history, not a forecast; see docs/BACKTEST-YT-REAL-DATA-31OCT.md.",
+ "survivors": [
+  {"label": "2-trading-day strangle d18", "symbol": "NIFTY", "structure": "strangle_d18",
+   "params": {"weekly": true, "entry_tdays": 2, "exit_dte": -1, "unstable_dte": -1}}
+ ]
+}
