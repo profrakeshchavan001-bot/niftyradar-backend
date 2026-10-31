@@ -59,10 +59,6 @@ def splits(symbol, tr, vix):
     tr["vix"] = tr.entry.map(lambda d: vix.asof(prev.get(d, d)))
     edges = [vix[vix.index <= R.TRAIN_END].quantile(q) for q in (1 / 3, 2 / 3)]
     tr["vix_bucket"] = np.where(tr.vix < edges[0], "vix_low", np.where(tr.vix < edges[1], "vix_mid", "vix_high"))
-    exps = set()
-    for d in R.trading_days()[::20]:
-        pass
-    mon = set()
     allx = pd.read_parquet(DATA_DIR / ("idxopt_banknifty.parquet" if symbol == "BANKNIFTY" else "idxopt_nifty.parquet"), columns=["expiry"])
     mon = set(R.monthly_expiries(pd.to_datetime(allx.expiry.unique())))
     me = np.array(sorted(mon), dtype="datetime64[ns]")
@@ -91,7 +87,6 @@ def walk_forward(symbol, cells):
             picked[str(y)] = grid[b]
             total += net
             pos += net > 0
-        fixed = {str(y): round(float(dfs[[g for g in range(len(grid))][0]][dfs[0].entry.dt.year == y].net.sum())) for y in ()}
         res[name] = {"years_net_inr": yrs, "picked": picked, "total_inr": round(total), "positive_years": int(pos),
                      "n_years": len(yrs)}
     return res

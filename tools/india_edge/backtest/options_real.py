@@ -220,15 +220,16 @@ def monthly_expiries(exps):
 
 
 def price_exit(name, pos, g):
+    P = pos.meta.get("P", {})
     if name == "condor":
         if g >= 0.5 * pos.credit_inr:
             return "TP50"
-        if g <= -pos.credit_inr:
+        if g <= -P.get("sl_mult", 1.0) * pos.credit_inr:
             return "SL100"
     elif name.startswith("strangle"):
-        if g >= 13000:
+        if g >= P.get("tp", 13000):
             return "TP"
-        if g <= -13000:
+        if g <= -P.get("sl", 13000):
             return "SL"
     elif name == "calendar":
         if g >= 5000:
@@ -239,9 +240,10 @@ def price_exit(name, pos, g):
 
 
 def sl_of(name, pos):
+    P = pos.meta.get("P", {})
     if name == "condor":
-        return pos.credit_inr
-    return 13000.0 if name.startswith("strangle") else 6000.0
+        return P.get("sl_mult", 1.0) * pos.credit_inr
+    return float(P.get("sl", 13000)) if name.startswith("strangle") else 6000.0
 
 
 def finish(pos, name, day, why, trades):
@@ -300,8 +302,11 @@ def run(name, days, params=None):
         if prev is not None and (name.startswith("strangle") or not book):
             pos = None
             if name in ("condor", "strangle_d18", "strangle_p100"):
-                E = next((e for e in monthly_expiries(prev.expiries)
-                          if P["dte_lo"] <= (e - prev.date).days <= P["dte_hi"] and e not in done), None)
+                if P.get("weekly"):  # any listed expiry, DTE counted from the fill day (0 = expiry-day entry)
+                    cand = [e for e in prev.expiries if P["entry_lo"] <= (e - d).days <= P["entry_hi"]]
+                else:
+                    cand = [e for e in monthly_expiries(prev.expiries) if P["dte_lo"] <= (e - prev.date).days <= P["dte_hi"]]
+                E = next((e for e in cand if e not in done), None)
                 if E is not None:
                     done.add(E)
                     pos = enter_condor(prev, day, E, P) if name == "condor" else enter_strangle(prev, day, E, P)
@@ -318,7 +323,12 @@ def run(name, days, params=None):
                 pos.credit_inr = sum(-L.side * L.entry for L in pos.legs) * LOT
                 pos.meta["spot_entry"] = prev.S_close
                 pos.meta["margin_est"] = margin_estimate(name, prev.S_close, pos)
-                book.append(pos)
+                pos.meta["P"] = P
+                if pos.meta["E"] <= d:  # expiry-day entry: cash-settled at the day's settle, no overnight exposure
+                    finish(pos, name, day, "EXPIRY0", trades)
+                    cum += trades[-1]["net"]
+                else:
+                    book.append(pos)
         # ---- evaluate older positions on today's real settles
         for pos in list(book):
             if pos.entry_date == d:
@@ -354,10 +364,12 @@ def date_exit(name, pos, day, P, days, i, g):
     dte = (E - day.date).days
     if name == "condor" and dte <= P["exit_dte"]:
         return "15DTE"
+    if name == "condor" and day.date >= E:
+        return "EXPIRY"
     if name.startswith("strangle"):
         if day.date >= E:
             return "EXPIRY"
-        if dte <= 7 and g < 0:
+        if dte <= P.get("unstable_dte", 7) and g < 0:
             return "7DTE_UNSTABLE"
     if name == "calendar" and (day.date >= E or (i + 1 < len(days) and days[i + 1] >= E)):
         return "PRE_EXPIRY"

@@ -2,6 +2,24 @@
 
 Research measurement only: not advice, no profit claim. Real NSE NIFTY option settle prices (2015-01 to 2026-10, 2919 sessions), real Nifty OHLC. Black-Scholes is used only to read a delta off a real price. Costs DOUBLED, train = entries to 2022-12-31, test = 2023+, walk-forward by calendar year, Rs per 1 lot (75). Stops are evaluated ONLY on real daily settles (intraday touches invisible; gap losses booked at that day's settle). Rules frozen, nothing tuned.
 
+## Verdict (plain words, 31 Oct 2026; research measurement, not advice, no profit claim)
+
+**Survivors (passed on real settle prices, 2x costs, across a pre-registered grid; none is proven):**
+- NIFTY weekly short strangle entered 2 calendar days before expiry (18-delta): passes in all 7 parameter sets (3 other deltas, 3 other stops), positive in both halves (2015-21 +82k, 2022-26 +190k per lot) and in 7 of 7 years 2019-2025. Caveats: stops almost never act (355 of 371 trades run to expiry), worst trade -36k, max drawdown 87k, and the rule has NO entries in 2026 (see Study 2).
+- BANKNIFTY monthly condor: passes in 6 of 7 sets (the 7th had only 25 trades) and is positive in both halves in all 6 (fit 2015-21 +117k, 2022-26 +155k for the chosen set). Caveats: only 94 trades, 48 months skipped by the 1:2 rule, stops at 1.5x/2x are effectively "no stop".
+
+**Dead:**
+- All four NIFTY monthly structures (earlier section).
+- NIFTY expiry-day-only (0 DTE) strangle: train negative in all 7 sets, passes only in 2 of 7; NIFTY 0 DTE and 2 DTE condor: 0 of 14 sets pass.
+- Calendar on both indices; BANKNIFTY strangle p100 (passes in 3 of 7 sets only because of the stop level, train negative in every set).
+
+**Only works after 2022 (cannot be called a survivor):** BANKNIFTY strangle d18 passes 4 of 7 sets but the 2015-21 half is negative in all 7, so nothing was confirmed out of sample; it is a regime result.
+
+**Needs real SPAN margin before any capital decision:** every survivor. The margin used here is an estimate (about 2.5x a crude SPAN-like scan, so likely conservative) and no SPAN file exists in the data. Also unverified: intraday stop touches (daily settles only), fill quality at the open, and live behaviour; the paper-forward log is the next test.
+
+Not tested: a 2-trading-day entry (needed after Nifty expiries moved to Tuesday in Q4 2025), BANKNIFTY weeklies (no BANKNIFTY weekly study run), real lot-size history, SPAN, intraday data.
+
+
 ## Verdicts
 
 | Strategy | Train trades / total Rs / maxDD | Test trades / total Rs / maxDD | WF total, +yrs | Worst loss / SL (test) | Margin est (median) | Verdict |
@@ -115,6 +133,31 @@ schtasks /Create /F /SC DAILY /ST 19:45 /TN "NiftyRadar-CC8-PaperForward" /TR "\
 ```
 
 Check: `schtasks /Query /TN "NiftyRadar-CC8-PaperForward"`. Run now: `schtasks /Run /TN "NiftyRadar-CC8-PaperForward"`. Log: `tools\india_edge\logs\paper_forward.log`. Remove: `schtasks /Delete /TN "NiftyRadar-CC8-PaperForward" /F`.
+
+## Study 2: robustness grid, weekly Nifty, out-of-sample (costs 2x, real settles only, nothing re-chosen per year)
+
+Grid fixed in advance, one parameter changed at a time: 3 other deltas (or premiums) and 3 other stop levels per structure. Strangle deltas 0.12/0.24/0.30 (base 0.18), premiums 70/140/200 (base 100), stop Rs 8k/18k/26k (base 13k, take-profit unchanged); condor short deltas 0.20/0.25/0.35 (base 0.30), stop 0.5x/1.5x/2x credit (base 1x). A set PASSES when the preset rule holds (train and test >= 20 trades, test > 0, walk-forward total > 0, at least half the years positive) AND at least 5 of the 8 years 2019-2026 are positive. Out-of-sample: pick the set with the best net on entries before 2022 (>= 15 trades), read its 2022-26 result unchanged. Base-rule results reproduce the earlier BANKNIFTY/NIFTY runs exactly. Full per-year and per-regime detail (VIX terciles, monthly expiry week) per set is in `backtest/options_real_study2.json`.
+
+| Family (index / entry / structure) | Sets passing | Base: train / test Rs | Set chosen on 2015-21 | Its net 2015-21 / 2022-26 Rs | Sets positive in both halves |
+|---|---|---|---|---|---|
+| BANKNIFTY/monthly/strangle_d18 | 4/7 | -101,733 / 177,526 | sl=8000 | -8,855 / 113,180 | 0/7 |
+| BANKNIFTY/monthly/strangle_p100 | 3/7 | -90,999 / 76,192 | premium=140 | -15,300 / 52,418 | 0/7 |
+| BANKNIFTY/monthly/condor | 6/7 | 100,960 / 40,040 | sl_mult=1.5 | 117,435 / 155,445 | 6/6 |
+| NIFTY/weekly0/strangle_d18 | 2/7 | -43,889 / 93,041 | delta=0.3 | -38,390 / 95,217 | 0/7 |
+| NIFTY/weekly0/condor | 0/7 | -102,529 / -76,238 | short_delta=0.2 | 2,344 / -29,872 | 0/7 |
+| NIFTY/weekly2/strangle_d18 | 7/7 | 92,243 / 179,523 | sl=8000 | 88,492 / 191,668 | 7/7 |
+| NIFTY/weekly2/condor | 0/7 | -145,764 / -1,855 | short_delta=0.2 | -40,767 / -54,331 | 0/7 |
+
+How entries are defined: monthly = 40-50 DTE (condor) or 45-50 DTE (strangle) as before; weekly0 = enter at the open of the expiry day, settle the same day at the index settlement (exit reason EXPIRY0; stops cannot act); weekly2 = enter at the open 2 calendar days before a listed expiry, hold to expiry (no 15-DTE or 7-DTE exits).
+
+Reading, per family:
+- NIFTY weekly2 strangle: all 7 sets pass and are positive in both halves. Parameters hardly matter because 355 of 371 trades run to expiry; the result is one mechanism (selling 2-day premium), not seven independent confirmations. 2019-2025 each positive; 2015-2018 entries are the old monthly expiries only. Tail: worst trade -36k (base) to -46k (delta 0.30), max drawdown 87k, 12 of 371 trades lose more than 1.1x the stop because stops see only daily settles.
+- Data gap for weekly2: Nifty weekly expiries moved to Tuesday in Q4 2025 (checked in the expiry list: 12 of 14 Q4-2025 expiries are Tuesdays), so no entry exists 2 calendar days before expiry (it would be a Sunday). The rule has zero 2026 trades; its last entry is 2025-08-26. A 2-trading-day variant (Friday entry) was NOT run.
+- NIFTY weekly0 strangle: train negative in every set, positive test; 2 of 7 pass (deltas 0.24, 0.30). Stop levels change nothing because the position never survives a night. The pass is a post-2022 effect: fit half -43k, 2022-26 +93k for the base rule.
+- Condor, weekly0 and weekly2: 0 of 14 sets pass; negative nearly every year.
+- BANKNIFTY strangle d18 and p100: positive 2022-26 in 6 of 7 sets each but the 2015-21 half is negative in all 7 (d18) and all 7 (p100): the grid never found an edge in the fit half, so the out-of-sample "result" is not a confirmation.
+- BANKNIFTY condor: positive in both halves in all 6 eligible sets; chosen set (stop 1.5x) +117k then +155k. Base rule alone: +107k then +34k.
+- Multiple looks: 49 runs in this study on top of 8 earlier BANKNIFTY/NIFTY tests; the base rules were seen on the full period before this split, so only the grid selection is out of sample, not the base rule.
 
 ## Bottom line
 
