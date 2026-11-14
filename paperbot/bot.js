@@ -27,6 +27,16 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     return entry;
   }
 
+  // How old the latest closed candle may be: 2 candles, plus the allowed feed
+  // delay when the candles come from the delayed free Yahoo feed.
+  const isDelayed = (dataSource) => dataSource === 'yahoo_delayed';
+  const maxAgeMs = (dataSource, n) => 2 * FIVE_MIN + (isDelayed(dataSource) ? (n.yahoo_max_delay_sec || 0) * 1000 : 0);
+  // A delayed feed's newest candle is still forming at the feed's own time, even if the wall clock is past its end.
+  // So "closed" is judged at the time of the last trade the feed has seen (asOfMs), never later than now.
+  const cutoffOf = (feed, at = now()) => (feed && Number.isFinite(feed.asOfMs) ? Math.min(at, feed.asOfMs) : at);
+  // Feed delay stored on trade / skip rows: seconds since the latest closed candle ended.
+  const delaySecOf = (last) => (last ? Math.round((now() - (last.t + FIVE_MIN)) / 1000) : null);
+
   // Real R factor for every liquid stock with valid candles, best first.
   // Entry = live price; ATR and swing levels come from 15-min candles.
   async function rankNse(quotes, n, cfg) {
@@ -38,9 +48,9 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       if (!q || !(q.price > 0) || !Number.isFinite(q.pct)) continue;
       if (!((q.volume || 0) * q.price >= n.min_turnover_inr)) { illiquid += 1; continue; }
       const got = await candlesFor(q.symbol, 3 * FIVE_MIN);
-      const c5 = E.closedOnly(got.candles, FIVE_MIN, got.at);
+      const c5 = E.closedOnly(got.candles, FIVE_MIN, cutoffOf(got, got.at));
       const last = c5[c5.length - 1];
-      const r = c5.length >= n.min_candles && got.at - (last.t + FIVE_MIN) <= 2 * FIVE_MIN
+      const r = c5.length >= n.min_candles && got.at - (last.t + FIVE_MIN) <= maxAgeMs(got.dataSource, n)
         ? R.rFactor({ entry: q.price, c15: E.aggregate(c5), prevDay: R.prevDayLevels(c5, istDayStart(now())), opt: cfg.rfactor })
         : null;
       if (!r) { noData += 1; continue; }
@@ -59,21 +69,25 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     if (skipSeen.size > 5000) skipSeen.clear();
     skipSeen.add(key);
     log(`[paperbot] skip ${market} ${symbol}: ${reason}`);
-    await store.insertSkip({ market, symbol, skip_date: date, reason, r_factor: extra.r_factor ?? null, patterns: extra.patterns || null, trend_state: extra.trend_state || null });
+    await store.insertSkip({ market, symbol, skip_date: date, reason, r_factor: extra.r_factor ?? null, patterns: extra.patterns || null, trend_state: extra.trend_state || null,
+      data_source: extra.data_source ?? null, data_delay_sec: extra.data_delay_sec ?? null });
   }
 
   // Shared part of both scans: closed candles -> context -> patterns -> entry decision.
-  async function analyse(market, symbol, raw, cfg, score) {
-    const c5 = E.closedOnly(raw, FIVE_MIN, now());
+  // `feed` = { dataSource, c15 }: where the candles came from and, when the feed has them, native 15-minute candles.
+  async function analyse(market, symbol, raw, cfg, score, feed = {}) {
+    const c5 = E.closedOnly(raw, FIVE_MIN, cutoffOf(feed));
     const last = c5[c5.length - 1];
-    if (c5.length < cfg.min_candles) { await skip(market, symbol, `not enough 5-min candles yet (need ${cfg.min_candles})`, { r_factor: score }); return null; }
-    if (now() - (last.t + FIVE_MIN) > 2 * FIVE_MIN) { await skip(market, symbol, 'no fresh candle (market closed or data feed stale)', { r_factor: score }); return null; }
-    const ctx = E.buildContext(c5, istDayStart(now()));
+    const src = { data_source: feed.dataSource ?? null, data_delay_sec: delaySecOf(last) };
+    if (c5.length < cfg.min_candles) { await skip(market, symbol, `not enough 5-min candles yet (need ${cfg.min_candles})`, { r_factor: score, ...src }); return null; }
+    if (now() - (last.t + FIVE_MIN) > maxAgeMs(feed.dataSource, cfg)) { await skip(market, symbol, 'no fresh candle (market closed or data feed stale)', { r_factor: score, ...src }); return null; }
+    const c15 = feed.c15 ? E.closedOnly(feed.c15, 3 * FIVE_MIN, cutoffOf(feed)) : null;
+    const ctx = E.buildContext(c5, istDayStart(now()), c15);
     const patterns = P.detectPatterns(c5, ctx, cfg.patternOpt);
     if (!patterns.length) return null; // no setup, nothing to log
     const names = patterns.map((p) => p.name);
     const decision = E.decideEntry(patterns, ctx);
-    const extra = { r_factor: score, patterns: names, trend_state: ctx, trigger_t: last.t };
+    const extra = { r_factor: score, patterns: names, trend_state: ctx, trigger_t: last.t, ...src };
     if (!decision.enter) { await skip(market, symbol, decision.reason, extra); return null; }
     return { c5, last, ctx, decision, extra };
   }
@@ -111,8 +125,9 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
 
     for (const s of top) {
       if (open.some((t) => t.symbol === s.symbol) || entered.includes(s.symbol)) continue; // 1 open trade per stock
-      const { candles, source, dataSource, quoteLagSec, exchangeDelayMin } = await candlesFor(s.symbol, FIVE_MIN);
-      const a = await analyse('nse', s.symbol, candles, n, s.rFactor);
+      const { candles, source, dataSource, quoteLagSec, exchangeDelayMin, asOfMs } = await candlesFor(s.symbol, FIVE_MIN);
+      const c15 = isDelayed(dataSource) && typeof nse.candles15 === 'function' ? await nse.candles15(s.symbol) : null;
+      const a = await analyse('nse', s.symbol, candles, n, s.rFactor, { dataSource, c15, asOfMs });
       if (!a) continue;
       if (today.some((t) => t.symbol === s.symbol && t.trigger_t === a.last.t)) continue; // this candle was already traded
       const news = newsCheck(s.symbol, await nse.news(), now());
@@ -137,8 +152,9 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       if (!size) { await skip('nse', s.symbol, `one lot (${lot} x Rs ${premium}) is bigger than the 2% risk size or the free cash`, a.extra); continue; }
 
       const type = dir === 'up' ? 'CE' : 'PE';
-      // Observed data delay: how long ago the latest closed candle ended when the trade was decided (always at most 2 candles, see analyse()).
-      const delaySec = Math.round((now() - (a.last.t + FIVE_MIN)) / 1000);
+      // Observed data delay: how long ago the latest closed candle ended when the trade was decided
+      // (at most 2 candles on a live feed; up to 2 candles + nse.yahoo_max_delay_sec on the delayed Yahoo feed).
+      const delaySec = delaySecOf(a.last);
       const rDir = dir === 'up' ? s.r.long.r : s.r.short.r; // R of the direction actually traded
       const row = {
         ...tradeRow('nse', s.symbol, rDir, 'r_factor_v2 (target distance / stop distance, 15-min ATR and swing levels)', a, news.reason),
@@ -149,7 +165,10 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
         simulated_option: simulated,
         price_source: quote ? 'dhan_option_chain_ltp' : `simulated: premium ${n.sim_premium_pct}% of spot, delta ${n.sim_delta}`,
         candle_source: source, data_source: dataSource || null, data_delay_sec: delaySec, qty: size.qty, entry_price: premium, entry_underlying: spot,
-        basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: rDir, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated }),
+        // exit levels on the OPTION price, fixed at entry so the report shows what the bot was aiming for
+        sl_price: P.round(premium * (1 - n.stop_pct / 100), 2), target_price: P.round(premium * (1 + n.target_pct / 100), 2),
+        basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: rDir, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated })
+          + (isDelayed(dataSource) ? ` Data: free Yahoo feed, about ${Math.round(delaySec / 60)} min behind the market.` : ''),
         ...(jd ? tradeFields(jd) : {}),
       };
       await store.insertTrade(row);
@@ -189,7 +208,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       const dir = t.direction === 'CALL' ? 'up' : 'down';
       let price = null;
       if (typeof nse.refreshSpot === 'function') await nse.refreshSpot(t.symbol);
-      let spot = nse.spot(t.symbol);
+      let spot = nse.spot(t.symbol, { maxDelaySec: n.yahoo_max_delay_sec || 0 });
       let extra = {};
       if (!t.simulated_option) {
         const [, expiry, strike] = t.instrument.split(' ');
@@ -217,7 +236,6 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     const date = istParts(now()).date;
     const today = await store.tradesForDay('crypto', date);
     const open = await store.openTrades('crypto');
-    let taken = today.length;
     let freeCash = c.capital_usdt - open.reduce((s, t) => s + t.entry_price * t.qty, 0);
     const scored = [];
     for (const symbol of c.symbols) {
@@ -232,13 +250,12 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     scored.sort((a, b) => (b.m?.score || 0) - (a.m?.score || 0));
     const entered = [];
     for (const s of scored) {
-      if (open.some((t) => t.symbol === s.symbol)) continue; // 1 open trade per coin
+      if (open.some((t) => t.symbol === s.symbol)) continue; // 1 open trade per coin (no daily cap, no cooldown)
       const score = s.m ? s.m.score : null;
-      const a = await analyse('crypto', s.symbol, s.raw, c, score);
+      const a = await analyse('crypto', s.symbol, s.raw, c, score, { dataSource: 'binance_public' });
       if (!a) continue;
       if (today.some((t) => t.symbol === s.symbol && t.trigger_t === a.last.t)) continue;
       if (score == null || score < c.min_momentum_score) { await skip('crypto', s.symbol, `momentum score ${score} is below ${c.min_momentum_score}`, a.extra); continue; }
-      if (taken >= c.max_trades_per_day) { await skip('crypto', s.symbol, `max ${c.max_trades_per_day} trades for the day already taken`, a.extra); continue; }
       const dir = a.decision.direction;
       const price = a.ctx.price;
       const size = E.sizeCrypto({ capital: c.capital_usdt, riskPct: c.risk_pct, stopPct: c.stop_pct, freeCash, price, coins: c.symbols.length });
@@ -246,12 +263,13 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       const row = {
         ...tradeRow('crypto', s.symbol, score, `momentum_score_v1 (vol x${s.m.volumeSpike}, range x${s.m.rangeExpansion}, trend ${s.m.trendStrength})`, a, 'not applied to crypto'),
         direction: dir === 'up' ? 'LONG' : 'SHORT', instrument: `${s.symbol} spot (paper)`, simulated_option: false,
-        price_source: 'binance_public_5m_close', candle_source: 'binance_public_klines_5m', qty: size.qty, entry_price: price, entry_underlying: price,
+        price_source: 'binance_public_5m_close', candle_source: 'binance_public_klines_5m', data_source: 'binance_public', data_delay_sec: delaySecOf(a.last),
+        qty: size.qty, entry_price: price, entry_underlying: price,
+        sl_price: P.round(price * (1 + (dir === 'up' ? -1 : 1) * c.stop_pct / 100), 6), target_price: P.round(price * (1 + (dir === 'up' ? 1 : -1) * c.target_pct / 100), 6),
         basis: E.basisSentence({ market: 'crypto', symbol: s.symbol, score, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: 'not applied to crypto', simulated: false }),
       };
       await store.insertTrade(row);
       log(`[paperbot] PAPER entry crypto ${s.symbol} ${row.direction} @ ${price}: ${row.patterns.join(', ')}`);
-      taken += 1;
       freeCash -= size.value;
       entered.push(s.symbol);
     }

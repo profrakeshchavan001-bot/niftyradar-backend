@@ -790,6 +790,7 @@ require('./paperbot').attachPaperBot({
     getMovers: () => cache.movers,
     getLotSize: (symbol) => lotSizes[symbol],
     fetchNews: fetchMarketNews,
+    universe: NIFTY50_SYMBOLS, // read-only: listed at /api/paper/universe
   },
 });
 

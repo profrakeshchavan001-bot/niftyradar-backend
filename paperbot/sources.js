@@ -134,14 +134,22 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
       return { source: 'yahoo', ok: r.ok, failed: r.failed };
     },
     sample() { const r = dhanQuotes(); if (r) aggregator.record(r, now()); },
-    // Last real price of a stock. Yahoo price only if its last trade is at most 2 candles old.
-    spot(symbol) {
+    // Last real price of a stock. A Yahoo price is used only if its last trade is at most
+    // 2 candles + the allowed feed delay old (Yahoo's NSE data may run about 15 minutes late).
+    spot(symbol, { maxDelaySec = 0 } = {}) {
       const live = dhanQuotes();
       if (live) return live.find((s) => s.symbol === symbol)?.price || null;
       const q = yahoo ? yahoo.quote(symbol) : null;
-      if (!q || q.marketTime == null || now() - q.marketTime > 2 * FIVE_MIN) return null;
+      if (!q || q.marketTime == null || now() - q.marketTime > 2 * FIVE_MIN + maxDelaySec * 1000) return null;
       return q.price;
     },
+    // Native 15-minute candles (Yahoo only, for the few stocks about to be analysed). null = build them from the 5-minute candles.
+    async candles15(symbol) {
+      if (!yahoo || dhanQuotes()) return null;
+      try { return (await yahoo.get(symbol, '15m', '5d')).candles; } catch (e) { log(`[paperbot] ${e.message}; 15-min candles of ${symbol} are built from its 5-min candles instead`); return null; }
+    },
+    // Candles for the report page chart (read-only): same order as candles(), nothing made up.
+    async chartCandles(symbol) { return this.candles(symbol); },
     // For the exit check of an open trade when Dhan quotes are gone: one Yahoo read per 5-minute window.
     async refreshSpot(symbol) {
       if (!yahoo || dhanQuotes()) return;
@@ -164,7 +172,8 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
       if (yahoo) {
         try {
           const y = await yahoo.get(symbol);
-          return { candles: y.candles, source: 'yahoo_chart_5m', dataSource: 'yahoo', quoteLagSec: y.quoteLagSec, exchangeDelayMin: y.meta.exchangeDelayMin };
+          return { candles: y.candles, source: 'yahoo_chart_5m', dataSource: 'yahoo_delayed', quoteLagSec: y.quoteLagSec, exchangeDelayMin: y.meta.exchangeDelayMin,
+            asOfMs: y.meta.marketTime }; // time of the last trade the delayed feed has seen: a candle counts as closed only up to here
         } catch (e) {
           log(`[paperbot] ${e.message}; ${symbol} is skipped`);
         }
@@ -234,8 +243,8 @@ function createCryptoSource({ axios, log = console.log, now = Date.now, hosts = 
     throw lastErr;
   }
   return {
-    async candles(symbol, limit = 330) {
-      const rows = await get('/api/v3/klines', { symbol, interval: '5m', limit });
+    async candles(symbol, limit = 330, range = null) {
+      const rows = await get('/api/v3/klines', { symbol, interval: '5m', limit, ...(range ? { startTime: range.startMs, endTime: range.endMs } : {}) });
       return rows.map((r) => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] })).filter((k) => [k.t, k.o, k.h, k.l, k.c].every(Number.isFinite));
     },
     async price(symbol) {

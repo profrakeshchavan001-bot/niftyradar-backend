@@ -11,11 +11,12 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
   'price_source', 'candle_source', 'qty', 'entry_price', 'entry_time', 'entry_underlying', 'exit_price', 'exit_time',
   'exit_underlying', 'exit_reason', 'pnl_inr', 'fx_rate', 'fx_source', 'max_fav_pct', 'max_adv_pct', 'basis', 'legacy_rf', 'r_detail',
   'judge_score', 'judge_take', 'judge_contributions', 'judge_basis', // judge_*: docs/JUDGE.md
-  'data_source', 'data_delay_sec']; // NSE candle feed of the trade: "dhan" or "yahoo", and the observed delay in seconds
+  'data_source', 'data_delay_sec', // candle feed of the trade ("dhan", "yahoo_delayed", "binance_public") and the observed delay in seconds
+  'sl_price', 'target_price']; // exit levels fixed at entry (option price for NSE, coin price for crypto)
 const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
-  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec'];
-const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state'];
+  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec', 'sl_price', 'target_price'];
+const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec'];
 
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
 
@@ -35,6 +36,7 @@ function createMemoryStore() {
     async tradesForDay(market, date) { return copy(db.trades.filter((t) => t.market === market && t.trade_date === date)); },
     async closedTrades(market) { return copy(db.trades.filter((t) => t.status === 'closed' && (!market || t.market === market))); },
     async insertSkip(s) { db.skips.push({ id: ++seq, ...copy(s) }); },
+    async getTrade(id) { const row = db.trades.find((t) => t.id === id); return row ? copy(row) : null; },
     async skipsSince(date) { return copy(db.skips.filter((s) => s.skip_date >= date)); },
     async saveSummary(s) { db.summaries.push({ id: ++seq, ...copy(s) }); },
     async listSummaries(limit) { return copy(db.summaries.slice(-clampLimit(limit)).reverse()); },
@@ -105,6 +107,7 @@ function createPgStore(getPool) {
         SKIP_COLS.map((c) => toParam(c, s[c])));
     },
     skipsSince: (date) => q('SELECT * FROM paper_skips WHERE skip_date >= $1 ORDER BY id', [date]),
+    async getTrade(id) { return (await q('SELECT * FROM paper_trades WHERE id = $1', [id]))[0] || null; },
     async saveSummary(s) {
       await pool.query('INSERT INTO daily_summaries (kind, summary_date, body, data, telegram_sent) VALUES ($1, $2, $3, $4, $5)',
         [s.kind, s.summary_date, s.body, JSON.stringify(s.data || null), !!s.telegram_sent]);

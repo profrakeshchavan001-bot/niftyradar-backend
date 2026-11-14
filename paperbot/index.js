@@ -10,8 +10,9 @@ const { createMemoryStore, createPgStore, createCachedStore } = require('./store
 const { createNseSource, createCryptoSource } = require('./sources');
 const { createReporter } = require('./report');
 const { createYahooSource } = require('./yahoo');
-const { buildReport } = require('./reportPage');
-const { loadConfig, DEFAULTS } = require('./config');
+const { buildReport, chartData } = require('./reportPage');
+const { loadUniverse } = require('./yahoo');
+const { loadConfig, DEFAULTS, merge } = require('./config');
 const { istParts, nseSession } = require('./time');
 
 // The bot has its OWN database: PAPER_DATABASE_URL (any Postgres URL, for
@@ -50,6 +51,26 @@ function buildStore(env, log) {
   return createCachedStore(createPgStore(makePool));
 }
 
+// Rules as stored, laid over the defaults. Reads only (the report routes must not write).
+const loadConfigReadOnly = async (store) => merge(DEFAULTS, await store.getConfig());
+
+// What the bot scans and how the top stocks are picked (GET /api/paper/universe, docs/UNIVERSE.md).
+function universeInfo({ live, fallback, cfg }) {
+  return {
+    paperOnly: true,
+    nse: {
+      whenDhanIsLive: { source: 'Dhan live quotes: the basket of the site Movers page (Nifty 50 list in server.js)', count: live.length, symbols: live },
+      whenDhanIsDown: { source: 'Yahoo Finance chart feed, SYMBOL.NS, delayed (data/nse-fno-top60.json)', count: fallback.length, symbols: fallback },
+      liquidityFilter: `traded value today (price x volume) of at least Rs ${cfg.nse.min_turnover_inr.toLocaleString('en-IN')}`,
+      candleFilter: `at least ${cfg.nse.min_candles} closed 5-minute candles and 15 closed 15-minute candles; latest candle at most 2 candles old (plus up to ${cfg.nse.yahoo_max_delay_sec} s on the delayed Yahoo feed)`,
+      ranking: 'risk-reward R factor = target distance / stop distance, better of the long and the short side (docs/R-FACTOR.md)',
+      picked: `top ${cfg.nse.top_n} by R factor every 5 minutes; ties go to the bigger move today, then A-Z`,
+      hours: `Mon-Fri 09:15-15:30 IST, new entries until ${cfg.nse.no_new_entry_after_ist}, not on: ${cfg.nse.holidays.join(', ') || 'no holiday listed'}`,
+    },
+    crypto: { source: 'Binance public 5-minute candles', symbols: cfg.crypto.symbols, picked: `every coin with a momentum score of at least ${cfg.crypto.min_momentum_score}; one open trade per coin, no daily limit` },
+  };
+}
+
 // Runs a job, never lets it overlap with itself, never lets it crash the server.
 function guarded(name, fn, log) {
   let busy = false;
@@ -81,12 +102,15 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
     const b = crypto.createHash('sha256').update(secret).digest();
     return crypto.timingSafeEqual(a, b);
   };
-  const route = (pathname, read) => app.get(pathname, async (req, res) => {
+  // `read(limit)` answers { rows }; `custom(req)` answers { status?, body } for routes with their own shape.
+  const route = (pathname, read, custom = null) => app.get(pathname, async (req, res) => {
     if (!secret) return res.status(503).json({ error: 'PAPER_ADMIN_SECRET not configured' });
     if (!okSecret(req.get('x-paper-secret') || req.query.key)) return res.status(401).json({ error: 'Unauthorized' });
     if (!enabled || !state.ready) return res.status(503).json({ error: enabled ? 'paper bot is starting' : 'paper bot is disabled (PAPER_BOT_ENABLED=false)' });
     try {
-      res.set('Cache-Control', 'no-store').json({ paperOnly: true, storage: state.store.kind, rows: await read(req.query.limit) });
+      res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+      if (custom) { const out = await custom(req); return res.status(out.status || 200).json(out.body); }
+      res.json({ paperOnly: true, storage: state.store.kind, rows: await read(req.query.limit) });
     } catch (e) {
       res.status(500).json({ error: 'could not read paper bot data' });
     }
@@ -108,6 +132,21 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
     }
   });
 
+  // Candles, markers and SL / target lines of one trade, for the chart on the report page. Read-only.
+  route('/api/paper/chart', null, async (req) => {
+    const id = Number(req.query.id);
+    if (!Number.isSafeInteger(id) || id < 1) return { status: 400, body: { error: 'id must be a trade number' } };
+    const data = await chartData({ store: state.store, nse: state.nse, crypto: state.crypto, id });
+    return data ? { body: data } : { status: 404, body: { error: 'no such trade' } };
+  });
+
+  // The exact lists the bot scans (docs/UNIVERSE.md says the same in words). Read-only.
+  route('/api/paper/universe', null, async () => {
+    let cfg = DEFAULTS;
+    try { cfg = await loadConfigReadOnly(state.store); } catch (e) { /* database not reachable: show the default rules */ }
+    return { body: universeInfo({ live: deps.universe || [], fallback: loadUniverse(), cfg }) };
+  });
+
   if (!enabled) { log('[paperbot] disabled (PAPER_BOT_ENABLED=false)'); return state; }
 
   const store = buildStore(env, log);
@@ -115,6 +154,8 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   const yahoo = createYahooSource({ axios, log }); // free NSE candle fallback, asked only when Dhan has no data
   const nse = createNseSource({ axios, log, yahoo, ...deps });
   const cryptoSrc = createCryptoSource({ axios, log });
+  state.nse = nse;
+  state.crypto = cryptoSrc;
   const judgeOn = String(env.PAPER_JUDGE_ON ?? 'true').toLowerCase() !== 'false'; // the judge decides NSE entries (docs/JUDGE.md); PAPER_JUDGE_ON=false switches it off
   const bot = createBot({ store, nse, crypto: cryptoSrc, log, onConfig: (cfg) => { state.holidays = cfg.nse.holidays; }, judgeOn });
   const reporter = createReporter({ store, axios, env, log, loadConfig });
@@ -153,4 +194,4 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   return state;
 }
 
-module.exports = { attachPaperBot, guarded, buildStore, pgOptions };
+module.exports = { attachPaperBot, guarded, buildStore, pgOptions, universeInfo };

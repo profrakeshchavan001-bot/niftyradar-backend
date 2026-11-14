@@ -219,6 +219,30 @@ test('replay crypto: exhaustion reversal down -> SHORT -> stop, P&L in INR; then
   assert.match(w.text, /Too few trades, no conclusion/);
 });
 
+test('crypto: no daily trade limit (one open trade per coin stays)', async () => {
+  const FIVE_MS = 5 * 60000;
+  const trigger = fx.crypto.candles[39];
+  const clock = { t: trigger.t + FIVE_MS + 25000 };
+  const store = createMemoryStore();
+  await store.setConfigIfMissing('crypto', { max_trades_per_day: 0 }); // an old stored limit is ignored
+  // seven closed trades already taken today (more than the old limit of 6)
+  for (let i = 0; i < 7; i++) {
+    const id = await store.insertTrade({ market: 'crypto', symbol: 'BTCUSDT', trade_date: '2026-11-13', trigger_t: i, patterns: [], qty: 1, entry_price: 100, basis: 'b' });
+    await store.updateTrade(id, { status: 'closed', pnl_inr: 1 });
+  }
+  const crypto = { candles: async (s) => (s === 'BTCUSDT' ? fx.crypto.candles.filter((k) => k.t <= clock.t) : []), price: async () => 101.6, usdtInr: async () => ({ rate: 88, source: 'test' }) };
+  const bot = createBot({ store, nse: null, crypto, now: () => clock.t, log: () => {} });
+  await bot.cryptoScan();
+  assert.equal(store._db.trades.length, 8); // the 8th trade of the day is taken
+  const t = store._db.trades[7];
+  assert.deepEqual([t.symbol, t.direction, t.status, t.data_source], ['BTCUSDT', 'SHORT', 'open', 'binance_public']);
+  // short at 101.58: stop 1% above = 102.5958, target 2% below = 99.5484
+  assert.deepEqual([t.sl_price, t.target_price], [102.5958, 99.5484]);
+  assert.ok(!store._db.skips.some((s) => /max .* trades/.test(s.reason)));
+  await bot.cryptoScan(); // still one open trade per coin
+  assert.equal(store._db.trades.length, 8);
+});
+
 test('Telegram: sent when the env vars exist, token never logged', async () => {
   const { sendTelegram } = require('../paperbot/report');
   const calls = [];
