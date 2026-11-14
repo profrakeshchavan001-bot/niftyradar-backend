@@ -1,0 +1,78 @@
+'use strict';
+// trend_smc plugin wiring (docs/BOT-INTERFACE.md, docs/BOTS.md). Auto-loaded by src/paper/pluginLoader.js - nothing in
+// paperbot/index.js or server.js needs to change for this bot to exist. Switch: PAPER_TREND_SMC_ENABLED (default on).
+const path = require('path');
+const fs = require('fs');
+const { createTrendSmcBot, MARKET } = require('./bot');
+const { createMemoryTrendSmcStore, createPgTrendSmcStore } = require('./store');
+const { loadTrendSmcConfig } = require('./config');
+const { summarise } = require('../../scalp/report');
+const { createMemoryShadowStore, createPgShadowStore } = require('../../shadow/store');
+
+// A tiny, self-contained native 15-minute Binance source (own file, not touching the shared paperbot/sources.js, which has no
+// 15m method yet): the main crypto bot and the scalp bots build their 15-minute candles from 5-minute ones (E.aggregate), but
+// trend_smc's EMA20/50(15m) trend needs 51+ real 15-minute candles, which aggregate() cannot give from a sane number of 5-minute
+// candles. Same two-host fallback as createCryptoSource.
+function create15mSource({ axios, log }) {
+  const hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
+  return {
+    async candles15(symbol, limit = 100) {
+      let lastErr;
+      for (const h of hosts) {
+        try {
+          const rows = (await axios.get(`${h}/api/v3/klines`, { params: { symbol, interval: '15m', limit }, timeout: 15000 })).data;
+          return rows.map((row) => ({ t: row[0], o: +row[1], h: +row[2], l: +row[3], c: +row[4], v: +row[5] })).filter((k) => [k.t, k.o, k.h, k.l, k.c].every(Number.isFinite));
+        } catch (e) { lastErr = e; }
+      }
+      throw lastErr;
+    },
+  };
+}
+
+module.exports = {
+  name: 'trend_smc',
+  schemaSql: path.join(__dirname, 'schema.sql'),
+  async register(ctx) {
+    const { app, cron, env, log, store: mainStore, guarded, tz, pool } = ctx;
+    const on = env.PAPER_TREND_SMC_ENABLED !== 'false';
+
+    app.get('/api/paper/trend-smc-report', async (req, res) => {
+      res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+      const secret = env.PAPER_ADMIN_SECRET || env.RENEW_SECRET;
+      if (!secret) return res.status(503).type('text').send('PAPER_ADMIN_SECRET not configured');
+      if ((req.get('x-paper-secret') || req.query.key) !== secret) return res.status(401).type('text').send('Unauthorized');
+      try {
+        const tStore = pool ? createPgTrendSmcStore(pool) : ctx.trendSmcMemoryStore;
+        if (!tStore) return res.status(503).type('text').send('trend_smc is starting');
+        const cfg = await loadTrendSmcConfig(mainStore);
+        const closed = await tStore.closedTrades();
+        const open = await tStore.allOpenTrades();
+        const skips = await tStore.skipsSince('1970-01-01');
+        const data = { paperOnly: true, enabled: on, minTrades: cfg.min_trades_for_conclusion, summary: summarise({ closed, open, skips, minTrades: cfg.min_trades_for_conclusion }), recent: await tStore.listTrades(20) };
+        return res.json(data);
+      } catch (e) {
+        return res.status(500).type('text').send('could not read trend_smc data');
+      }
+    });
+
+    if (!on) { log('[trend_smc] disabled (PAPER_TREND_SMC_ENABLED=false)'); return; }
+
+    const crypto = ctx.cachedCrypto || (() => {
+      const axios = require('axios');
+      const { createCryptoSource } = require('../../../../paperbot/sources');
+      return createCryptoSource({ axios, log });
+    })();
+    const tStore = pool ? createPgTrendSmcStore(pool) : createMemoryTrendSmcStore();
+    ctx.trendSmcMemoryStore = tStore; // so the report route (and the leaderboard) can read it even without a pool
+
+    const shadowStore = pool ? createPgShadowStore(pool) : createMemoryShadowStore();
+    if (pool) pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[trend_smc] shadow schema failed: ${e.message}`));
+
+    const axios = require('axios');
+    const crypto15 = create15mSource({ axios, log });
+    const bot = createTrendSmcBot({ store: tStore, crypto, crypto15, loadCfg: () => loadTrendSmcConfig(mainStore), shadowStore, log });
+    cron.schedule('20 */5 * * * *', guarded('trend_smc scan', bot.scan, log), tz);
+    cron.schedule('50 * * * * *', guarded('trend_smc monitor', bot.monitor, log), tz);
+    log(`[trend_smc] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/trend-smc-report)`);
+  },
+};
