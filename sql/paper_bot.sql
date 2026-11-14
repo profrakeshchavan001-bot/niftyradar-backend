@@ -73,3 +73,10 @@ CREATE TABLE IF NOT EXISTS daily_summaries (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS daily_summaries_kind_date_idx ON daily_summaries (kind, summary_date);
+
+-- Judge (docs/JUDGE.md): the score and the points of every helper are stored with each trade, so the weekly ablation report can measure which
+-- helper adds value. judge_contributions = {"r_factor": 25, "pattern": 22.5, "sector": 16, "news": 7.5, "market_trend": 10, "time": 10}.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_score         numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_take          boolean;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_contributions jsonb;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_basis         text;
