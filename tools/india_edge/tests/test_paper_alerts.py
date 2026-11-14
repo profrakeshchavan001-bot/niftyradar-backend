@@ -130,6 +130,7 @@ class LedgerTests(unittest.TestCase):
             self.assertEqual(len(L2.open_trades()), 1)
             out = L2.export_csv(Path(t) / "t.csv")
             self.assertEqual(pd.read_csv(out).iloc[0]["grade"], "A")
+            L2.close()
 
 
 class AlertTests(unittest.TestCase):
