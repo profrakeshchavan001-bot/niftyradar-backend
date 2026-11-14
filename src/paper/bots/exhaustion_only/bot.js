@@ -8,10 +8,10 @@ const { decide, evaluateExit, settle } = require('./engine');
 const MARKET = 'crypto_exhaustion_only';
 const FIVE = 5 * 60000;
 
-function createExhaustionBot({ store, crypto, loadCfg, now = Date.now, log = console.log }) {
+function createExhaustionBot({ store, crypto, loadCfg, shadowStore, now = Date.now, log = console.log }) {
   const skipSeen = new Set();
 
-  async function skip(symbol, reason) {
+  async function skip(symbol, reason, extra = {}) {
     const date = istParts(now()).date;
     const key = `${date}|${symbol}|${reason}`;
     if (skipSeen.has(key)) return;
@@ -19,6 +19,26 @@ function createExhaustionBot({ store, crypto, loadCfg, now = Date.now, log = con
     skipSeen.add(key);
     log(`[exhaustion_only] skip ${symbol}: ${reason}`);
     await store.insertSkip({ symbol, skip_date: date, reason });
+    if (extra.shadowPlan && shadowStore) {
+      await shadowStore.insertShadow({ bot: 'exhaustion_only', symbol, setup_date: date, trigger_t: extra.shadowPlan.trigger_t, direction: extra.shadowPlan.direction, entry_price: extra.shadowPlan.entry_price, sl_price: extra.shadowPlan.sl_price, target_price: extra.shadowPlan.target_price, skip_reason: reason });
+    }
+  }
+
+  async function resolveShadows() {
+    if (!shadowStore) return { checked: 0, resolved: 0 };
+    const open = await shadowStore.openShadows('exhaustion_only');
+    if (!open.length) return { checked: 0, resolved: 0 };
+    let resolved = 0;
+    for (const sh of open) {
+      let c5;
+      try { c5 = await crypto.candles(sh.symbol); } catch (e) { log(`[exhaustion_only] shadow candles for ${sh.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const ev = evaluateExit({ trade: sh, candles: closedOnly(c5, FIVE, now()) });
+      if (!ev.exit) continue;
+      await shadowStore.resolveShadow(sh.id, { resolved_reason: ev.reason, resolved_price: ev.price, resolved_time: new Date(ev.timeMs).toISOString() });
+      log(`[exhaustion_only] shadow resolved ${sh.symbol}: ${ev.reason} @ ${ev.price} (would-be, never a trade)`);
+      resolved += 1;
+    }
+    return { checked: open.length, resolved };
   }
 
   async function scan() {
@@ -35,7 +55,7 @@ function createExhaustionBot({ store, crypto, loadCfg, now = Date.now, log = con
       const closed5 = closedOnly(c5, FIVE, now());
       const ctx5 = buildContext(closed5, istDayStart(now()));
       const d = decide(closed5, { vwap: ctx5.vwap, c1h: closedOnly(c1h, 3600000, now()), nowMs: now(), cfg });
-      if (!d.take) { if (!d.quiet) await skip(symbol, d.reason); continue; }
+      if (!d.take) { if (!d.quiet) await skip(symbol, d.reason, d.extra || {}); continue; }
       if (today.some((t) => t.symbol === symbol && t.trigger_t === d.trigger_t)) continue; // this candle was already traded
       const stopPct = Math.abs(d.entry - d.stop) / d.entry * 100;
       const size = sizeCrypto({ capital: cfg.capital_usdt, riskPct: cfg.risk_pct, stopPct, freeCash, price: d.entry, coins: cfg.symbols.length });
@@ -56,7 +76,7 @@ function createExhaustionBot({ store, crypto, loadCfg, now = Date.now, log = con
   async function monitor() {
     const cfg = await loadCfg();
     const open = await store.allOpenTrades();
-    if (!open.length) return { checked: 0, closed: 0 };
+    if (!open.length) { await resolveShadows(); return { checked: 0, closed: 0 }; }
     let closed = 0;
     for (const t of open) {
       let c5;
@@ -69,6 +89,7 @@ function createExhaustionBot({ store, crypto, loadCfg, now = Date.now, log = con
       log(`[exhaustion_only] PAPER exit ${t.symbol}: ${ev.reason}, gross ${s.gross_pnl_usdt} net ${s.net_pnl_usdt} USDT (Rs ${s.pnl_inr})`);
       closed += 1;
     }
+    await resolveShadows();
     return { checked: open.length, closed };
   }
 

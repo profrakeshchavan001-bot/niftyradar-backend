@@ -2,10 +2,12 @@
 // exhaustion_only plugin wiring (docs/BOT-INTERFACE.md, docs/BOTS.md). Auto-loaded by src/paper/pluginLoader.js - nothing in
 // paperbot/index.js or server.js needs to change for this bot to exist. Switch: PAPER_EXHAUSTION_ENABLED (default on).
 const path = require('path');
+const fs = require('fs');
 const { createExhaustionBot, MARKET } = require('./bot');
 const { createMemoryExhaustionStore, createPgExhaustionStore } = require('./store');
 const { loadExhaustionConfig } = require('./config');
 const { summarise } = require('../../scalp/report');
+const { createMemoryShadowStore, createPgShadowStore } = require('../../shadow/store');
 
 module.exports = {
   name: 'exhaustion_only',
@@ -46,7 +48,10 @@ module.exports = {
     const eStore = pool ? createPgExhaustionStore(pool) : createMemoryExhaustionStore();
     ctx.exhaustionMemoryStore = eStore; // so the report route above can read it even without a pool
 
-    const bot = createExhaustionBot({ store: eStore, crypto, loadCfg: () => loadExhaustionConfig(mainStore), log });
+    const shadowStore = pool ? createPgShadowStore(pool) : createMemoryShadowStore();
+    if (pool) pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[exhaustion_only] shadow schema failed: ${e.message}`));
+
+    const bot = createExhaustionBot({ store: eStore, crypto, loadCfg: () => loadExhaustionConfig(mainStore), shadowStore, log });
     cron.schedule('15 */5 * * * *', guarded('exhaustion_only scan', bot.scan, log), tz);
     cron.schedule('45 * * * * *', guarded('exhaustion_only monitor', bot.monitor, log), tz);
     log(`[exhaustion_only] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/exhaustion-report)`);
