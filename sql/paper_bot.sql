@@ -104,3 +104,13 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS legacy_target  numeric;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS legacy_stop    numeric;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS legacy_result  text;
 
+-- Scalp strategy (docs/SCALP.md, src/paper/scalp/). Every trade carries its strategy; old rows are 'intraday'. Scalp trades use their own market key
+-- ('crypto_scalp', later 'nse_scalp') so the intraday monitor, the intraday report and the judge never see them.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS strategy       text NOT NULL DEFAULT 'intraday';
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS gross_pnl_usdt numeric;  -- before fees and slippage
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS net_pnl_usdt   numeric;  -- after fees and slippage (pnl_inr is this, in rupees)
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS cost_usdt      numeric;  -- fees + slippage
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS gross_pnl_inr  numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS be_moved       boolean;  -- the stop was moved to breakeven
+ALTER TABLE paper_trades DROP CONSTRAINT IF EXISTS paper_trades_market_check;
+ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp'));
