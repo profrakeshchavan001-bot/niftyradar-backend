@@ -11,6 +11,7 @@ const { createBot } = require('../paperbot/bot');
 const { createMemoryStore } = require('../paperbot/store');
 const { createReporter } = require('../paperbot/report');
 const { loadConfig } = require('../paperbot/config');
+const CS = require('./fixtures/cryptoScenario');
 
 const fx = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'paper_replay.json'), 'utf8'));
 const MIN = 60000;
@@ -167,13 +168,14 @@ test('wake after sleep: stale data is refused, missed candles are not replayed, 
   assert.equal(onTime.store._db.trades.length, 1);
 });
 
-test('replay crypto: exhaustion reversal down -> SHORT -> stop, P&L in INR; then summary', async () => {
-  const trigger = fx.crypto.candles[39]; // red candle O 101.88 C 101.58, closes 09:20 IST
-  const clock = { t: trigger.t + FIVE + 25000 };
+test('replay crypto: exhaustion reversal down -> SHORT -> stop at the level-based stop, P&L in INR; then summary', async () => {
+  // candles and hand-worked numbers: test/fixtures/cryptoScenario.js (entry 102.18, stop 103.12, target 99.099)
+  const candles = CS.build();
+  const clock = { t: CS.scanTime(candles) };
   const store = createMemoryStore();
-  let price = 101.6;
+  let price = 102.2;
   const crypto = {
-    candles: async (s) => (s === 'BTCUSDT' ? fx.crypto.candles.filter((k) => k.t <= clock.t) : []),
+    candles: async (s) => (s === 'BTCUSDT' ? candles.filter((k) => k.t <= clock.t) : []),
     price: async () => price,
     usdtInr: async () => ({ rate: 88, source: 'test' }),
   };
@@ -185,22 +187,22 @@ test('replay crypto: exhaustion reversal down -> SHORT -> stop, P&L in INR; then
   assert.equal(t.market, 'crypto');
   assert.equal(t.direction, 'SHORT');
   assert.ok(t.patterns.includes('exhaustion_reversal'));
-  assert.equal(t.entry_price, 101.58);
+  assert.equal(t.entry_price, 102.18);
   assert.ok(t.r_factor >= 1);
   assert.match(t.basis, /Went SHORT on BTCUSDT because its momentum score was/);
-  // notional = min(2000, 1000/3, 1000) = 333.33 USDT
-  assert.ok(Math.abs(t.qty * 101.58 - 333.3333) < 0.001);
+  // notional = min(risk-based 2174, 1000/3, 1000) = 333.33 USDT
+  assert.ok(Math.abs(t.qty * 102.18 - 333.3333) < 0.001);
 
   clock.t += 30000;
-  await bot.cryptoMonitor(); // 101.6 = -0.02% for a short: stays open
+  await bot.cryptoMonitor(); // 102.2 is under the stop 103.12: stays open
   assert.equal(store._db.trades[0].status, 'open');
-  price = 102.7; // +1.1026% against the short: stop
+  price = 103.2; // above the stop 103.12 (pattern high 102.52 + ATR 0.6)
   clock.t += MIN;
   await bot.cryptoMonitor();
   const c = store._db.trades[0];
   assert.equal(c.exit_reason, 'stop');
-  // loss = 333.3333 x 1.12 / 101.58 = 3.675264 USDT x 88 = Rs 323.42
-  assert.equal(c.pnl_inr, -323.42);
+  // loss = (103.2 - 102.18) x 333.3333 / 102.18 = 3.327461 USDT x 88 = Rs 292.82
+  assert.equal(c.pnl_inr, -292.82);
   assert.equal(c.fx_rate, 88);
 
   // end-of-day summary: no Telegram env -> stored in daily_summaries
@@ -212,17 +214,16 @@ test('replay crypto: exhaustion reversal down -> SHORT -> stop, P&L in INR; then
   assert.equal(saved.summary_date, '2026-11-13');
   assert.match(saved.body, /PAPER bot \(demo, no real money\)/);
   assert.match(saved.body, /BTCUSDT SHORT/);
-  assert.match(saved.body, /exit: stop · P&L Rs -323/);
-  assert.match(saved.body, /Day total: 1 trades, 0 wins, P&L Rs -323/);
-  assert.match(saved.body, /exhaustion_reversal: 1 trades, win 0%, avg Rs -323 \(fewer than 20 trades, no conclusion\)/);
+  assert.match(saved.body, /exit: stop · P&L Rs -293/);
+  assert.match(saved.body, /Day total: 1 trades, 0 wins, P&L Rs -293/);
+  assert.match(saved.body, /exhaustion_reversal: 1 trades, win 0%, avg Rs -293 \(fewer than 20 trades, no conclusion\)/);
   const w = await reporter.weekly();
   assert.match(w.text, /Too few trades, no conclusion/);
 });
 
 test('crypto: no daily trade limit (one open trade per coin stays)', async () => {
-  const FIVE_MS = 5 * 60000;
-  const trigger = fx.crypto.candles[39];
-  const clock = { t: trigger.t + FIVE_MS + 25000 };
+  const candles = CS.build();
+  const clock = { t: CS.scanTime(candles) };
   const store = createMemoryStore();
   await store.setConfigIfMissing('crypto', { max_trades_per_day: 0 }); // an old stored limit is ignored
   // seven closed trades already taken today (more than the old limit of 6)
@@ -230,14 +231,14 @@ test('crypto: no daily trade limit (one open trade per coin stays)', async () =>
     const id = await store.insertTrade({ market: 'crypto', symbol: 'BTCUSDT', trade_date: '2026-11-13', trigger_t: i, patterns: [], qty: 1, entry_price: 100, basis: 'b' });
     await store.updateTrade(id, { status: 'closed', pnl_inr: 1 });
   }
-  const crypto = { candles: async (s) => (s === 'BTCUSDT' ? fx.crypto.candles.filter((k) => k.t <= clock.t) : []), price: async () => 101.6, usdtInr: async () => ({ rate: 88, source: 'test' }) };
+  const crypto = { candles: async (s) => (s === 'BTCUSDT' ? candles.filter((k) => k.t <= clock.t) : []), price: async () => 102.2, usdtInr: async () => ({ rate: 88, source: 'test' }) };
   const bot = createBot({ store, nse: null, crypto, now: () => clock.t, log: () => {} });
   await bot.cryptoScan();
   assert.equal(store._db.trades.length, 8); // the 8th trade of the day is taken
   const t = store._db.trades[7];
   assert.deepEqual([t.symbol, t.direction, t.status, t.data_source], ['BTCUSDT', 'SHORT', 'open', 'binance_public']);
-  // short at 101.58: stop 1% above = 102.5958, target 2% below = 99.5484
-  assert.deepEqual([t.sl_price, t.target_price], [102.5958, 99.5484]);
+  // short at 102.18: stop = pattern high 102.52 + ATR 0.6, target = 0.1% before the swing low 99 (test/fixtures/cryptoScenario.js)
+  assert.deepEqual([t.sl_price, t.target_price], [103.12, 99.099]);
   assert.ok(!store._db.skips.some((s) => /max .* trades/.test(s.reason)));
   await bot.cryptoScan(); // still one open trade per coin
   assert.equal(store._db.trades.length, 8);

@@ -25,8 +25,12 @@ const DEFAULTS = {
   },
   crypto: {
     symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
-    target_pct: 2, // on the underlying
+    // Exits come from price levels (paperbot/cryptoLevels.js): target = nearest support / resistance, stop = beyond the pattern + ATR.
+    levels: { minRr: 1.5, targetBufferPct: 0.1, atrStopMult: 1, look: 60, impulse: 2 }, // min reward/risk, exit 0.1% before the level, stop = 1 x ATR14 (15-min) beyond
+    breakeven_at: 0.5, // stop moves to the entry once this share of the way to the target is covered
+    target_pct: 2, // OLD fixed rule, kept only for the A/B columns legacy_target / legacy_stop / legacy_result; never used for an exit
     stop_pct: 1,
+    legacy_max_hours: 48, // the old rule's outcome is followed this long after the entry, then marked undecided
     capital_usdt: 1000,
     risk_pct: 2,
     min_momentum_score: 1,

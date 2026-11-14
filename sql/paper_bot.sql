@@ -91,3 +91,16 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS sl_price     numeric;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS target_price numeric;
 ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS data_source    text;
 ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS data_delay_sec numeric;
+
+-- Crypto level-based exits. sl_price / target_price = the levels set at entry; stop_active = the stop in force now
+-- (moves to the entry price at breakeven); target_type / stop_type say what the level is (for example "swing low 1h at 3012.5").
+-- legacy_* = the old fixed +2% / -1% rule, followed in parallel for comparison only, never used for an exit.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS stop_active    numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS breakeven_time timestamptz;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS target_type    text;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS stop_type      text;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS rr             numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS legacy_target  numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS legacy_stop    numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS legacy_result  text;
+

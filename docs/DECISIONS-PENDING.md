@@ -103,3 +103,23 @@ Points that were unclear. For each one the safest default was taken and the work
 | U16 | Old chart candles | Yahoo and Dhan 5-minute history is short. | For a trade older than the feed's history the chart shows only the candles stored with the trade, and says so. | None. |
 | U17 | "Use Sonnet" / Actions | As before. | Session's configured model; no CI minutes; tests run locally; merge commit carries `[skip ci]`. | None. |
 
+## Follow-up (crypto: level-based target and stop, breakeven, old rule kept for A/B)
+
+| # | Topic | What was unclear | Default taken | Needs from owner |
+|---|---|---|---|---|
+| V1 | "Same as NSE" | NSE exits are still fixed on the option price (+10 % / -5 %); only its ranking uses levels. | Level-based exits were built for crypto only, as the 7 points describe. NSE exits are unchanged. | Say if NSE should exit on levels too. |
+| V2 | Which level is the target | Several kinds of level were listed. | All of them go in one list; the NEAREST one beyond the entry is the target, whatever its kind. A very near level usually fails the 1.5 reward/risk test, so the setup is skipped and logged. | Say if near levels should be ignored (for example closer than 1 x ATR) so the next one is used. |
+| V3 | No level found | Not said. | No trade; skip reason "no support / resistance level found". No made-up target. | Or allow a 2 x ATR target as a fallback. |
+| V4 | Stop: "pattern high/low or nearest swing" | Which of the two. | The pattern's own high / low is used; the nearest 15-minute swing only when the pattern gives no level on the stop side. Then + 1 x ATR14 (15-minute). | OK or choose "whichever is farther". |
+| V5 | Day and week for crypto | Crypto has no session. | UTC day and UTC week (Monday to Sunday), read from 1-hour candles (about 16 days, one extra free request per coin only when a setup is being planned). If that read fails, 1-hour levels come from the 5-minute candles (about 27 hours) and the log says so. | None. |
+| V6 | Order block / FVG as a target | Edge to use. | The edge the price meets first (support: top of the zone; resistance: bottom). Only gaps no later candle has filled; last 60 five-minute candles. | None. |
+| V7 | Exit price | Checks run once a minute on the last price. | Exit is booked at the price seen at the check, so it can be a little past the level (a breakeven stop can show a small loss or gain). A wick between two checks is not seen. | Say if candle highs / lows should trigger exits too. |
+| V8 | Position size | Size used the fixed 1 % stop. | Size now uses the real stop distance: capital x 2 % / stop distance %, still capped at one third of the balance per coin. | None. |
+| V9 | Old rule "in parallel" | How long to follow it. | Same entry, checked at the same minute checks, also after the real trade has closed, until its target or stop is hit; after 48 hours `undecided after 48 h`. If the server sleeps, a hit in between can be missed, same as for the real exits. | None. |
+| V10 | Trades already open | Opened under the fixed rule, no levels stored. | They finish on the fixed +2 % / -1 % rule they were opened with. | None. |
+| V11 | Best / worst % "every scan" | Earlier it was kept in memory until the close (no polling rule). | Written at every 5-minute scan, only when the value changed: at most one small write per open trade per scan. NSE too. | None. |
+| V12 | New columns | Needed for the levels and the A/B. | Eight idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` lines (run by the bot on first connect). | None. |
+| V13 | Weekly report | Its "thresholds" part still reads the fixed crypto %. | Left as is; for crypto compare with the SQL in `docs/PAPER-BOT.md` instead. | Say if the weekly report should include the A/B table. |
+| V14 | Not tried for real | Binance cannot be reached from the build machine. | Tests use hand-built candles (`test/fixtures/cryptoScenario.js`) with hand-worked numbers. The live 1-hour read is untested. | Send Claude a Render log line with `PAPER entry crypto` or `1-hour candles ... failed` once one appears. |
+| V15 | "Use Sonnet" / Actions | As before. | Session's configured model; no CI minutes; tests run locally; merge commit carries `[skip ci]`. | None. |
+

@@ -247,6 +247,11 @@ function createCryptoSource({ axios, log = console.log, now = Date.now, hosts = 
       const rows = await get('/api/v3/klines', { symbol, interval: '5m', limit, ...(range ? { startTime: range.startMs, endTime: range.endMs } : {}) });
       return rows.map((r) => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] })).filter((k) => [k.t, k.o, k.h, k.l, k.c].every(Number.isFinite));
     },
+    // 1-hour candles (about 16 days): 1-hour swings and the previous day / week high and low.
+    async hourly(symbol, limit = 400) {
+      const rows = await get('/api/v3/klines', { symbol, interval: '1h', limit });
+      return rows.map((r) => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] })).filter((k) => [k.t, k.o, k.h, k.l, k.c].every(Number.isFinite));
+    },
     async price(symbol) {
       const p = +(await get('/api/v3/ticker/price', { symbol })).price;
       return p > 0 ? p : null;

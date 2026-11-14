@@ -6,6 +6,7 @@
 const P = require('./patterns');
 const E = require('./engine');
 const R = require('./rfactor');
+const L = require('./cryptoLevels');
 const { loadConfig } = require('./config');
 const { newsCheck, FIVE_MIN } = require('./sources');
 const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
@@ -119,6 +120,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     const top = await rankNse(quotes, n, cfg);
     const today = await store.tradesForDay('nse', p.date);
     const open = await store.openTrades('nse');
+    for (const t of open) await persistExcursion(t, t.max_fav_pct || 0, t.max_adv_pct || 0); // every scan: best / worst % so far goes to the database
     let taken = today.length;
     let freeCash = n.capital_inr - open.reduce((s, t) => s + t.entry_price * t.qty, 0);
     const entered = [];
@@ -189,6 +191,17 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     log(`[paperbot] PAPER exit ${t.market} ${t.symbol}: ${reason}, P&L Rs ${P.round(pnlInr, 2)}`);
   }
 
+  // Best / worst % of an open trade, written to the database at every scan (only when it changed).
+  const persisted = new Map(); // trade id -> "fav|adv" last written
+  async function persistExcursion(t, fav, adv) {
+    const f = P.round(Math.max(t.max_fav_pct || 0, fav), 2);
+    const a = P.round(Math.min(t.max_adv_pct || 0, adv), 2);
+    const key = `${f}|${a}`;
+    if (persisted.get(t.id) === key) return; // unchanged since the last write
+    persisted.set(t.id, key);
+    await store.updateTrade(t.id, { max_fav_pct: f, max_adv_pct: a });
+  }
+
   async function track(t, pct) {
     if (pct > (t.max_fav_pct || 0) || pct < (t.max_adv_pct || 0)) {
       // best / worst % so far: kept in memory, written to the database only when the trade closes
@@ -247,6 +260,16 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
         log(`[paperbot] crypto candles for ${symbol} failed: ${e.response?.status || e.message}`);
       }
     }
+    // Every scan: best / worst % of each open trade from the candles since its entry (highs and lows, not only closes).
+    for (const t of open) {
+      const s = scored.find((x) => x.symbol === t.symbol);
+      const since = s ? E.closedOnly(s.raw, FIVE_MIN, now()).filter((k) => k.t + FIVE_MIN > Date.parse(t.entry_time)) : [];
+      if (!since.length) continue;
+      const short = t.direction === 'SHORT';
+      const hi = E.changePct(t.entry_price, Math.max(...since.map((k) => k.h)), short);
+      const lo = E.changePct(t.entry_price, Math.min(...since.map((k) => k.l)), short);
+      await persistExcursion(t, Math.max(hi, lo), Math.min(hi, lo));
+    }
     scored.sort((a, b) => (b.m?.score || 0) - (a.m?.score || 0));
     const entered = [];
     for (const s of scored) {
@@ -258,40 +281,90 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       if (score == null || score < c.min_momentum_score) { await skip('crypto', s.symbol, `momentum score ${score} is below ${c.min_momentum_score}`, a.extra); continue; }
       const dir = a.decision.direction;
       const price = a.ctx.price;
-      const size = E.sizeCrypto({ capital: c.capital_usdt, riskPct: c.risk_pct, stopPct: c.stop_pct, freeCash, price, coins: c.symbols.length });
+      // Target and stop from price levels; a trade needs reward / risk of at least levels.minRr.
+      let c1h = [];
+      try { if (typeof crypto.hourly === 'function') c1h = E.closedOnly(await crypto.hourly(s.symbol), 12 * FIVE_MIN, now()); } catch (e) { log(`[paperbot] 1-hour candles for ${s.symbol} failed (${e.response?.status || e.message}); 1-hour levels come from the 5-min candles only`); }
+      if (!c1h.length) c1h = E.aggregate(a.c5, FIVE_MIN, 12 * FIVE_MIN);
+      const planned = L.planTrade({ entry: price, direction: dir, patterns: a.decision.patterns, c5: a.c5, c15: E.aggregate(a.c5), c1h, nowMs: now(), opt: c.levels });
+      if (!planned.ok) { await skip('crypto', s.symbol, planned.reason, a.extra); continue; }
+      const plan = planned.plan;
+      const size = E.sizeCrypto({ capital: c.capital_usdt, riskPct: c.risk_pct, stopPct: plan.riskPct, freeCash, price, coins: c.symbols.length });
       if (!size) { await skip('crypto', s.symbol, 'no free virtual USDT balance', a.extra); continue; }
+      const legacy = L.legacyLevels({ entry: price, short: dir !== 'up', targetPct: c.target_pct, stopPct: c.stop_pct });
+      const targetType = `${plan.targetType} at ${plan.targetLevel}`;
+      const stopType = `${plan.stopType} (${plan.stopBase} ${dir === 'up' ? '-' : '+'} ${plan.atr15})`;
       const row = {
         ...tradeRow('crypto', s.symbol, score, `momentum_score_v1 (vol x${s.m.volumeSpike}, range x${s.m.rangeExpansion}, trend ${s.m.trendStrength})`, a, 'not applied to crypto'),
         direction: dir === 'up' ? 'LONG' : 'SHORT', instrument: `${s.symbol} spot (paper)`, simulated_option: false,
         price_source: 'binance_public_5m_close', candle_source: 'binance_public_klines_5m', data_source: 'binance_public', data_delay_sec: delaySecOf(a.last),
         qty: size.qty, entry_price: price, entry_underlying: price,
-        sl_price: P.round(price * (1 + (dir === 'up' ? -1 : 1) * c.stop_pct / 100), 6), target_price: P.round(price * (1 + (dir === 'up' ? 1 : -1) * c.target_pct / 100), 6),
-        basis: E.basisSentence({ market: 'crypto', symbol: s.symbol, score, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: 'not applied to crypto', simulated: false }),
+        sl_price: plan.stop, target_price: plan.target, stop_active: plan.stop, target_type: targetType, stop_type: stopType, rr: plan.rr,
+        legacy_target: legacy.target, legacy_stop: legacy.stop, legacy_result: null, r_detail: { plan },
+        basis: `${E.basisSentence({ market: 'crypto', symbol: s.symbol, score, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: 'not applied to crypto', simulated: false })}`
+          + ` Target ${plan.target}: ${c.levels.targetBufferPct}% before the ${targetType}. Stop ${plan.stop}: ${stopType}. Reward/risk ${plan.rr}. Stop moves to the entry after ${Math.round(c.breakeven_at * 100)}% of the way to the target.`,
       };
-      await store.insertTrade(row);
-      log(`[paperbot] PAPER entry crypto ${s.symbol} ${row.direction} @ ${price}: ${row.patterns.join(', ')}`);
+      const id = await store.insertTrade(row);
+      if (legacyWatch) legacyWatch.set(id, { ...row, id });
+      log(`[paperbot] PAPER entry crypto ${s.symbol} ${row.direction} @ ${price}: ${row.patterns.join(', ')} · target ${plan.target} (${targetType}), stop ${plan.stop}, reward/risk ${plan.rr}`);
       freeCash -= size.value;
       entered.push(s.symbol);
     }
     return { ran: true, entered };
   }
 
+  // Trades whose old fixed-rule outcome (legacy_result) is not decided yet, open or already closed.
+  // Read from the store once, then kept in memory.
+  let legacyWatch = null;
+  async function legacyPending() {
+    if (!legacyWatch) {
+      legacyWatch = new Map();
+      for (const t of await store.legacyPending('crypto')) legacyWatch.set(t.id, t);
+    }
+    return legacyWatch;
+  }
+
   async function cryptoMonitor() {
     const open = await store.openTrades('crypto');
-    if (!open.length) return { checked: 0 };
+    const watch = await legacyPending();
+    if (!open.length && !watch.size) return { checked: 0 };
     const c = (await loadConfig(store)).crypto;
+    const prices = new Map(); // one price read per coin per check
+    for (const symbol of new Set([...open, ...watch.values()].map((t) => t.symbol))) {
+      try { prices.set(symbol, await crypto.price(symbol)); } catch (e) { log(`[paperbot] crypto price for ${symbol} failed: ${e.response?.status || e.message}`); }
+    }
     let closed = 0;
     for (const t of open) {
-      let price;
-      try { price = await crypto.price(t.symbol); } catch (e) { log(`[paperbot] crypto price for ${t.symbol} failed: ${e.response?.status || e.message}`); }
+      const price = prices.get(t.symbol);
       if (!price) continue;
       const short = t.direction === 'SHORT';
-      const r = E.evaluateExit({ entry: t.entry_price, current: price, targetPct: c.target_pct, stopPct: c.stop_pct, short });
-      if (!r.exit) { await track(t, r.pct); continue; }
+      const pct = E.changePct(t.entry_price, price, short);
+      let reason = null;
+      if (t.target_price == null || t.stop_active == null) {
+        // a trade opened before level-based exits existed: it finishes on the fixed rule it was opened with
+        const r = E.evaluateExit({ entry: t.entry_price, current: price, targetPct: c.target_pct, stopPct: c.stop_pct, short });
+        if (r.exit) reason = r.reason;
+      } else {
+        const m = L.manageTrade({ entry: t.entry_price, target: t.target_price, stop: t.stop_active, short, price, breakevenDone: !!t.breakeven_time, breakevenAt: c.breakeven_at });
+        if (m.action === 'exit') reason = m.reason;
+        if (m.action === 'breakeven') {
+          await store.updateTrade(t.id, { stop_active: t.entry_price, breakeven_time: new Date(now()).toISOString() });
+          log(`[paperbot] PAPER crypto ${t.symbol}: ${Math.round(c.breakeven_at * 100)}% of the way to the target covered at ${price}, stop moved to the entry ${t.entry_price}`);
+        }
+      }
+      if (!reason) { await track(t, pct); continue; }
       const fx = await crypto.usdtInr(c.usdt_inr_fallback);
       const pnlUsdt = (price - t.entry_price) * t.qty * (short ? -1 : 1);
-      await closeTrade(t, price, price, r.reason, pnlUsdt * fx.rate, r.pct, { fx_rate: fx.rate, fx_source: fx.source });
+      await closeTrade(t, price, price, reason, pnlUsdt * fx.rate, pct, { fx_rate: fx.rate, fx_source: fx.source });
       closed += 1;
+    }
+    // A/B only: what the old fixed +target% / -stop% rule would have done with the same entry. Never used for an exit.
+    for (const t of [...watch.values()]) {
+      const price = prices.get(t.symbol);
+      let result = price ? L.legacyOutcome({ target: t.legacy_target, stop: t.legacy_stop, short: t.direction === 'SHORT', price }) : null;
+      if (!result && now() - Date.parse(t.entry_time) > c.legacy_max_hours * 3600000) result = `undecided after ${c.legacy_max_hours} h`;
+      if (!result) continue;
+      await store.updateTrade(t.id, { legacy_result: result });
+      watch.delete(t.id);
     }
     return { checked: open.length, closed };
   }
