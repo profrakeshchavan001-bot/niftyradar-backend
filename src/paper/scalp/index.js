@@ -27,8 +27,10 @@ function attachScalp({ app, cron, axios, env = process.env, log = console.log, s
   const tz = { timezone: 'Asia/Kolkata' };
   cron.schedule('5 * * * * *', guarded('scalp scan', bot.cryptoScalpScan, log), tz);
   cron.schedule('35 * * * * *', guarded('scalp monitor', bot.cryptoScalpMonitor, log), tz);
+  cron.schedule('10 */5 * * * *', guarded('scalp_wide scan', bot.cryptoScalpWideScan, log), tz);
+  cron.schedule('40 * * * * *', guarded('scalp_wide monitor', bot.cryptoScalpWideMonitor, log), tz);
   bot.nseScalpScan(); // logs once why NSE scalp does not run
-  log('[scalp] ready (PAPER ONLY, crypto 1-minute scalps; report: /api/paper/scalp-report)');
+  log('[scalp] ready (PAPER ONLY, crypto 1-minute scalps + 5-minute scalp_wide; report: /api/paper/scalp-report)');
   return { enabled: true, bot };
 }
 

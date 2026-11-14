@@ -117,4 +117,75 @@ function settle({ trade, exitPrice, cfg, fxRate }) {
   return { gross_pnl_usdt: r(gross, 6), cost_usdt: r(cost, 6), net_pnl_usdt: r(net, 6), gross_pnl_inr: r(gross * fxRate, 2), pnl_inr: r(net * fxRate, 2) };
 }
 
-module.exports = { analyse, evaluateExit, settle };
+// scalp_wide entry: same shape as analyse(), but on closed 5-minute candles with the 15-minute candles as trend (native c15raw, else built from c5).
+// Target must be the nearest opposite level, and that level must be at least cfg.target_min_pct AND at least 1 x ATR14(5m) away (whichever is larger) -
+// otherwise there is no room and the setup is skipped. Stop: beyond the pattern candle + atr_mult x ATR14(5m). Reward/risk after costs >= cfg.min_rr.
+function analyseWide({ c5raw, c15raw, now, cfg, dayStartMs }) {
+  const FIVE = 5 * MIN; const FIFTEEN = 15 * MIN;
+  const c5 = E.closedOnly(c5raw, FIVE, now);
+  if (c5.length < cfg.min_candles_5m) return { ok: false, reason: `not enough 5-min candles yet (need ${cfg.min_candles_5m})` };
+  const last = c5[c5.length - 1];
+  if (now - (last.t + FIVE) > cfg.max_candle_age_min * MIN) return { ok: false, reason: 'no fresh 5-min candle (feed stale)' };
+  const c15raw2 = c15raw && c15raw.length ? c15raw : E.aggregate(c5);
+  const c15 = E.closedOnly(c15raw2, FIFTEEN, now);
+  if (c15.length < cfg.min_candles_15m) return { ok: false, reason: `not enough 15-min candles yet (need ${cfg.min_candles_15m})` };
+
+  const ctx15 = E.buildContext(c5, dayStartMs, c15);
+  const trend15 = P.trendOf(c15, 20);
+  const ctx = { vwap: ctx15.vwap };
+  const hits = [P.exhaustionReversal(c5, ctx), P.engulfing(c5, ctx), P.hammer(c5, ctx), P.shootingStar(c5, ctx), P.liquiditySweep(c5, { swing: cfg.pattern_swing })].filter(Boolean);
+  if (!hits.length) return { ok: false, quiet: true, reason: 'no setup' };
+  const names = hits.map((h) => h.name);
+  const extra = { patterns: names, trigger_t: last.t, trend_state: { ...ctx15, trend15 } };
+
+  // must agree with the 15-minute trend or the VWAP side; the exhaustion reversal is exempt
+  const agree = hits.filter((h) => h.kind === 'reversal' || trend15 === h.direction || ctx15.vwapSide === h.direction);
+  if (!agree.length) return { ok: false, extra, reason: `pattern ${hits.map((h) => `${h.name} (${h.direction})`).join(', ')} is against the 15-min trend (${trend15}) and the VWAP side (${ctx15.vwapSide})` };
+  if (new Set(agree.map((h) => h.direction)).size > 1) return { ok: false, extra, reason: `patterns disagree: ${agree.map((h) => `${h.name} (${h.direction})`).join(', ')}` };
+  const long = agree[0].direction === 'up';
+  const entry = last.c;
+
+  // stop: beyond the pattern candle + atr_mult x ATR14(5m), never wider than the cap
+  const atr = P.atr(c5, cfg.atr_n);
+  if (!(atr > 0)) return { ok: false, extra, reason: 'ATR of the 5-min candles is not available' };
+  const atrPct = atr / entry * 100;
+  const used = agree.flatMap((h) => h.candles);
+  const extreme = long ? Math.min(...used.map((k) => k.l)) : Math.max(...used.map((k) => k.h));
+  const rawStopPct = (Math.abs(long ? entry - extreme : extreme - entry) + cfg.atr_mult * atr) / entry * 100;
+  const stopPct = Math.max(cfg.min_stop_pct, Math.min(rawStopPct, cfg.stop_cap_pct));
+
+  // target: nearest opposite level (5-min swing highs/lows, today's high/low); it must be at least target_min_pct AND 1 x ATR away, whichever is larger
+  const sw = R.swingLevels(c5, 2, 60);
+  const today = c5.filter((k) => k.t >= dayStartMs);
+  const above = [...sw.highs, ...(today.length ? [Math.max(...today.map((k) => k.h))] : [])].filter((x) => x > entry * 1.0001);
+  const below = [...sw.lows, ...(today.length ? [Math.min(...today.map((k) => k.l))] : [])].filter((x) => x < entry * 0.9999);
+  const level = long ? (above.length ? Math.min(...above) : null) : (below.length ? Math.max(...below) : null);
+  if (level == null) return { ok: false, extra, reason: `no ${long ? 'resistance' : 'support'} level in the way; scalp_wide needs one to target` };
+  const levelPct = Math.abs(level - entry) / entry * 100;
+  const required = Math.max(cfg.target_min_pct, atrPct);
+  if (levelPct < required) {
+    return { ok: false, extra, reason: `nearest ${long ? 'resistance' : 'support'} ${r(level, 4)} is only ${r(levelPct, 2)}% away, below the ${r(required, 2)}% needed (${cfg.target_min_pct}% minimum, or 1 x ATR ${r(atrPct, 2)}%, whichever is larger)` };
+  }
+  const targetPct = levelPct; // the target IS the level (no margin held back, unlike the tight scalp); rounded only for display below
+
+  // reward / risk after costs
+  const costs = costPct(cfg);
+  const rewardNet = targetPct - costs;
+  const riskNet = stopPct + costs;
+  const rr = rewardNet / riskNet;
+  if (!(rewardNet > 0) || rr < cfg.min_rr) {
+    return { ok: false, extra: { ...extra, r_factor: r(rr, 2) }, reason: `reward/risk ${r(rr, 2)} after costs is below ${cfg.min_rr} (target ${r(targetPct, 2)}%, stop ${r(stopPct, 2)}%, costs ${r(costs, 2)}% round trip)` };
+  }
+  const sgn = long ? 1 : -1;
+  return {
+    ok: true,
+    plan: {
+      direction: agree[0].direction, long, hits: agree, entry, atr, trend15, ctx15, last,
+      stopPct: r(stopPct, 4), targetPct: r(targetPct, 4), costPct: r(costs, 4), rr: r(rr, 2), rewardNetPct: r(rewardNet, 4), riskNetPct: r(riskNet, 4),
+      stopPrice: r(entry * (1 - sgn * stopPct / 100), 6), targetPrice: r(entry * (1 + sgn * targetPct / 100), 6),
+      level: { price: r(level, 6), pct: r(levelPct, 4) },
+    },
+  };
+}
+
+module.exports = { analyse, analyseWide, evaluateExit, settle };
