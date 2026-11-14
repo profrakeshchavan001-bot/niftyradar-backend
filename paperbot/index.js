@@ -14,10 +14,11 @@ const { buildReport, chartData } = require('./reportPage');
 const { loadUniverse } = require('./yahoo');
 const { loadConfig, DEFAULTS, merge } = require('./config');
 const { istParts, nseSession } = require('./time');
-const { defaultTracker, attachHealthRoute } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
+const { defaultTracker, attachHealthRoute, JOB_NAMES, STALE_MS } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
 const { newsScore, eventBlock } = require('../src/paper/context/news');
 const { attachNewsCheckRoute } = require('../src/paper/context/newsCheck'); // GET /api/paper/news-check
 const { attachHomeRoute } = require('../src/paper/ops/home'); // GET /api/paper/home
+const { attachCsvRoute } = require('../src/paper/ops/csvExport'); // GET /api/paper/export.csv
 const { createCandleCache, keyOf } = require('../src/paper/lib/candleCache'); // one cache shared by every bot (CC3, overnight EXTRA item)
 
 // The bot has its OWN database: PAPER_DATABASE_URL (any Postgres URL, for
@@ -116,7 +117,13 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   app.get('/api/paper/ping', (req, res) => {
     const p = istParts(Date.now());
     const session = nseSession(Date.now(), state.holidays);
-    res.set('Cache-Control', 'no-store').json({ ok: true, paperOnly: true, botEnabled: enabled, istDate: p.date, istTime: p.hhmm, insideMarketHours: session.open, marketNote: session.reason || 'NSE open (09:15-15:30 IST)', cryptoAlwaysOpen: true });
+    // Overnight item 4: a short status line, in-memory only (no database read - this is hit every 5 min
+    // by the free Render pinger and must stay cheap), no secrets, no stack traces, no error text.
+    const now = Date.now();
+    const jobs = healthTracker.snapshot().jobs;
+    const stale = !enabled || !state.ready || JOB_NAMES.some((n) => { const j = jobs[n]; return !j || now - j.lastRunAt > STALE_MS; });
+    const status = !enabled ? 'disabled' : stale ? 'PROBLEM' : 'ALIVE';
+    res.set('Cache-Control', 'no-store').json({ ok: true, paperOnly: true, botEnabled: enabled, status, istDate: p.date, istTime: p.hhmm, insideMarketHours: session.open, marketNote: session.reason || 'NSE open (09:15-15:30 IST)', cryptoAlwaysOpen: true });
   });
 
   // Read-only admin routes (GET only). Protected by PAPER_ADMIN_SECRET (or
@@ -150,6 +157,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   attachHealthRoute(app, { secret, okSecret, tracker: healthTracker, state });
   attachNewsCheckRoute(app, { secret, okSecret, newsScore, eventBlock });
   attachHomeRoute(app, { secret, okSecret, tracker: healthTracker, state });
+  attachCsvRoute(app, { secret, okSecret, state });
 
   // Read-only report page (plain HTML, for a phone). Same secret, sent as ?key= (or the x-paper-secret header).
   app.get('/api/paper/report', async (req, res) => {
@@ -234,6 +242,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
     await reporter.daily('nse');
   }), tz);
   cron.schedule('55 23 * * *', job('crypto summary', () => reporter.daily('crypto')), tz);
+  cron.schedule('45 4 * * *', job('morning brief', reporter.morningBrief), tz); // overnight item 2
   cron.schedule('0 10 * * 0', job('weekly suggestions', reporter.weekly), tz);
   return state;
 }

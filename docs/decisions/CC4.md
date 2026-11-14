@@ -50,3 +50,59 @@ was installed fresh) - no code fix was needed or made.
 - Tests: `test/opsSourceStats.test.js` (8 cases, fake axios, no network) + extended `test/opsHealth.test.js`.
 - Not verified live (sandbox has no outbound network): these recorders have never seen a real Dhan/Binance/Yahoo
   response, only fakes. Items 2, 4 and 5 of this round are in a separate, immediately-following PR.
+
+### Item 2: daily summary extension + morning brief
+All in `paperbot/report.js` (CC4 was explicitly allowed to edit this round). `dailySummary()` extended,
+`weeklySuggestions()`'s skip-grouping refactored into the same shared `groupSkipsByReason()` (identical
+behaviour, no duplicate logic):
+- **By bot**: `perBotBreakdown()` - net INR, wins/losses, open count per bot that traded that day. Only the
+  bot's OWN market family: `VARIANT_MARKETS = { nse: ['nse_scalp'], crypto: ['crypto_scalp', 'crypto_wide_scalp'] }`.
+  **`exhaustion_only` is deliberately excluded** - it keeps its own table (`src/paper/bots/exhaustion_only/store.js`)
+  and already has its own report page (`/api/paper/exhaustion-report`); pulling its numbers in would need a
+  cross-module store import outside tonight's scope, so it stays out rather than being guessed in.
+- **Best/worst trade**: `bestWorstTrade()`, across the main market + its variants for that day.
+- **Skips by reason**: `groupSkipsByReason()`, same normalization the weekly report already used.
+- **What to learn**: `whatToLearn()` - "too few trades today" below `minTrades`; otherwise names the single
+  best-average pattern of the day, worded as a suggestion ("nothing changed automatically"), never applied.
+- **Morning brief**: `morningBrief()` + `reporter.morningBrief()`, scheduled `cron.schedule('45 4 * * *', ...)`
+  (one line in `paperbot/index.js`) - yesterday's full NSE day, crypto trades since the 23:55 cutoff, every
+  open trade across every bot, and any `paper_alerts` rows from the last 12h (via `store.query`, when the
+  alerts plugin's table exists). Telegram only when both env vars are set (reuses the existing `sendTelegram`/
+  `publish` gate - no new logic needed there).
+- Tests: `test/opsDailySummary.test.js` (14 cases, every number hand-computed in the test comments per rule 8).
+
+### Item 4: CSV export + ping status line
+- `src/paper/ops/csvExport.js` (new): `GET /api/paper/export.csv?type=trades|skips&date=YYYY-MM-DD[&market=...]`,
+  same secret check as every other route. No market given = every market in `VARIANT_MARKETS` combined (each
+  row keeps its own `market` column). No new dependency - CSV escaping is 6 lines, not worth `csv-parse`/`csv-stringify`.
+- `paperbot/index.js`: `GET /api/paper/ping` now carries a `status` field (`ALIVE`/`PROBLEM`/`disabled`) read
+  from the shared health tracker **in memory only** (no database read - it's hit every 5 min by the free
+  Render pinger) - no secrets, no stack traces, ever.
+- Tests: `test/opsCsvExport.test.js` (9 cases) + `test/opsPingStatus.test.js` (4 cases).
+
+### Item 5: home page auto-linking to other windows' new report pages
+Confirmed working **as designed**, no fix needed for `replay-report` or `bots-report` - both routes (CC5's
+`route()` helper and CC3's leaderboard plugin's `app.get(`) were picked up automatically by `routeExists()`'s
+live Express-router check the moment they merged.
+**One real gap, fixed**: CC3's `exhaustion_only` bot's own page is `/api/paper/exhaustion-report`, which
+wasn't in the candidate list at all - added it to `CANDIDATE_LINKS` in `src/paper/ops/home.js`.
+
+### A real secret-leak bug found and fixed during the VERIFY loop (real Chromium, 390px)
+The home page was putting the raw `PAPER_ADMIN_SECRET` into every link's `href` on every load (`?key=...`),
+even after the cookie (`#33`) was already authenticating the browser - so the "weak secret in a URL" problem
+`#33` was meant to fix was quietly recreated inside the home page's own HTML. Caught by a real
+headless-Chromium run at 390×844 checking the rendered page source for the secret string, not just the
+response we expected. Fixed: link `href`s are now the plain path with no query string at all; the cookie
+already carries every follow-up navigation. Re-ran the same Chromium check after the fix - clean on
+`/home`, `/health`, `/report`, `/news-check`, `/export.csv`.
+
+### VERIFY loop, this round
+`npm test`: 396/396 on the final rebase (300-396 across the round as other windows merged), repeated clean
+runs throughout. Real headless Chromium at 390×844 against a throwaway in-memory store: `/home`, `/health`,
+`/report`, `/news-check`, `/export.csv` all load, no `PAPER_ADMIN_SECRET` value and no
+`postgres://`/`PAPER_DATABASE_URL` substring anywhere in the rendered page source or in `document.cookie`
+(HttpOnly confirmed invisible to JS). `GET /api/paper/export.csv` and the new `GET /api/paper/ping` `status`
+field smoke-tested end to end against the real wired server.
+
+### Not verified live (sandbox has no outbound network)
+The morning brief and Telegram sends have never gone out for real - fixture/mock-only throughout.

@@ -13,6 +13,7 @@ const CANDIDATE_LINKS = [
   { path: '/api/paper/report', label: 'Report', desc: 'NSE + crypto trades and P&L' },
   { path: '/api/paper/scalp-report', label: 'Scalp report', desc: '1-minute crypto scalps' },
   { path: '/api/paper/bots-report', label: 'Bots report', desc: 'per-bot breakdown' },
+  { path: '/api/paper/exhaustion-report', label: 'Exhaustion-only bot', desc: "CC3's exhaustion_only bot, measured alone" },
   { path: '/api/paper/replay-report', label: 'Replay report', desc: 'candle-accurate replay' },
   { path: '/api/paper/news-check', label: 'News check', desc: 'which news sources answered' },
   { path: '/api/paper/universe', label: 'Universe', desc: 'what the bot scans' },
@@ -27,10 +28,11 @@ function routeExists(app, path) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function htmlHome({ status, reason, key, links, latestSummary, recentAlerts = [] }) {
+function htmlHome({ status, reason, links, latestSummary, recentAlerts = [] }) {
   const color = status === 'ALIVE' ? '#1a7f37' : '#c23';
-  const qs = (path) => `${path}?key=${encodeURIComponent(key || '')}`;
-  const linkRows = links.map((l) => `<a href="${esc(qs(l.path))}" style="display:block;padding:12px 14px;margin:8px 0;border:1px solid #ddd;border-radius:10px;text-decoration:none;color:#111">
+  // No ?key= in these hrefs: cookieAuth.js (src/paper/ops/cookieAuth.js) already set the HttpOnly cookie
+  // on this same visit, so the browser carries it to every link below with no secret in the page source.
+  const linkRows = links.map((l) => `<a href="${esc(l.path)}" style="display:block;padding:12px 14px;margin:8px 0;border:1px solid #ddd;border-radius:10px;text-decoration:none;color:#111">
     <div style="font-weight:600;font-size:16px">${esc(l.label)}</div>
     <div style="color:#666;font-size:13px">${esc(l.desc)}</div>
   </a>`).join('');
@@ -71,7 +73,7 @@ function attachHomeRoute(app, { secret, okSecret, tracker, state }) {
       if (state.store) {
         try { const rows = await state.store.listSummaries(1); latestSummary = rows[0] || null; } catch (e) { /* home page still loads without it */ }
       }
-      res.type('html').send(htmlHome({ status: h.status, reason: h.reason, key, links, latestSummary, recentAlerts: h.recentAlerts }));
+      res.type('html').send(htmlHome({ status: h.status, reason: h.reason, links, latestSummary, recentAlerts: h.recentAlerts }));
     } catch (e) {
       res.status(500).type('text').send('could not build the home page');
     }
