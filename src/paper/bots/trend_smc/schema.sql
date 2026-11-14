@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS trend_smc_trades (
 );
 CREATE INDEX IF NOT EXISTS trend_smc_trades_open_idx ON trend_smc_trades (symbol, status);
 CREATE INDEX IF NOT EXISTS trend_smc_trades_date_idx ON trend_smc_trades (trade_date);
+-- CC3 round 3 (restart safety): a restart mid-cycle re-scanning the still-current candle must never double-enter.
+CREATE UNIQUE INDEX IF NOT EXISTS trend_smc_trades_once_idx ON trend_smc_trades (symbol, trigger_t);
 
 CREATE TABLE IF NOT EXISTS trend_smc_skips (
   id          bigserial PRIMARY KEY,

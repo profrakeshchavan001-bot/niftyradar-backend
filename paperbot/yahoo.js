@@ -58,7 +58,7 @@ function parseChart(json, interval = '5m') {
 const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function createYahooSource({ axios, log = console.log, now = Date.now, sleep = defaultSleep, universe = loadUniverse(), gapMs = 1000, windowMs = 300000,
-  maxRetries = 3, backoffMs = 2000, maxBackoffMs = 60000, coolDownMs = 300000, timeoutMs = 15000 }) {
+  maxRetries = 3, backoffMs = 2000, maxBackoffMs = 60000, coolDownMs = 300000, timeoutMs = 8000 }) {
   const allowed = new Set(universe.slice(0, MAX_UNIVERSE));
   const cache = new Map(); // `${symbol}|${interval}|${range}` -> { candles, meta, fetchedAt } or { error, fetchedAt }
   const inflight = new Map();

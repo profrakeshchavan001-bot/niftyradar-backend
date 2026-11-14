@@ -4,7 +4,8 @@
 // fetch instead of one each, without ever serving a cached answer to a call that asked for something different (a custom range/limit).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createCachedCrypto } = require('../paperbot/index');
+const { createCachedCrypto, create15mCrypto } = require('../paperbot/index');
+const { createCandleCache } = require('../src/paper/lib/candleCache');
 
 function fakeRaw() {
   const calls = { candles: [], hourly: [] };
@@ -51,4 +52,28 @@ test('price() and every other method pass straight through, uncached', async () 
   const raw = fakeRaw();
   const cached = createCachedCrypto(raw);
   assert.equal(await cached.price('BTCUSDT'), 100);
+});
+
+// CC3 round 3 item 3: one shared cache across 5m/1h/15m, so the 15-minute source (trend_smc) and the 5m/1h source (everyone
+// else) can never both hold their own separate copy of the same symbol+timeframe fetch.
+test('create15mCrypto shares the SAME cache instance as createCachedCrypto: a 5m fetch and a 15m fetch of the same symbol are independent (different keys), but each is fetched once no matter how many bots ask', async () => {
+  const cache = createCandleCache({ ttlMs: 50000 });
+  const raw5m = fakeRaw();
+  const raw15m = { calls: [], async candles15(symbol) { this.calls.push(symbol); return [{ t: 1 }]; } };
+  const cached5m = createCachedCrypto(raw5m, cache);
+  const cached15m = create15mCrypto(raw15m, cache);
+  await Promise.all([cached5m.candles('BTCUSDT'), cached5m.candles('BTCUSDT'), cached15m.candles15('BTCUSDT'), cached15m.candles15('BTCUSDT')]);
+  assert.equal(raw5m.calls.candles.length, 1, 'one 5m fetch for both callers');
+  assert.equal(raw15m.calls.length, 1, 'one 15m fetch for both callers, not mixed up with the 5m one');
+  assert.equal(cache.stats().size, 2, 'exactly two cache entries (5m, 15m) for this one symbol, on the one shared cache');
+});
+
+test('create15mCrypto: a non-default limit bypasses the cache, same convention as the 5m/1h source', async () => {
+  const cache = createCandleCache({ ttlMs: 50000 });
+  const raw15m = { calls: [], async candles15(symbol, limit) { this.calls.push({ symbol, limit }); return []; } };
+  const cached15m = create15mCrypto(raw15m, cache);
+  await cached15m.candles15('BTCUSDT');
+  await cached15m.candles15('BTCUSDT', 50);
+  await cached15m.candles15('BTCUSDT');
+  assert.equal(raw15m.calls.length, 2, 'one cached call warms the cache, the custom-limit call bypasses it, the final plain call is served from cache');
 });

@@ -149,3 +149,23 @@ plus a real insert to confirm the constraints actually work, not just parse. Re-
 before each merge; found none beyond the two already described above (the entry-price mix-up in trend_smc's own test, and the
 mismatched test-fixture clocks), both caught by the tests themselves, not missed. Binance not verified live (no route from this
 sandbox); fixtures only throughout.
+
+# CC3 round 3 (2026-11-14): stability audit
+
+One bundled PR, one merge, as the brief capped it ("every merge restarts the live bot"). Full detail and the measured numbers:
+`docs/STABILITY.md`.
+
+| # | Topic | What was found | Decision taken | Needs from owner |
+|---|---|---|---|---|
+| 1 | Measurement | No prior measurement existed for this session's 4 bots + shadow tracking together. | `tools/stability-check.js`: fixtures, a throwaway Postgres, one full scan+monitor cycle - 59 ms, 44 DB queries, 60.5 MB process RSS (bare Node + pg, no Express). Said plainly in `docs/STABILITY.md` that the main intraday bot, the Judge and the replay engine were NOT included (their fixtures would have needed more time than was left), so this is not a clean bill of health for the whole app, only for this session's own bots. | Someone should benchmark the main bot + replay the same way; flagged, not done. |
+| 2 | Cron collisions | 3 real second-collisions found by listing every `cron.schedule` call: `trend_smc scan`/`nse scan` both `:20` every 5 min (market hours); `trend_smc monitor`/`nse monitor` both `:50` every minute (market hours); `shadow monitor`/`scalp_wide monitor` both `:40` (one every 5 min, one every minute - collide every 5th minute). | Moved to `:22`, `:58`, `:42` respectively. Every other requirement (overlap guard, error isolation) was already satisfied by the existing `guarded()` wrapper every job already used - checked, not re-implemented. | None. |
+| 3 | Timeout/backoff | 15 s timeout, no backoff, on Binance/CoinGecko; Yahoo already had retries but a 15 s default timeout too. | 8 s timeout everywhere named, one backoff pass (400 ms, then every host again) added to the Binance/CoinGecko fetch and `trend_smc`'s own 15-minute source; Yahoo's own retry/backoff logic untouched, only its default timeout lowered. | Say if 8 s is too aggressive once this runs live (Binance can be slow from some regions). |
+| 4 | No held DB connections | Brief asked this be confirmed. | Grepped the whole repo for `pool.connect()` / `client.release` - none found; every store call uses `pool.query()` directly, which `pg` checks out and returns per call, never held across an `await` on a network fetch. Confirmed, not changed. | None. |
+| 5 | Shared cache | `trend_smc`'s own 15-minute Binance source used its own `createCandleCache()`, separate from the 5m/1h cache every other bot shares. | `paperbot/index.js` now builds ONE cache and wraps both the 5m/1h source (`createCachedCrypto`) and the new 15m wrapper (`create15mCrypto`) with it; the plugin loader hands trend_smc the wrapped version as `ctx.cached15mCrypto`. | None. |
+| 6 | Restart safety | The existing protection was application-level only (a `SELECT` before every insert) - real, but not airtight across a true process restart mid-insert. | Added a real `UNIQUE` index: `(market, symbol, trigger_t)` on the shared `paper_trades` (idempotent `CREATE UNIQUE INDEX IF NOT EXISTS`; nullable `trigger_t` rows are untouched, Postgres never conflicts two NULLs), `(symbol, trigger_t)` on `exhaustion_only_trades` and `trend_smc_trades`. Every `insertTrade()` (Postgres and the in-memory store that mirrors it for tests) does `ON CONFLICT ... DO NOTHING RETURNING id`, returns `null` on a duplicate, and every bot's `scan()` now checks for that and silently moves on instead of logging a second entry. Simulated the actual kill-mid-cycle both in `test/paperRestartSafety.test.js` (a fresh bot instance, same store, same still-current candle) and by hand against a local Postgres 16 (same insert run twice with `ON CONFLICT`: second run returns 0 rows, the table still has exactly 1). `shadow_setups` already had this from round 2, unchanged. | None. |
+
+**VERIFY loop:** `node --test test/*.test.js` - 419 passing, 0 failing. Re-read the whole diff once more specifically for anything
+that could change a trade decision: nothing does - every change is a timeout value, a cron second, a cache key, a DB-level dedupe,
+or a restart-safety null-check; no stop/target/reward-risk/pattern/trend calculation was touched. Binance/Yahoo not verified live
+(no route from this sandbox); every number in `docs/STABILITY.md` came from fixtures against a real local throwaway Postgres, said
+so there and here.

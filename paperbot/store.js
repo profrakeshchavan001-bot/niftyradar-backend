@@ -43,7 +43,12 @@ function createMemoryStore() {
     async init() {},
     async getConfig() { return copy(db.config); },
     async setConfigIfMissing(key, value) { if (!(key in db.config)) db.config[key] = copy(value); },
-    async insertTrade(t) { const row = { id: ++seq, status: 'open', ...copy(t) }; db.trades.push(row); return row.id; },
+    // CC3 round 3 (restart safety): a restart that re-scans the current, still-open candle must never double-enter - the same
+    // dedupe a real UNIQUE (market, symbol, trigger_t) constraint gives the Postgres store below.
+    async insertTrade(t) {
+      if (t.trigger_t != null && db.trades.some((x) => x.market === t.market && x.symbol === t.symbol && x.trigger_t === t.trigger_t)) return null;
+      const row = { id: ++seq, status: 'open', ...copy(t) }; db.trades.push(row); return row.id;
+    },
     async updateTrade(id, fields) { const row = db.trades.find((t) => t.id === id); if (row) Object.assign(row, copy(fields)); },
     async noteTrade(id, fields) { return this.updateTrade(id, fields); },
     async openTrades(market) { return copy(db.trades.filter((t) => t.market === market && t.status === 'open')); },
@@ -111,9 +116,11 @@ function createPgStore(getPool) {
     },
     async insertTrade(t) {
       const cols = TRADE_COLS.filter((c) => t[c] !== undefined);
-      const rows = await q(`INSERT INTO paper_trades (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id`,
+      // CC3 round 3 (restart safety): ON CONFLICT DO NOTHING on the (market, symbol, trigger_t) unique index (sql/paper_bot.sql) -
+      // a restart mid-cycle that re-decides the same still-open candle gets null back, never a second row for it.
+      const rows = await q(`INSERT INTO paper_trades (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) ON CONFLICT (market, symbol, trigger_t) DO NOTHING RETURNING id`,
         cols.map((c) => toParam(c, t[c])));
-      return rows[0].id;
+      return rows[0]?.id ?? null;
     },
     async updateTrade(id, fields) {
       const cols = Object.keys(fields).filter((c) => TRADE_COLS.includes(c));
@@ -190,6 +197,7 @@ function createCachedStore(inner, { now = Date.now, configTtlMs = 600000 } = {})
     },
     async insertTrade(t) {
       const id = await inner.insertTrade(t);
+      if (id == null) return null; // the DB caught a duplicate (restart safety) - nothing new to add to the in-memory cache either
       const row = { status: 'open', ...copy(t), id };
       if (open.has(t.market)) open.get(t.market).push(row);
       const key = `${t.market}|${t.trade_date}`;

@@ -12,17 +12,21 @@ const { createMemoryShadowStore, createPgShadowStore } = require('../../shadow/s
 // A tiny, self-contained native 15-minute Binance source (own file, not touching the shared paperbot/sources.js, which has no
 // 15m method yet): the main crypto bot and the scalp bots build their 15-minute candles from 5-minute ones (E.aggregate), but
 // trend_smc's EMA20/50(15m) trend needs 51+ real 15-minute candles, which aggregate() cannot give from a sane number of 5-minute
-// candles. Same two-host fallback as createCryptoSource.
-function create15mSource({ axios, log }) {
+// candles. Same two-host fallback as createCryptoSource; exported so paperbot/index.js can wrap it with the ONE shared candle
+// cache (CC3 round 3 item 3 - no separate cache for this timeframe). 8 s timeout + one backoff pass (round 3 item 2).
+function create15mSource({ axios, log, timeoutMs = 8000, backoffMs = 400, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   const hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
   return {
     async candles15(symbol, limit = 100) {
       let lastErr;
-      for (const h of hosts) {
-        try {
-          const rows = (await axios.get(`${h}/api/v3/klines`, { params: { symbol, interval: '15m', limit }, timeout: 15000 })).data;
-          return rows.map((row) => ({ t: row[0], o: +row[1], h: +row[2], l: +row[3], c: +row[4], v: +row[5] })).filter((k) => [k.t, k.o, k.h, k.l, k.c].every(Number.isFinite));
-        } catch (e) { lastErr = e; }
+      for (const attempt of [0, 1]) {
+        if (attempt === 1) await sleep(backoffMs);
+        for (const h of hosts) {
+          try {
+            const rows = (await axios.get(`${h}/api/v3/klines`, { params: { symbol, interval: '15m', limit }, timeout: timeoutMs })).data;
+            return rows.map((row) => ({ t: row[0], o: +row[1], h: +row[2], l: +row[3], c: +row[4], v: +row[5] })).filter((k) => [k.t, k.o, k.h, k.l, k.c].every(Number.isFinite));
+          } catch (e) { lastErr = e; }
+        }
       }
       throw lastErr;
     },
@@ -68,11 +72,16 @@ module.exports = {
     const shadowStore = pool ? createPgShadowStore(pool) : createMemoryShadowStore();
     if (pool) pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[trend_smc] shadow schema failed: ${e.message}`));
 
-    const axios = require('axios');
-    const crypto15 = create15mSource({ axios, log });
+    // Reuse the main bot's already-cached 15-minute source when the caller provides one (paperbot/index.js builds it with the
+    // SAME candle cache as the 5m/1h source - see createCachedCrypto/create15mCrypto there); a test or standalone caller still
+    // gets its own, uncached source.
+    const crypto15 = ctx.cached15mCrypto || create15mSource({ axios: require('axios'), log });
     const bot = createTrendSmcBot({ store: tStore, crypto, crypto15, loadCfg: () => loadTrendSmcConfig(mainStore), shadowStore, log });
-    cron.schedule('20 */5 * * * *', guarded('trend_smc scan', bot.scan, log), tz);
-    cron.schedule('50 * * * * *', guarded('trend_smc monitor', bot.monitor, log), tz);
+    // Staggered seconds (CC3 round 3 item 2): :22 and :58 so neither ever lands on the same tick as another bot's job
+    // (nse scan/monitor also use :20/:50 during market hours; shadowMonitor uses :40 every 5 min).
+    cron.schedule('22 */5 * * * *', guarded('trend_smc scan', bot.scan, log), tz);
+    cron.schedule('58 * * * * *', guarded('trend_smc monitor', bot.monitor, log), tz);
     log(`[trend_smc] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/trend-smc-report)`);
   },
+  create15mSource,
 };
