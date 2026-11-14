@@ -1,0 +1,37 @@
+# Layer 2 (timing), Layer 3 (vetoes) and paper-bot settings. config.yaml (Layer 1) is untouched.
+
+timing:
+  windows: [["09:30", "11:00"], ["13:30", "15:00"]]   # IST, entry bar open must fall inside
+  atr_bars: 14              # bars used for the intraday range proxy
+  displacement_atr: 1.0     # OB needs a displacement body >= this x range proxy
+  fvg_min_gap_atr: 0.15     # minimum fair-value-gap size in range-proxy units
+  ob_lookback: 5            # bars searched backwards for the order-block candle
+  stop_buffer_atr: 0.1      # stop sits this far beyond the zone
+  target_r: 2.0
+  max_risk_pct: 1.5         # reject setups whose stop is wider than this % of price
+  triggers: [bos, engulfing]
+  require_vwap: true        # VWAP side must agree with the Layer 1 direction
+  require_orb: true         # ORB side must not oppose the Layer 1 direction
+
+vetoes:
+  chop_er_threshold: 0.25   # 20-day efficiency ratio below this = chop
+  chop_lookback: 20
+  iv_pct_max: 70            # IV percentile above this vetoes
+  iv_lookback: 252
+  event_days: 2             # event on trade day or within the next N trading days
+  hold_days: 1              # horizon for the expected-move test
+  spread_max_pct: 2.0       # option bid/ask spread as % of premium
+  veto_on_missing_iv: false
+  veto_on_missing_quote: false
+
+paper:
+  capital: 1000000
+  risk_pct: 1.0             # allowed 1.0 - 2.0
+  max_positions: 2
+  max_sl_per_day: 2         # kill switch: this many stop-outs in a day stops new entries
+  daily_loss_pct: 3.0       # kill switch: day P&L below -this % of capital stops new entries
+  square_off: "15:15"       # open positions are closed at this bar's close
+  slippage_pct: 0.0
+
+alerts:
+  telegram_enabled_env: TELEGRAM_ENABLED   # must be exactly "true" to send anything
