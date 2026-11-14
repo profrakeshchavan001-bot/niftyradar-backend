@@ -136,6 +136,11 @@ test('old fixed rule, for comparison only: +2% / -1% from the entry', () => {
 });
 
 // ---- the real bot on the scenario ----
+// CC2 round 2 item 1: h.at(spec) now appends a real CLOSED 5-minute candle - a flat "doji"
+// (o=h=l=c) when `spec` is a plain number, or the exact [o,h,l,c] given - and runs cryptoMonitor,
+// which checks the stop/target against that candle's high AND low (src/paper/lib/exitSim.js), not
+// a bare tick. h.wait(ms) advances the clock with no new candle, for the legacy rule's own
+// time-based giveup check, which does not depend on candles at all.
 function rig({ dip, after, config } = {}) {
   const candles = S.build({ dip, after });
   const clock = { t: S.scanTime(candles) };
@@ -149,11 +154,19 @@ function rig({ dip, after, config } = {}) {
   };
   const bot = createBot({ store, nse: null, crypto, now: () => clock.t, log: (m) => logs.push(m) });
   const ready = config ? store.setConfigIfMissing('crypto', config) : Promise.resolve();
-  const at = async (price, minutes = 1) => { state.price = price; clock.t += minutes * 60000; await bot.cryptoMonitor(); return store._db.trades[0]; };
-  return { candles, clock, store, logs, bot, ready, at };
+  const at = async (spec, jumpMs = S.FIVE + 25000) => {
+    const [o, h, l, c] = Array.isArray(spec) ? spec : [spec, spec, spec, spec];
+    candles.push({ t: clock.t, o, h, l, c, v: 100 });
+    state.price = c;
+    clock.t += jumpMs;
+    await bot.cryptoMonitor();
+    return store._db.trades[0];
+  };
+  const wait = async (jumpMs) => { clock.t += jumpMs; await bot.cryptoMonitor(); return store._db.trades[0]; };
+  return { candles, clock, store, logs, bot, ready, at, wait };
 }
 
-test('bot: SHORT with level-based target and stop, breakeven, target exit; old rule tracked beside it', async () => {
+test('bot: SHORT with level-based target and stop, breakeven, candle-accurate target exit; old rule tracked beside it', async () => {
   const h = rig({ after: [[102.18, 102.3, 101.5, 101.6]] });
   await h.bot.cryptoScan();
   assert.equal(h.store._db.trades.length, 1);
@@ -166,38 +179,42 @@ test('bot: SHORT with level-based target and stop, breakeven, target exit; old r
   // size: risk 0.9199% -> 1000 x 2% / 0.9199% = 2174 USDT, capped at one third of the balance = 333.33 USDT
   assert.ok(Math.abs(t.qty * 102.18 - 333.3333) < 0.001);
 
-  t = await h.at(101); // not half way yet (half way = 100.6395)
+  t = await h.at(101); // doji low 101: not half way yet (half way = entry - 0.5 x 3.081 = 100.6395)
   assert.deepEqual([t.status, t.stop_active, t.breakeven_time ?? null], ['open', 103.12, null]);
-  t = await h.at(100.6); // half way covered: stop moves to the entry
+  t = await h.at(100.6); // doji low 100.6: 102.18 - 100.6 = 1.58 >= 1.5405 -> half way covered, stop moves to the entry
   assert.deepEqual([t.status, t.stop_active], ['open', 102.18]);
   assert.equal(t.breakeven_time, new Date(h.clock.t).toISOString());
   assert.equal(t.sl_price, 103.12); // the level set at entry stays on record
   t = await h.at(100.1); // old rule's target 100.1364 is reached: only noted, the trade stays open
   assert.deepEqual([t.status, t.legacy_result], ['open', 'target']);
 
-  // every scan: best / worst % from the candles since entry. Candle after entry: low 101.5, high 102.3
-  // best = (102.18 - 101.5) / 102.18 = 0.67%; worst = -(102.3 - 102.18) / 102.18 = -0.12%
-  h.clock.t = h.candles[98].t + S.FIVE + 25000;
+  // every scan: best / worst % from EVERY candle since entry (the "after" candle 101.5-102.3 plus the
+  // three doji candles above). Highest high overall is still 102.3 (the "after" candle):
+  // worst = -(102.3 - 102.18) / 102.18 = -0.12%. Lowest low overall is now 100.1 (the last doji):
+  // best = (102.18 - 100.1) / 102.18 = 2.04% - the same value the per-tick tracking above already
+  // recorded, so the stored max does not move either way.
   await h.bot.cryptoScan();
   t = h.store._db.trades[0];
-  // the minute checks above had already seen 100.1: (102.18 - 100.1) / 102.18 = 2.04%, which is better than the candle's 0.67%
   assert.deepEqual([t.max_fav_pct, t.max_adv_pct], [2.04, -0.12]);
   assert.equal(h.store._db.trades.length, 1); // still one open trade per coin
 
-  t = await h.at(99); // at / past the target 99.099
-  assert.deepEqual([t.status, t.exit_reason, t.exit_price], ['closed', 'target', 99]);
-  // P&L = (102.18 - 99) x 333.3333 / 102.18 = 10.37385 USDT x 88 = Rs 912.90
-  assert.equal(t.pnl_inr, 912.9);
+  // A doji at 99 (no wick): its low (99) is already past the target (99.099), but the exit books AT
+  // THE TARGET LEVEL, not the tick that reached it - the whole point of CC2 round 2 item 1.
+  t = await h.at(99);
+  assert.deepEqual([t.status, t.exit_reason, t.exit_price], ['closed', 'target', 99.099]);
+  // P&L booked at the level, not the overshoot: (102.18 - 99.099) x 333.3333 / 102.18 = 10.050931 USDT x 88 = Rs 884.48
+  assert.equal(t.pnl_inr, 884.48);
   assert.equal(t.legacy_result, 'target');
 });
 
-test('bot: stop exit, and the old rule decided later, after the trade has closed', async () => {
+test('bot: stop exit booked at the stop level (not the overshoot tick), and the old rule decided later', async () => {
   const h = rig();
   await h.bot.cryptoScan();
-  let t = await h.at(103.2); // above the stop 103.12, but under the old rule's stop 103.2018
-  assert.deepEqual([t.status, t.exit_reason, t.legacy_result], ['closed', 'stop', null]);
-  // loss = (103.2 - 102.18) x 333.3333 / 102.18 = 3.327461 USDT x 88 = Rs 292.82
-  assert.equal(t.pnl_inr, -292.82);
+  // A doji at 103.2: above the level-based stop (103.12) but still under the old rule's stop (103.2018).
+  let t = await h.at(103.2);
+  assert.deepEqual([t.status, t.exit_reason, t.exit_price, t.legacy_result], ['closed', 'stop', 103.12, null]);
+  // loss booked at the stop level: (103.12 - 102.18) x 333.3333 / 102.18 = 3.066484 USDT x 88 = Rs 269.85
+  assert.equal(t.pnl_inr, -269.85);
   t = await h.at(103.3); // the closed trade is still followed for the comparison
   assert.equal(t.legacy_result, 'stop');
   const before = JSON.stringify(h.store._db.trades);
@@ -205,15 +222,15 @@ test('bot: stop exit, and the old rule decided later, after the trade has closed
   assert.equal(JSON.stringify(h.store._db.trades), before);
 });
 
-test('bot: breakeven stop, and an undecided old rule gives up after 48 hours', async () => {
+test('bot: breakeven stop booked exactly at the entry (zero P&L), and an undecided old rule gives up after 48 hours', async () => {
   const h = rig();
   await h.bot.cryptoScan();
   await h.at(100.6); // breakeven; old target 100.1364 not reached
-  let t = await h.at(102.2); // back above the entry: out at the breakeven stop
-  assert.deepEqual([t.status, t.exit_reason, t.exit_price, t.legacy_result], ['closed', 'breakeven_stop', 102.2, null]);
-  // exit is booked at the price seen: -(102.2 - 102.18) x 333.3333 / 102.18 = -0.065245 USDT x 88 = -5.74
-  assert.equal(t.pnl_inr, -5.74);
-  t = await h.at(102.2, 48 * 60);
+  // A doji at 102.2 (back above the entry): its high crosses the NEW stop (the entry, 102.18) and is
+  // booked exactly there, so the P&L is exactly zero - which is what "breakeven" is supposed to mean.
+  let t = await h.at(102.2);
+  assert.deepEqual([t.status, t.exit_reason, t.exit_price, t.pnl_inr, t.legacy_result], ['closed', 'breakeven_stop', 102.18, 0, null]);
+  t = await h.wait(48 * 3600000);
   assert.equal(t.legacy_result, 'undecided after 48 h');
 });
 

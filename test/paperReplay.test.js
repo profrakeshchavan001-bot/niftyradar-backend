@@ -197,12 +197,16 @@ test('replay crypto: exhaustion reversal down -> SHORT -> stop at the level-base
   await bot.cryptoMonitor(); // 102.2 is under the stop 103.12: stays open
   assert.equal(store._db.trades[0].status, 'open');
   price = 103.2; // above the stop 103.12 (pattern high 102.52 + ATR 0.6)
-  clock.t += MIN;
+  // CC2 round 2 item 1: the exit now checks a closed candle's own high/low, not a bare tick - so the
+  // breach needs a real candle, not just the `price` variable the mock's price() returns.
+  candles.push({ t: clock.t, o: 103.2, h: 103.2, l: 103.2, c: 103.2, v: 100 });
+  clock.t += CS.FIVE + 25000; // let the candle close
   await bot.cryptoMonitor();
   const c = store._db.trades[0];
   assert.equal(c.exit_reason, 'stop');
-  // loss = (103.2 - 102.18) x 333.3333 / 102.18 = 3.327461 USDT x 88 = Rs 292.82
-  assert.equal(c.pnl_inr, -292.82);
+  assert.equal(c.exit_price, 103.12); // booked at the stop level, not the tick (103.2) that crossed it
+  // loss booked at the stop level: (103.12 - 102.18) x 333.3333 / 102.18 = 3.066484 USDT x 88 = Rs 269.85
+  assert.equal(c.pnl_inr, -269.85);
   assert.equal(c.fx_rate, 88);
 
   // end-of-day summary: no Telegram env -> stored in daily_summaries
@@ -214,9 +218,9 @@ test('replay crypto: exhaustion reversal down -> SHORT -> stop at the level-base
   assert.equal(saved.summary_date, '2026-11-13');
   assert.match(saved.body, /PAPER bot \(demo, no real money\)/);
   assert.match(saved.body, /BTCUSDT SHORT/);
-  assert.match(saved.body, /exit: stop · P&L Rs -293/);
-  assert.match(saved.body, /Day total: 1 trades, 0 wins, P&L Rs -293/);
-  assert.match(saved.body, /exhaustion_reversal: 1 trades, win 0%, avg Rs -293 \(fewer than 20 trades, no conclusion\)/);
+  assert.match(saved.body, /exit: stop · P&L Rs -270/); // -269.85 rounded for display
+  assert.match(saved.body, /Day total: 1 trades, 0 wins, P&L Rs -270/);
+  assert.match(saved.body, /exhaustion_reversal: 1 trades, win 0%, avg Rs -270 \(fewer than 20 trades, no conclusion\)/);
   const w = await reporter.weekly();
   assert.match(w.text, /Too few trades, no conclusion/);
 });
