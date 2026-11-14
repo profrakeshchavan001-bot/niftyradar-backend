@@ -128,3 +128,15 @@ ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS ema_cross text;
 -- smc_tags on every skip too (paper_trades already had it): BOS/CHoCH, liquidity pools/sweeps, order
 -- blocks, FVG retests, premium/discount, displacement, session - src/paper/lib/smc/, CC2 round 2 item 2.
 ALTER TABLE paper_skips ADD COLUMN IF NOT EXISTS smc_tags jsonb;
+
+-- Judge v2 (CC2 round 2 item 3, src/paper/decision/judge2.js): a PARALLEL scorer, stored on every
+-- trade AND skip, both markets. NEVER used for a live entry/exit decision - the live judge above
+-- still decides NSE entries. judge2_na lists helpers excluded (not applicable / null) and rescaled.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge2_score         numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge2_take          boolean;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge2_contributions jsonb;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge2_basis         text;
+ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_score         numeric;
+ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_take          boolean;
+ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_contributions jsonb;
+ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_basis         text;

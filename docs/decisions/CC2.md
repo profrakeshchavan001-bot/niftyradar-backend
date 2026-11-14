@@ -268,3 +268,47 @@ Noted again here so it does not get lost between rounds.
 
 Full suite after this item: 292/295 (same 3 pre-existing CC4 failures as
 the SMC PR above, confirmed unrelated).
+
+### Item 3 - Judge v2, a PARALLEL scorer (PR)
+
+`src/paper/decision/judge2.js`: weights R factor 25, pattern 25, SMC/levels
+15, EMA/trend 10, sector 10, news/event 10, time/session 5 (sums to 100).
+Reuses judge.js's individual scorers (`scoreR`, `scorePattern`, `scoreSector`,
+`scoreNews`, `scoreTrend`, `scoreTime` - newly exported from `judge.js`,
+additive, nothing existing changed) rather than duplicating them, and adds
+two new ones: `scoreSmc` (counts `smc_tags` aligned with vs. against the
+trade's direction - BOS/CHoCH/order-block/FVG/liquidity-sweep tags by
+`_up`/`_down` suffix, `premium`/`discount` by zone) and `scoreEmaTrend`
+(maps `ema_cross`'s label to a fraction). Take at 65+.
+
+**Rescaling is deliberately different from judge v1.** v1 gives an
+unavailable helper HALF its points, inside the full weight pool. v2
+EXCLUDES a helper that does not apply or answers null, and rescales the
+REMAINING weights to sum to 100 - the brief's literal wording for this
+round. Sector and news are always excluded for crypto (there is no sector
+or news concept for a coin); SMC and EMA/trend are excluded when no tags /
+no cross reading exist. `time` is NOT excluded for crypto (it trades round
+the clock, which is a legitimate neutral 0.5, not "does not apply" -
+judge.js's existing convention, reused as-is).
+
+Wired into the shared `analyse()` (both NSE and crypto, every trade and
+skip) - new additive, nullable `judge2_score` / `judge2_take` /
+`judge2_contributions` / `judge2_basis` columns on BOTH `paper_trades` and
+`paper_skips` (`npm run migrate` needed). **Never read by any entry/exit
+code** - `nseScan`/`cryptoScan` still only consult the live `judge`
+(judge.js) or the pattern/trend entry rule; judge2 is logged for the report
+to show both side by side (item 5, not yet built this round - see below).
+
+**Known limitation, documented rather than hidden:** for crypto, the real
+reward/risk (`plan.rr` from `cryptoLevels.planTrade`) is only computed
+AFTER `analyse()` returns, inside `cryptoScan`. Passing the crypto momentum
+score off as "R factor" would be dishonest, so `r_factor` is left `null`
+(excluded, rescaled) for every crypto judge2 score this round. A future
+pass could move the judge2 call to after `planTrade()` in `cryptoScan` to
+give crypto its real R too - noted for the next session, not done tonight
+given the time left.
+
+4 hand-worked tests (`test/paperJudge2.test.js`): full-weights NSE case,
+crypto rescale case (sector/news/smc/ema_trend all excluded), no-direction
+case, hard-block case. Full suite: 313/316 (same 3 pre-existing CC4
+failures).

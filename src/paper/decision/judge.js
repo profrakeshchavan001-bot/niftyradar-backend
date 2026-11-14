@@ -262,4 +262,8 @@ function weeklyAblationReport({ date, closed, config } = {}) {
 let shared = null;
 const judge = (candidate) => (shared || (shared = createJudge()))(candidate);
 
-module.exports = { judge, createJudge, loadJudgeConfig, tradeFields, ablation, weeklyAblationReport, JUDGE_DEFAULTS, HELPERS, merge, sideOf };
+module.exports = {
+  judge, createJudge, loadJudgeConfig, tradeFields, ablation, weeklyAblationReport, JUDGE_DEFAULTS, HELPERS, merge, sideOf,
+  // Additive exports (CC2 round 2, judge2.js): the individual scorers, reused rather than duplicated.
+  scoreR, scorePattern, scoreSector, scoreNews, scoreTrend, scoreTime, clamp, num, r1, isObj,
+};
