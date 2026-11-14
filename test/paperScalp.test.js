@@ -2,20 +2,26 @@
 // Scalp strategy (docs/SCALP.md): entry rules, exits, costs, bot behaviour, report, wiring. Numbers are worked out by hand (see the comments).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { analyse, evaluateExit, settle } = require('../src/paper/scalp/engine');
-const { SCALP_DEFAULTS, costPct } = require('../src/paper/scalp/config');
+const { analyse, analyseWide, evaluateExit, settle } = require('../src/paper/scalp/engine');
+const { SCALP_DEFAULTS, SCALP_WIDE_DEFAULTS, costPct } = require('../src/paper/scalp/config');
 const { createScalpBot } = require('../src/paper/scalp/bot');
 const { summarise, buildScalpData, renderScalpReport, NO_CONCLUSION } = require('../src/paper/scalp/report');
 const { attachScalp } = require('../src/paper/scalp');
 const { createMemoryStore } = require('../paperbot/store');
-const { scene, MIN } = require('./scalpFixtures');
+const { scene, sceneWide, MIN } = require('./scalpFixtures');
 
 const FREE = { ...SCALP_DEFAULTS, fee_pct_per_side: 0, slippage_pct: 0 }; // no costs: pure geometry
 
-test('defaults: 0.1% fee per side + 0.03% slippage = 0.23% round trip; target 0.3-0.5%, stop cap 0.3%, reward/risk 1.3, 15 min, breakeven at half', () => {
+test('defaults: 0.1% fee per side + 0.03% slippage = 0.23% round trip; target 0.3-0.5%, stop cap 0.3%, reward/risk 1.0 (never below, after costs), 15 min, breakeven at half', () => {
   assert.equal(Math.round(costPct(SCALP_DEFAULTS) * 1000) / 1000, 0.23);
-  assert.deepEqual([SCALP_DEFAULTS.target_min_pct, SCALP_DEFAULTS.target_cap_pct, SCALP_DEFAULTS.stop_cap_pct, SCALP_DEFAULTS.min_rr, SCALP_DEFAULTS.time_stop_min, SCALP_DEFAULTS.breakeven_frac], [0.3, 0.5, 0.3, 1.3, 15, 0.5]);
+  assert.deepEqual([SCALP_DEFAULTS.target_min_pct, SCALP_DEFAULTS.target_cap_pct, SCALP_DEFAULTS.stop_cap_pct, SCALP_DEFAULTS.min_rr, SCALP_DEFAULTS.time_stop_min, SCALP_DEFAULTS.breakeven_frac], [0.3, 0.5, 0.3, 1.0, 15, 0.5]);
   assert.deepEqual(SCALP_DEFAULTS.symbols, ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
+});
+
+test('scalp_wide defaults: 5-min entry / 15-min trend, target >= 0.8% AND 1xATR, min_rr 1.0 (never below, after costs), 45 min time stop, breakeven at half', () => {
+  assert.equal(Math.round(costPct(SCALP_WIDE_DEFAULTS) * 1000) / 1000, 0.23);
+  assert.deepEqual([SCALP_WIDE_DEFAULTS.target_min_pct, SCALP_WIDE_DEFAULTS.min_rr, SCALP_WIDE_DEFAULTS.time_stop_min, SCALP_WIDE_DEFAULTS.breakeven_frac], [0.8, 1.0, 45, 0.5]);
+  assert.deepEqual(SCALP_WIDE_DEFAULTS.symbols, ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
 });
 
 // ---------- entry ----------
@@ -34,10 +40,10 @@ test('entry: exhaustion reversal gives a long with stop 0.1056 %, target 0.5 %, 
   assert.equal(p.rr, 4.73);                                                       // 0.5 / 0.1056 = 4.73 with no costs
 });
 
-test('entry: with the default costs (0.23 %) the same setup is SKIPPED: reward 0.5 - 0.23 = 0.27, risk 0.1056 + 0.23 = 0.3356, 0.27 / 0.3356 = 0.8 < 1.3', () => {
+test('entry: with the default costs (0.23 %) the same setup is SKIPPED: reward 0.5 - 0.23 = 0.27, risk 0.1056 + 0.23 = 0.3356, 0.27 / 0.3356 = 0.8 < 1.0', () => {
   const a = analyse({ ...scene(), cfg: SCALP_DEFAULTS });
   assert.equal(a.ok, false);
-  assert.match(a.reason, /^reward\/risk 0\.8 after costs is below 1\.3 \(target 0\.5%, stop 0\.11%, costs 0\.23% round trip\)$/);
+  assert.match(a.reason, /^reward\/risk 0\.8 after costs is below 1 \(target 0\.5%, stop 0\.11%, costs 0\.23% round trip\)$/);
   assert.equal(a.extra.r_factor, 0.8); assert.deepEqual(a.extra.patterns, ['exhaustion_reversal', 'bullish_engulfing']); // every pattern that fired is logged
   assert.equal(analyse({ ...scene(), cfg: { ...SCALP_DEFAULTS, min_rr: 0.5 } }).ok, true, 'min_rr is the lever');
 });
@@ -73,6 +79,46 @@ test('entry: a pattern against both the 5-min trend and the VWAP side is refused
   const a = analyse({ ...s, cfg: FREE });
   assert.equal(a.ok, false);
   assert.match(a.reason, /is against the 5-min trend \(down\) and the VWAP side \(down\)/);
+});
+
+// ---------- scalp_wide entry ----------
+// sceneWide() reuses candles1()'s exact numbers at 5-minute spacing: same stop (0.1056 %), and today's high 102.025 is the only level, 1.585 away.
+//   levelPct = 1.585 / 100.44 x 100 = 1.578057 % (worked by long division); required = max(0.8, ATR% 0.0917) = 0.8 %, so there is room.
+//   target = the level itself (no margin held back) = entry + 1.585 = 102.025 exactly.
+const FREE_WIDE = { ...SCALP_WIDE_DEFAULTS, fee_pct_per_side: 0, slippage_pct: 0, min_candles_15m: 10 }; // 34 candles -> 11 complete 15-min buckets
+const WIDE = { ...SCALP_WIDE_DEFAULTS, min_candles_15m: 10 };
+
+test('scalp_wide entry: exhaustion reversal on 5-min candles gives a long, stop 0.1056 %, target = the level (102.025), no costs', () => {
+  const a = analyseWide({ ...sceneWide(), cfg: FREE_WIDE });
+  assert.equal(a.ok, true, a.reason);
+  const p = a.plan;
+  assert.equal(p.long, true); assert.deepEqual(p.hits.map((h) => h.name), ['exhaustion_reversal']);
+  assert.equal(p.entry, 100.44); assert.equal(p.stopPct, 0.1056); assert.equal(p.targetPct, 1.5781);
+  assert.equal(p.stopPrice, 100.333929); assert.equal(p.targetPrice, 102.025);
+  assert.equal(p.rr, 14.94); // 1.578057 / 0.105607 (no costs) worked by long division
+});
+
+// reward 1.578057 - 0.23 = 1.348057, risk 0.105607 + 0.23 = 0.335607, 1.348057 / 0.335607 = 4.02: scalp_wide still trades after the real costs
+// (unlike the tight scalp above, whose 0.5 % cap leaves almost no reward once the 0.23 % round trip is taken off).
+test('scalp_wide entry: with the default costs (0.23 %) the same setup still trades, reward/risk 4.02 after costs', () => {
+  const a = analyseWide({ ...sceneWide(), cfg: WIDE });
+  assert.equal(a.ok, true, a.reason);
+  assert.equal(a.plan.rr, 4.02);
+});
+
+// highOverride caps every candle's high at 100.84: the only level is then 100.84, 0.3983 % away ((100.84-100.44)/100.44 x 100), below the 0.8 %
+// minimum (and below 1 x ATR 0.0917 %, so the 0.8 % floor is what actually binds here): no room, skipped.
+test('scalp_wide entry: a level only 0.40 % away is below the 0.8 % / 1xATR floor and is skipped', () => {
+  const a = analyseWide({ ...sceneWide({ highOverride: 100.84 }), cfg: FREE_WIDE });
+  assert.equal(a.ok, false);
+  assert.match(a.reason, /^nearest resistance 100\.84 is only 0\.4% away, below the 0\.8% needed \(0\.8% minimum, or 1 x ATR 0\.09%, whichever is larger\)$/);
+});
+
+test('scalp_wide entry: too few 5-min or 15-min candles, and a stale candle, are refused in plain words', () => {
+  const s = sceneWide();
+  assert.match(analyseWide({ ...s, now: s.now + 20 * MIN, cfg: FREE_WIDE }).reason, /no fresh 5-min candle/);
+  assert.match(analyseWide({ ...s, c5raw: s.c5raw.slice(-10), cfg: FREE_WIDE }).reason, /not enough 5-min candles yet \(need 30\)/);
+  assert.match(analyseWide({ ...s, cfg: { ...FREE_WIDE, min_candles_15m: 50 } }).reason, /not enough 15-min candles yet \(need 50\)/);
 });
 
 // ---------- exits ----------
@@ -161,7 +207,7 @@ test('bot: with the default costs nothing is entered, the skip is stored with it
   assert.deepEqual((await h.bot.cryptoScalpScan()).entered, []);
   assert.equal(h.store._db.trades.length, 0);
   const skips = await h.store.skipsSince('1970-01-01', 'crypto_scalp');
-  assert.equal(skips.length, 3); assert.match(skips[0].reason, /^reward\/risk 0\.8 after costs is below 1\.3/); assert.equal(skips[0].market, 'crypto_scalp');
+  assert.equal(skips.length, 3); assert.match(skips[0].reason, /^reward\/risk 0\.8 after costs is below 1\b/); assert.equal(skips[0].market, 'crypto_scalp');
   assert.deepEqual(await h.store.skipsSince('1970-01-01'), [], 'intraday skip list stays clean');
   await h.bot.cryptoScalpScan(); assert.equal((await h.store.skipsSince('1970-01-01', 'crypto_scalp')).length, 3, 'the same skip is stored once');
 });
@@ -180,6 +226,33 @@ test('bot: the monitor closes at the target with gross, costs, net and rupee P&L
   assert.ok(Math.abs(t.gross_pnl_usdt - gross) < 1e-4); assert.ok(Math.abs(t.net_pnl_usdt - (gross - cost)) < 1e-4); assert.ok(Math.abs(t.cost_usdt - cost) < 1e-4);
   assert.ok(Math.abs(t.pnl_inr - (gross - cost) * 88) < 0.01); assert.ok(t.pnl_inr < t.gross_pnl_inr); assert.equal(t.fx_rate, 88);
   assert.equal(t.be_moved, false);
+});
+
+function harnessWide() {
+  const s = sceneWide();
+  const store = createMemoryStore();
+  const logs = [];
+  const clock = { t: s.now };
+  const crypto = { candles: async () => s.c5raw, usdtInr: async () => ({ rate: 88, source: 'test' }) };
+  const bot = createScalpBot({ store, crypto, source1m: { candles1m: async () => [] }, now: () => clock.t, log: (m) => logs.push(m) });
+  return { s, store, logs, clock, bot };
+}
+
+test('bot: scalp_wide opens one trade per coin under its OWN market/strategy, with its own balance; scalp and intraday queries never see it', async () => {
+  const h = harnessWide();
+  await h.store.setConfigIfMissing('scalp_wide', { min_candles_15m: 10 }); // this fixture's 34 candles give 11 complete 15-min buckets
+  const r = await h.bot.cryptoScalpWideScan();
+  assert.deepEqual(r.entered, ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']);
+  const rows = h.store._db.trades;
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((t) => t.market === 'crypto_wide_scalp' && t.strategy === 'scalp_wide' && t.status === 'open' && t.direction === 'LONG'));
+  const t = rows[0];
+  assert.equal(t.sl_price, 100.333929); assert.equal(t.target_price, 102.025); assert.equal(t.r_factor, 4.02);
+  assert.match(t.basis, /^Scalp wide LONG on BTCUSDT: the 5-min chart showed exhaustion reversal/); assert.match(t.basis, /reward\/risk 4\.02 after costs/);
+  assert.equal((await h.bot.cryptoScalpWideScan()).entered.length, 0, 'one open scalp_wide per coin');
+  assert.deepEqual(await h.store.openTrades('crypto_scalp'), [], 'the tight scalp never sees scalp_wide trades');
+  assert.deepEqual(await h.store.openTrades('crypto'), [], 'nor does the intraday crypto monitor');
+  assert.deepEqual(await h.store.closedTrades(null), [], 'nor the intraday lists (market ends in "_scalp", same exclusion as the tight scalp)');
 });
 
 test('bot: NSE scalp does not run (no 1-minute NSE source) and says why, once a day', async () => {
@@ -222,7 +295,7 @@ test('report page: Scalp and Intraday tabs, "too few trades, no conclusion", and
   const store = createMemoryStore();
   await store.insertSkip({ market: 'crypto_scalp', symbol: 'BTCUSDT', skip_date: '2026-11-16', reason: '<script>alert(1)</script> reward/risk 0.5' });
   const html = renderScalpReport(await buildScalpData({ store, now: () => Date.parse('2026-11-16T10:00:00Z') }));
-  assert.match(html, /id="b-scalp"[^>]*>Scalp<\/button><button id="b-intraday"[^>]*>Intraday<\/button>/);
+  assert.match(html, /id="b-scalp"[^>]*>Scalp<\/button><button id="b-scalp_wide"[^>]*>Scalp wide<\/button><button id="b-intraday"[^>]*>Intraday<\/button>/);
   assert.match(html, /too few trades, no conclusion/); assert.doesNotMatch(html, /<script>alert/); assert.match(html, /&lt;script&gt;alert\(1\)/);
 });
 
@@ -253,7 +326,7 @@ function wiring(env) {
 }
 test('wiring: scan every minute and monitor every minute; the report is behind the secret; PAPER_SCALP_ENABLED=false removes the jobs but not the report', async () => {
   const on = wiring({});
-  assert.deepEqual(on.crons, ['5 * * * * *', '35 * * * * *']); assert.equal(on.out.enabled, true);
+  assert.deepEqual(on.crons, ['5 * * * * *', '35 * * * * *', '10 */5 * * * *', '40 * * * * *']); assert.equal(on.out.enabled, true);
   assert.equal((await call(on.app, '/api/paper/scalp-report')).status, 401);
   assert.equal((await call(on.app, '/api/paper/scalp-report', { query: { key: 'wrong' } })).status, 401);
   const ok = await call(on.app, '/api/paper/scalp-report', { query: { key: 's3cret' } });

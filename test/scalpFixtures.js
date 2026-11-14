@@ -31,4 +31,31 @@ function scene({ bump = null } = {}) {
   return { c1raw: c1, c5raw: c5, now, dayStartMs: c5[0].t, last };
 }
 
-module.exports = { MIN, candles1, candles5, scene };
+// scalp_wide: the same shape as candles1() (32 falling candles, then a small red candle, then a green candle closing above its high -> bullish
+// exhaustion reversal, entry 100.44), but spaced 5 minutes apart so it can be read directly as the 5-minute entry candles. Same price steps as
+// candles1(), so ATR14 and the stop are IDENTICAL numbers (0.092143 / 0.1056 %); only the candle spacing changes.
+// highOverride caps every candle's high at that ceiling (so "today's high" = the ceiling, not the natural 102.025 at the start), moving the only
+// level this falling fixture offers closer to the entry; the tail candles near 100.4-100.9 that feed ATR stay below the ceiling, so it is unaffected.
+function candles5Wide({ highOverride = null } = {}) {
+  const out = [];
+  let px = 102.0; let t = 0;
+  for (let i = 0; i < 32; i++) {
+    let h = px + 0.025;
+    if (highOverride != null) h = Math.min(h, highOverride);
+    out.push({ t, o: px, h, l: px - 0.05 - 0.025, c: px - 0.05, v: 10 });
+    px = +(px - 0.05).toFixed(4); t += 5 * MIN;
+  }
+  out.push({ t, o: 100.40, h: 100.405, l: 100.38, c: 100.39, v: 10 }); t += 5 * MIN;
+  out.push({ t, o: 100.39, h: 100.45, l: 100.385, c: 100.44, v: 10 });
+  return out;
+}
+
+// Everything needed to call analyseWide(): 34 closed 5-minute candles (11 complete 15-minute buckets once aggregated), `now` 5 s after the last one.
+function sceneWide({ highOverride = null } = {}) {
+  const c5 = candles5Wide({ highOverride });
+  const last = c5[c5.length - 1];
+  const now = last.t + 5 * MIN + 5000;
+  return { c5raw: c5, now, dayStartMs: c5[0].t, last };
+}
+
+module.exports = { MIN, candles1, candles5, scene, candles5Wide, sceneWide };

@@ -40,11 +40,12 @@ function summarise({ closed, open, skips, minTrades }) {
   };
 }
 
-async function buildScalpData({ store, now = Date.now, scalpMarket = 'crypto_scalp' }) {
+async function buildScalpData({ store, now = Date.now, scalpMarket = 'crypto_scalp', scalpWideMarket = 'crypto_wide_scalp' }) {
   const cfg = merge(DEFAULTS, await store.getConfig());
   const minTrades = cfg.learning.min_trades_for_conclusion;
   const since = istParts(now() - 7 * 86400000).date;
   const scalpClosed = await store.closedTrades(scalpMarket);
+  const scalpWideClosed = await store.closedTrades(scalpWideMarket);
   const intradayClosed = await store.closedTrades(null); // intraday markets only (nse, crypto)
   const intradayOpen = [...await store.openTrades('nse'), ...await store.openTrades('crypto')];
   return {
@@ -53,8 +54,10 @@ async function buildScalpData({ store, now = Date.now, scalpMarket = 'crypto_sca
     minTrades,
     skipsWindow: `since ${since}`,
     scalp: summarise({ closed: scalpClosed, open: await store.openTrades(scalpMarket), skips: await store.skipsSince(since, scalpMarket), minTrades }),
+    scalpWide: summarise({ closed: scalpWideClosed, open: await store.openTrades(scalpWideMarket), skips: await store.skipsSince(since, scalpWideMarket), minTrades }),
     intraday: summarise({ closed: intradayClosed, open: intradayOpen, skips: await store.skipsSince(since), minTrades }),
     recentScalp: (await store.listTrades(20, scalpMarket)).map((t) => ({ id: t.id, symbol: t.symbol, direction: t.direction, patterns: t.patterns, status: t.status, entry_price: t.entry_price, exit_price: t.exit_price, exit_reason: t.exit_reason, gross_pnl_inr: t.gross_pnl_inr ?? null, pnl_inr: t.pnl_inr ?? null, minutes: minutesIn(t) })),
+    recentScalpWide: (await store.listTrades(20, scalpWideMarket)).map((t) => ({ id: t.id, symbol: t.symbol, direction: t.direction, patterns: t.patterns, status: t.status, entry_price: t.entry_price, exit_price: t.exit_price, exit_reason: t.exit_reason, gross_pnl_inr: t.gross_pnl_inr ?? null, pnl_inr: t.pnl_inr ?? null, minutes: minutesIn(t) })),
   };
 }
 
@@ -68,7 +71,7 @@ function block(name, s, minTrades) {
     ? `<table><tr><th>Skipped</th><th>Why (an example)</th></tr>${s.skips.reasons.map((r) => `<tr><td>${r.n}x</td><td>${esc(r.example)}</td></tr>`).join('')}</table>`
     : '<p class="m">No skips recorded.</p>';
   return `<section id="tab-${name}" class="tab"><div class="grid"><div><b>${s.trades}</b><span>closed trades</span></div><div><b>${s.winRatePct == null ? '-' : s.winRatePct + '%'}</b><span>win rate</span></div>
-<div><b>${inr(s.netPnlInr)}</b><span>net P&amp;L${name === 'scalp' ? ` (gross ${inr(s.grossPnlInr)}, costs ${inr(-s.costsInr)})` : ''}</span></div><div><b>${s.avgMinutes == null ? '-' : s.avgMinutes + ' min'}</b><span>average time in trade</span></div><div><b>${s.open}</b><span>open now</span></div></div>
+<div><b>${inr(s.netPnlInr)}</b><span>net P&amp;L${name === 'scalp' || name === 'scalp_wide' ? ` (gross ${inr(s.grossPnlInr)}, costs ${inr(-s.costsInr)})` : ''}</span></div><div><b>${s.avgMinutes == null ? '-' : s.avgMinutes + ' min'}</b><span>average time in trade</span></div><div><b>${s.open}</b><span>open now</span></div></div>
 ${s.trades < minTrades ? `<p class="m">${esc(NO_CONCLUSION)} (${s.trades} of ${minTrades} trades)</p>` : ''}
 <h3>Per pattern</h3>${patterns}<h3>Skips (${s.skips.total}), last 7 days</h3>${skips}</section>`;
 }
@@ -77,10 +80,10 @@ function renderScalpReport(d) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Paper: Scalp vs Intraday</title>
 <style>body{font:15px/1.4 system-ui,sans-serif;margin:0;padding:12px;color:#1c1f24;background:#fff}h1{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:16px 0 6px}.m{color:#5b6470}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.grid div{border:1px solid #d9dde3;border-radius:8px;padding:8px}.grid b{display:block;font-size:18px}.grid span{color:#5b6470;font-size:12px}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #e5e8ec;padding:5px 6px;text-align:left;font-size:13px;vertical-align:top}button{font:inherit;padding:6px 14px;border:1px solid #1c1f24;background:#fff;border-radius:6px;margin-right:6px}button.on{background:#1c1f24;color:#fff}.tab{display:none}.tab.on{display:block}</style></head><body>
 <h1>NiftyRadar PAPER bot: Scalp vs Intraday</h1><p class="m">Demo only, no real money. Updated ${esc(d.generatedAt)}. Scalp P&amp;L is after fees and slippage.</p>
-<p><button id="b-scalp" class="on" type="button">Scalp</button><button id="b-intraday" type="button">Intraday</button></p>
-${block('scalp', d.scalp, d.minTrades).replace('class="tab"', 'class="tab on"')}${block('intraday', d.intraday, d.minTrades)}
-<script>(function(){function show(n){['scalp','intraday'].forEach(function(k){document.getElementById('tab-'+k).className='tab'+(k===n?' on':'');document.getElementById('b-'+k).className=k===n?'on':'';});}
-document.getElementById('b-scalp').onclick=function(){show('scalp')};document.getElementById('b-intraday').onclick=function(){show('intraday')};})();</script></body></html>`;
+<p><button id="b-scalp" class="on" type="button">Scalp</button><button id="b-scalp_wide" type="button">Scalp wide</button><button id="b-intraday" type="button">Intraday</button></p>
+${block('scalp', d.scalp, d.minTrades).replace('class="tab"', 'class="tab on"')}${block('scalp_wide', d.scalpWide, d.minTrades)}${block('intraday', d.intraday, d.minTrades)}
+<script>(function(){function show(n){['scalp','scalp_wide','intraday'].forEach(function(k){document.getElementById('tab-'+k).className='tab'+(k===n?' on':'');document.getElementById('b-'+k).className=k===n?'on':'';});}
+document.getElementById('b-scalp').onclick=function(){show('scalp')};document.getElementById('b-scalp_wide').onclick=function(){show('scalp_wide')};document.getElementById('b-intraday').onclick=function(){show('intraday')};})();</script></body></html>`;
 }
 
 module.exports = { buildScalpData, renderScalpReport, summarise, NO_CONCLUSION };
