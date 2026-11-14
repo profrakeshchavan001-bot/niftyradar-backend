@@ -11,6 +11,7 @@ const { loadConfig } = require('./config');
 const { newsCheck, FIVE_MIN } = require('./sources');
 const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
 const { createJudge, loadJudgeConfig, tradeFields } = require('../src/paper/decision/judge');
+const { judge2, tradeFields2 } = require('../src/paper/decision/judge2');
 const { classifyEmaCross } = require('../src/paper/lib/emaCross');
 const { tagSmc } = require('../src/paper/lib/smc');
 const Lib = require('../src/paper/lib/exitSim');
@@ -74,7 +75,8 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     skipSeen.add(key);
     log(`[paperbot] skip ${market} ${symbol}: ${reason}`);
     await store.insertSkip({ market, symbol, skip_date: date, reason, r_factor: extra.r_factor ?? null, patterns: extra.patterns || null, trend_state: extra.trend_state || null,
-      data_source: extra.data_source ?? null, data_delay_sec: extra.data_delay_sec ?? null, ema_cross: extra.ema_cross ?? null, smc_tags: extra.smc_tags || null });
+      data_source: extra.data_source ?? null, data_delay_sec: extra.data_delay_sec ?? null, ema_cross: extra.ema_cross ?? null, smc_tags: extra.smc_tags || null,
+      judge2_score: extra.judge2_score ?? null, judge2_take: extra.judge2_take ?? null, judge2_contributions: extra.judge2_contributions || null, judge2_basis: extra.judge2_basis ?? null });
   }
 
   // Shared part of both scans: closed candles -> context -> patterns -> entry decision.
@@ -101,7 +103,17 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     // liquidity pools/sweeps, order blocks, FVG retests, premium/discount, displacement, session -
     // stored on EVERY trade and skip, informational only (nothing here feeds an entry/exit decision).
     const smcTags = [...new Set([...patterns.filter((p) => p.kind === 'smc').map((p) => p.name), ...tagSmc({ c5, nowMs: now(), market })])];
-    const extra = { r_factor: score, patterns: names, trend_state: ctx, trigger_t: last.t, ema_cross: emaCross, smc_tags: smcTags, ...src };
+    // Judge v2 (CC2 round 2 item 3, src/paper/decision/judge2.js): PARALLEL scorer, stored on every
+    // trade and skip in both markets, NEVER used for a live decision. For crypto, the real reward/risk
+    // (plan.rr) is only known later, after planTrade() runs in cryptoScan - r_factor is left null
+    // (excluded, rescaled) here rather than passing off the momentum score as a risk-reward number.
+    const judge2Candidate = {
+      market, direction: tentativeDir, rFactor: market === 'crypto' ? null : score, patterns,
+      smcTags, emaCross, time: now(),
+    };
+    const judge2Decision = tentativeDir ? await judge2(judge2Candidate) : null;
+    const judge2Fields = judge2Decision ? tradeFields2(judge2Decision) : { judge2_score: null, judge2_take: null, judge2_contributions: null, judge2_basis: null };
+    const extra = { r_factor: score, patterns: names, trend_state: ctx, trigger_t: last.t, ema_cross: emaCross, smc_tags: smcTags, ...judge2Fields, ...src };
     if (!decision.enter) { await skip(market, symbol, decision.reason, extra); return null; }
     return { c5, last, ctx, decision, extra };
   }
@@ -116,6 +128,8 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       smc_tags: a.extra.smc_tags || decision.patterns.filter((p) => p.kind === 'smc').map((p) => p.name),
       news_filter: news, entry_time: new Date(now()).toISOString(), max_fav_pct: 0, max_adv_pct: 0,
       ema_cross: a.extra.ema_cross ?? null,
+      judge2_score: a.extra.judge2_score ?? null, judge2_take: a.extra.judge2_take ?? null,
+      judge2_contributions: a.extra.judge2_contributions || null, judge2_basis: a.extra.judge2_basis ?? null,
     };
   }
 

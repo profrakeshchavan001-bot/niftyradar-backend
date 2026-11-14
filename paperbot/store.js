@@ -17,11 +17,13 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
   // and the old fixed +2% / -1% rule followed in parallel for comparison only
   'stop_active', 'breakeven_time', 'target_type', 'stop_type', 'rr', 'legacy_target', 'legacy_stop', 'legacy_result',
   'strategy', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr', 'be_moved', // scalp: docs/SCALP.md
-  'ema_cross']; // EMA9/21 (5m) / EMA20/50 (15m,1h) crossover confirmation, src/paper/lib/emaCross.js
-const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions']);
+  'ema_cross', // EMA9/21 (5m) / EMA20/50 (15m,1h) crossover confirmation, src/paper/lib/emaCross.js
+  'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis']; // PARALLEL scorer, src/paper/decision/judge2.js - never a live decision
+const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions', 'judge2_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
-  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr'];
-const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec', 'ema_cross', 'smc_tags'];
+  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'judge2_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr'];
+const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec', 'ema_cross', 'smc_tags',
+  'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis'];
 
 // scalp markets ('crypto_scalp', 'nse_scalp') stay out of the intraday lists unless asked for by name (docs/SCALP.md)
 const isScalp = (m) => String(m || '').endsWith('_scalp');
