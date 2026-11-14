@@ -10,6 +10,7 @@ const { createYahooSource, parseChart, loadUniverse, USER_AGENT } = require('../
 const { createNseSource } = require('../paperbot/sources');
 const { createBot } = require('../paperbot/bot');
 const { createMemoryStore } = require('../paperbot/store');
+const { aggregate } = require('../paperbot/engine');
 
 const fixture = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'yahoo', name), 'utf8'));
 const CHART_5M = fixture('chart-RELIANCE.NS-5m-5d.json');
@@ -133,7 +134,7 @@ function deadDhan(extra = {}) {
   };
 }
 
-test('source: Dhan candles fail -> Yahoo is used automatically, marked "yahoo", and Dhan is left alone for 15 minutes', async () => {
+test('source: Dhan candles fail -> Yahoo is used automatically, marked "yahoo_delayed", and Dhan is left alone for 15 minutes', async () => {
   const r = rig(() => CHART_5M);
   const d = deadDhan();
   const nse = createNseSource({ axios: r.axios, yahoo: r.yahoo, log: (m) => r.logs.push(m), now: () => r.clock.t, ...d.deps });
@@ -143,13 +144,16 @@ test('source: Dhan candles fail -> Yahoo is used automatically, marked "yahoo", 
   assert.ok(r.logs.some((l) => /NSE data source: yahoo .*4 of 4 stocks read.*Observed delay of the Yahoo quote: \d+ s/.test(l)));
   assert.deepEqual(nse.ranking().map((q) => [q.symbol, q.pct, q.source])[0], ['RELIANCE', 0.8, 'yahoo']);
   const a = await nse.candles('RELIANCE');
-  assert.deepEqual([a.source, a.dataSource, a.candles.length, a.exchangeDelayMin], ['yahoo_chart_5m', 'yahoo', 7, 0]);
+  assert.deepEqual([a.source, a.dataSource, a.candles.length, a.exchangeDelayMin], ['yahoo_chart_5m', 'yahoo_delayed', 7, 0]);
   await nse.candles('TCS');
   assert.equal(d.dhanCalls.length, 1); // one failed Dhan read, then no more for 15 minutes
   assert.ok(r.logs.some((l) => /Dhan intraday candles not available \(401\); using the free Yahoo chart fallback/.test(l)));
   assert.equal(nse.spot('RELIANCE'), 1512);
   r.clock.t = 1794542815000 + 10 * 60000 + 1000; // last trade is now older than 2 candles
   assert.equal(nse.spot('RELIANCE'), null);
+  assert.equal(nse.spot('RELIANCE', { maxDelaySec: 900 }), 1512); // the delayed feed is allowed 15 more minutes ...
+  r.clock.t = 1794542815000 + 25 * 60000 + 1000;
+  assert.equal(nse.spot('RELIANCE', { maxDelaySec: 900 }), null); // ... and not a second longer
   r.clock.t = NOW + 16 * 60000; // first failure was at NOW + 3 s (after the staggered refresh)
   await nse.candles('RELIANCE');
   assert.equal(d.dhanCalls.length, 2); // Dhan is tried again after 15 minutes, so it takes over by itself when the token is renewed
@@ -177,15 +181,17 @@ const MIN = 60000;
 const FIVE = 5 * MIN;
 const ist = (h, m, s = 0) => Date.UTC(2026, 10, 13, h - 5, m - 30, s);
 
-function botOnYahoo({ feedStopsAt = Infinity, fail = false } = {}) {
+// delayMs: how far behind the market the fake Yahoo answers (0 = live, 900000 = the 15 minutes Yahoo may be late for NSE).
+function botOnYahoo({ feedStopsAt = Infinity, fail = false, delayMs = 0 } = {}) {
   const clock = { t: replay.nse.sessionStart };
   const logs = [];
   const store = createMemoryStore();
-  const axios = { get: async (url) => {
+  const axios = { get: async (url, cfg) => {
     if (fail) throw httpError(500);
-    const seen = Math.min(clock.t, feedStopsAt);
-    const rows = replay.nse.candles.filter((k) => k.t <= seen); // includes the candle still forming, like the live answer
-    const closed = rows.filter((k) => k.t + FIVE <= seen);
+    const seen = Math.min(clock.t - delayMs, feedStopsAt);
+    const five = replay.nse.candles.filter((k) => k.t <= seen); // includes the candle still forming, like the live answer
+    const closed = five.filter((k) => k.t + FIVE <= seen);
+    const rows = cfg?.params?.interval === '15m' ? aggregate(closed) : five; // 15m answer: real 15-minute candles of the same prices
     return { data: { chart: { error: null, result: [{
       meta: { symbol: 'TESTSTK.NS', regularMarketPrice: closed.at(-1).c, regularMarketTime: Math.floor(seen / 1000), regularMarketVolume: 1000000, exchangeDataDelayedBy: 0 },
       timestamp: rows.map((k) => k.t / 1000),
@@ -205,16 +211,16 @@ function botOnYahoo({ feedStopsAt = Infinity, fail = false } = {}) {
       await bot.nseMonitor();
     }
   }
-  return { clock, logs, store, yahoo, runSession };
+  return { clock, logs, store, yahoo, bot, runSession };
 }
 
-test('bot on Yahoo candles: trade is marked data_source "yahoo" with the observed delay, R-factor ranking unchanged', async () => {
+test('bot on Yahoo candles: trade is marked data_source "yahoo_delayed" with the observed delay, R-factor ranking unchanged', async () => {
   const h = botOnYahoo();
   await h.runSession();
   const trades = h.store._db.trades;
   assert.equal(trades.length, 1);
   const t = trades[0];
-  assert.deepEqual([t.symbol, t.direction, t.data_source, t.candle_source], ['TESTSTK', 'CALL', 'yahoo', 'yahoo_chart_5m']);
+  assert.deepEqual([t.symbol, t.direction, t.data_source, t.candle_source], ['TESTSTK', 'CALL', 'yahoo_delayed', 'yahoo_chart_5m']);
   // scan runs at 11:05:20; the latest closed candle ended at 11:05:00 -> 20 s
   assert.equal(t.entry_time, new Date(ist(11, 5, 20)).toISOString());
   assert.equal(t.data_delay_sec, 20);
@@ -222,11 +228,59 @@ test('bot on Yahoo candles: trade is marked data_source "yahoo" with the observe
   assert.match(t.score_source, /^r_factor_v2/);
   assert.equal(t.simulated_option, true);
   assert.deepEqual([t.status, t.exit_reason], ['closed', 'time_exit_15:15']);
-  assert.ok(h.logs.some((l) => /PAPER entry nse .*data_source yahoo, latest candle closed 20 s ago, quote lag 0 s, delay declared by the feed 0 min/.test(l)));
-  assert.ok(h.yahoo.stats.requests <= 76, `one request per 5-minute window at most, got ${h.yahoo.stats.requests}`); // 75 windows in a session
+  assert.ok(h.logs.some((l) => /PAPER entry nse .*data_source yahoo_delayed, latest candle closed 20 s ago, quote lag 0 s, delay declared by the feed 0 min/.test(l)));
+  // one 5m request per 5-minute window at most (75 windows), plus one 15m request in a window where the stock is analysed
+  assert.ok(h.yahoo.stats.requests <= 152, `at most one request per interval per 5-minute window, got ${h.yahoo.stats.requests}`);
 });
 
-test('bot on Yahoo candles: latest candle older than 2 candles -> no trade', async () => {
+// Monday case: Dhan token expired, Yahoo answers 15 minutes late. The whole NSE flow must still work.
+test('end to end on a 15-minute-late Yahoo feed: R factor, pattern, entry, SL / target, forced exit at 15:15', async () => {
+  const h = botOnYahoo({ delayMs: 15 * MIN });
+  await h.runSession();
+  const trades = h.store._db.trades;
+  assert.equal(trades.length, 1);
+  const t = trades[0];
+  // the signal candle closed at 11:05; Yahoo shows it from 11:20; the scan at 11:20:20 takes it: 920 s late
+  assert.equal(t.entry_time, new Date(ist(11, 20, 20)).toISOString());
+  assert.deepEqual([t.symbol, t.direction, t.data_source, t.data_delay_sec], ['TESTSTK', 'CALL', 'yahoo_delayed', 920]);
+  assert.ok(t.patterns.includes('exhaustion_reversal'));
+  assert.equal(t.r_factor, 3); // same R factor as on live candles
+  assert.equal(t.news_filter, 'no headline about this stock today');
+  // no option price on Yahoo: simulated and flagged. Premium = 2.5% of 492 = 12.3; 40,000 / (12.3 x 500) = 6 lots = 3000
+  assert.deepEqual([t.simulated_option, t.entry_price, t.qty, t.entry_underlying], [true, 12.3, 3000, 492]);
+  // exit levels fixed at entry: stop 12.3 x 0.95 = 11.685, target 12.3 x 1.10 = 13.53
+  assert.ok(Math.abs(t.sl_price - 11.685) <= 0.0051);
+  assert.equal(t.target_price, 13.53);
+  assert.match(t.basis, /Data: free Yahoo feed, about 15 min behind the market\./);
+  // forced exit 15:15: Yahoo then shows the 15:00 candle, 47 candles after the signal: stock 492 + 47 x 0.02 = 492.94,
+  // option 12.3 + 0.5 x 0.94 = 12.77, P&L 0.47 x 3000 = 1410
+  assert.deepEqual([t.status, t.exit_reason, t.exit_underlying, t.exit_price, t.pnl_inr], ['closed', 'time_exit_15:15', 492.94, 12.77, 1410]);
+  assert.equal(t.exit_time, new Date(ist(15, 15, 50)).toISOString());
+});
+
+test('15-minute-late Yahoo feed: a skipped setup also stores data_source and data_delay_sec', async () => {
+  const h = botOnYahoo({ delayMs: 15 * MIN });
+  await h.store.setConfigIfMissing('nse', { max_trades_per_day: 0 });
+  await h.runSession();
+  assert.equal(h.store._db.trades.length, 0);
+  const s = h.store._db.skips.find((x) => /max 0 trades/.test(x.reason));
+  assert.deepEqual([s.symbol, s.data_source, s.data_delay_sec], ['TESTSTK', 'yahoo_delayed', 920]);
+});
+
+test('Yahoo feed more than 15 minutes late (30 min): refused, no trade', async () => {
+  const h = botOnYahoo({ delayMs: 30 * MIN });
+  await h.runSession();
+  assert.equal(h.store._db.trades.length, 0);
+});
+
+test('weekend: nothing is read from Yahoo and nothing is traded', async () => {
+  const h = botOnYahoo();
+  h.clock.t = replay.nse.sessionStart + 86400000 + 20000; // Saturday 14 Nov 2026 09:15:20 IST
+  assert.deepEqual(await h.bot.nseScan(), { ran: false, reason: 'weekend' });
+  assert.equal(h.yahoo.stats.requests, 0);
+});
+
+test('bot on Yahoo candles: feed stops (latest candle older than 2 candles + the allowed 15 minutes) -> no trade', async () => {
   const h = botOnYahoo({ feedStopsAt: ist(10, 40) }); // Yahoo keeps answering, but with nothing newer than 10:40
   await h.runSession();
   assert.equal(h.store._db.trades.length, 0);

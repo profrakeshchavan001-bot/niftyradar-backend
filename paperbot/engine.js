@@ -56,7 +56,7 @@ function aggregate(candles, fromMs = 300000, toMs = 900000) {
 
 // Trend context from closed 5-minute candles: 15-minute trend, today's VWAP,
 // EMA20 of the 5-minute closes and which side of VWAP the price is on.
-function buildContext(c5, dayStartMs) {
+function buildContext(c5, dayStartMs, c15 = null) {
   const today = c5.filter((k) => k.t >= dayStartMs);
   const last = c5[c5.length - 1];
   const v = today.length ? P.vwap(today) : null;
@@ -65,7 +65,7 @@ function buildContext(c5, dayStartMs) {
     price: last ? last.c : null,
     vwap: v == null ? null : P.round(v, 4),
     ema20: e == null ? null : P.round(e, 4),
-    trend15: P.trendOf(aggregate(c5), 20),
+    trend15: P.trendOf(c15 && c15.length ? c15 : aggregate(c5), 20), // native 15-min candles when the feed has them
     vwapSide: v == null || !last ? 'unknown' : last.c > v ? 'up' : last.c < v ? 'down' : 'flat',
     emaSide: e == null || !last ? 'unknown' : last.c > e ? 'up' : last.c < e ? 'down' : 'flat',
   };

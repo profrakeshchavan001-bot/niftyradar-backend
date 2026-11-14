@@ -85,3 +85,9 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_basis         text;
 -- (how long ago the latest closed candle ended when the trade was decided).
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS data_source    text;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS data_delay_sec numeric;
+
+-- Report page and delayed-feed labels: exit levels fixed at entry, and the candle feed + its delay on skip rows too.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS sl_price     numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS target_price numeric;
+ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS data_source    text;
+ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS data_delay_sec numeric;

@@ -10,7 +10,7 @@ Solves: "trade the top R-factor stocks in demo using candle patterns, log WHY ea
 |---|---|
 | every 5 min, Mon-Fri 09:15-15:00 | NSE scan: top 5 by the real risk-reward R factor (`docs/R-FACTOR.md`), 5-min candles, patterns, entry |
 | every minute, Mon-Fri | NSE exit check: target +10 %, stop -5 %, forced exit 15:15 |
-| every 5 min, all days | Crypto scan: BTCUSDT, ETHUSDT, SOLUSDT (Binance public candles, no key) |
+| every 5 min, all days | Crypto scan: BTCUSDT, ETHUSDT, SOLUSDT (Binance public candles, no key); one open trade per coin, no daily limit |
 | every minute, all days | Crypto exit check: target +2 %, stop -1 % |
 | 15:45 Mon-Fri | NSE summary to Telegram + `daily_summaries` |
 | 23:55 daily | Crypto summary |
@@ -63,16 +63,36 @@ If the service did sleep, a wake is a fresh start. One minute after start the bo
 
 When Dhan has no candles or no live quotes (expired token), the bot reads 5-minute candles from Yahoo Finance's public chart
 endpoint (`SYMBOL.NS`) by itself: `paperbot/yahoo.js`. Only the 60 stocks in `data/nse-fno-top60.json`, about 1 request per second,
-one request per stock per 5 minutes, backoff on 429 / 5xx. Every NSE trade stores `data_source` ("dhan" or "yahoo") and
-`data_delay_sec`; the entry log line shows the delay. A latest candle older than 2 candles means no trade. If Yahoo fails, the
-stock is skipped and the failure is logged; no value is ever filled in. Dhan takes over again by itself when it answers.
-The R-factor ranking is unchanged.
+one request per stock per 5 minutes (plus one 15-minute read for a stock about to be analysed), backoff on 429 / 5xx.
+Every trade AND every skipped setup stores `data_source` ("dhan", "yahoo_delayed", "binance_public") and `data_delay_sec`
+(seconds since the latest closed candle ended, about 900 when Yahoo runs 15 minutes late); the entry log line shows the delay.
+
+Yahoo's NSE data can be about 15 minutes late. So on `yahoo_delayed` data the latest closed candle may be up to
+2 candles + 900 seconds old (`nse.yahoo_max_delay_sec`); older than that means no trade. On live data the limit stays 2 candles.
+A candle counts as closed only up to the time of the last trade Yahoo has seen, so a half-formed candle is never traded.
+Entries, the exit checks and the 15:15 exit then all run on prices that are about 15 minutes old, and the option price is
+simulated (Yahoo has no NSE option prices). If Yahoo fails, the stock is skipped and the failure is logged; no value is ever
+filled in. Dhan takes over again by itself when it answers. The R-factor ranking is unchanged.
 
 ## Report page
 
-`GET /api/paper/report?key=<PAPER_ADMIN_SECRET>`: one plain HTML page for the phone (no script, nothing external): day totals,
-today's trades with the basis sentence, open trades, and win rate / average P&L per pattern since the start ("too few trades"
-under 20). Read-only.
+`GET /api/paper/report?key=<PAPER_ADMIN_SECRET>`: one page for the phone. Read-only.
+
+- Top: trades today, wins, total P&L in INR, setups skipped today, and a "How the bot decides" box.
+- Table of the last 100 trades, newest first: market, symbol, direction, entry, SL, target, exit, exit reason, P&L (INR), status.
+- Tap a row: candle chart around the trade (open-source lightweight-charts, loaded from the unpkg CDN, pinned version), markers
+  for entry and exit, lines for SL and target, the "basis" sentence (why), and an "Open in TradingView" button
+  (`NSE:SYMBOL` or `BINANCE:ETHUSDT`).
+- Skipped today: every setup the bot saw but did not trade, with the reason.
+- Then, as before: day totals per market, today's trades as cards, open trades, win rate per pattern.
+
+NSE trades are option trades but the chart shows the stock (there are no option candles). The SL and target lines on the
+chart are the stock prices at which the option reaches its level at delta 0.5: exact for simulated options, approximate for
+real ones. The table always shows the option prices. SL and target are stored with each new trade (`sl_price`,
+`target_price`); for older trades they are worked out from the current rules.
+
+`GET /api/paper/chart?key=...&id=<trade id>` gives the chart data (candles, markers, lines) as JSON.
+`GET /api/paper/universe?key=...` lists what the bot scans; the same in words: `docs/UNIVERSE.md`.
 
 ## Tests
 

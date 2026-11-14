@@ -17,6 +17,7 @@ const DEFAULTS = {
     sim_premium_pct: 2.5, // assumed ATM premium as % of spot, simulated trades only
     min_candles: 21,
     min_turnover_inr: 10000000, // liquidity floor: today's traded value (price x volume) must be at least Rs 1 crore
+    yahoo_max_delay_sec: 900, // free Yahoo feed only: its candles may be this many seconds late on top of the usual 2-candle limit
     // NSE trading holidays (yyyy-mm-dd, IST). OWNER: please verify against the
     // NSE circular and add next year's list. A day with no fresh candle is
     // skipped anyway.
@@ -26,7 +27,6 @@ const DEFAULTS = {
     symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'],
     target_pct: 2, // on the underlying
     stop_pct: 1,
-    max_trades_per_day: 6,
     capital_usdt: 1000,
     risk_pct: 2,
     min_momentum_score: 1,
