@@ -5,12 +5,48 @@
 // with recorded candles and a fake clock.
 const P = require('./patterns');
 const E = require('./engine');
+const R = require('./rfactor');
 const { loadConfig } = require('./config');
 const { newsCheck, FIVE_MIN } = require('./sources');
 const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
 
-function createBot({ store, nse, crypto, now = Date.now, log = console.log }) {
+function createBot({ store, nse, crypto, now = Date.now, log = console.log, onConfig = () => {} }) {
   const skipSeen = new Set();
+  const candleCache = new Map(); // symbol -> { candles, source, at }
+
+  // Candles of one stock, read again only when the clock has moved into a new
+  // `bucketMs` window since the last read (15 min for ranking, 5 min for patterns).
+  async function candlesFor(symbol, bucketMs) {
+    const hit = candleCache.get(symbol);
+    if (hit && Math.floor(hit.at / bucketMs) === Math.floor(now() / bucketMs)) return hit;
+    const entry = { ...(await nse.candles(symbol)), at: now() };
+    candleCache.set(symbol, entry);
+    return entry;
+  }
+
+  // Real R factor for every liquid stock with valid candles, best first.
+  // Entry = live price; ATR and swing levels come from 15-min candles.
+  async function rankNse(quotes, n, cfg) {
+    const legacyOrder = R.legacyOrderOf(quotes);
+    const rows = [];
+    let illiquid = 0;
+    let noData = 0;
+    for (const q of quotes) {
+      if (!q || !(q.price > 0) || !Number.isFinite(q.pct)) continue;
+      if (!((q.volume || 0) * q.price >= n.min_turnover_inr)) { illiquid += 1; continue; }
+      const got = await candlesFor(q.symbol, 3 * FIVE_MIN);
+      const c5 = E.closedOnly(got.candles, FIVE_MIN, got.at);
+      const last = c5[c5.length - 1];
+      const r = c5.length >= n.min_candles && got.at - (last.t + FIVE_MIN) <= 2 * FIVE_MIN
+        ? R.rFactor({ entry: q.price, c15: E.aggregate(c5), prevDay: R.prevDayLevels(c5, istDayStart(now())), opt: cfg.rfactor })
+        : null;
+      if (!r) { noData += 1; continue; }
+      rows.push({ symbol: q.symbol, price: q.price, pct: q.pct, r });
+    }
+    const top = R.rankByR(rows, n.top_n, legacyOrder);
+    log(`[paperbot] NSE rank: ${rows.length} ranked, ${illiquid} below the liquidity floor, ${noData} without valid candles; top: ${top.map((t) => `${t.symbol} R ${t.rFactor}`).join(', ') || 'none'}`);
+    return top;
+  }
 
   // One skip row per (day, symbol, reason, trigger candle), not one per scan.
   async function skip(market, symbol, reason, extra = {}) {
@@ -54,6 +90,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log }) {
   // ---------------- NSE ----------------
   async function nseScan() {
     const cfg = await loadConfig(store);
+    onConfig(cfg);
     const n = { ...cfg.nse, patternOpt: cfg.patterns };
     const session = nseSession(now(), n.holidays);
     if (!session.open) return { ran: false, reason: session.reason };
@@ -61,7 +98,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log }) {
     if (p.minutes >= toMinutes(n.no_new_entry_after_ist)) return { ran: false, reason: 'too late for new entries' };
     const quotes = nse.ranking();
     if (!quotes) { log('[paperbot] NSE scan: no fresh live quotes, nothing done'); return { ran: false, reason: 'no live quotes' }; }
-    const top = E.rankRFactor(quotes, n.top_n);
+    const top = await rankNse(quotes, n, cfg);
     const today = await store.tradesForDay('nse', p.date);
     const open = await store.openTrades('nse');
     let taken = today.length;
@@ -70,7 +107,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log }) {
 
     for (const s of top) {
       if (open.some((t) => t.symbol === s.symbol) || entered.includes(s.symbol)) continue; // 1 open trade per stock
-      const { candles, source } = await nse.candles(s.symbol);
+      const { candles, source } = await candlesFor(s.symbol, FIVE_MIN);
       const a = await analyse('nse', s.symbol, candles, n, s.rFactor);
       if (!a) continue;
       if (today.some((t) => t.symbol === s.symbol && t.trigger_t === a.last.t)) continue; // this candle was already traded
@@ -89,14 +126,17 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log }) {
       if (!size) { await skip('nse', s.symbol, `one lot (${lot} x Rs ${premium}) is bigger than the 2% risk size or the free cash`, a.extra); continue; }
 
       const type = dir === 'up' ? 'CE' : 'PE';
+      const rDir = dir === 'up' ? s.r.long.r : s.r.short.r; // R of the direction actually traded
       const row = {
-        ...tradeRow('nse', s.symbol, s.rFactor, 'r_factor_proxy_v1 (|% change| / basket median)', a, news.reason),
+        ...tradeRow('nse', s.symbol, rDir, 'r_factor_v2 (target distance / stop distance, 15-min ATR and swing levels)', a, news.reason),
+        legacy_rf: s.legacyRf,
+        r_detail: { ...s.r, traded: { direction: dir, r: rDir }, rRank: s.rRank, legacyRank: s.legacyRank, inLegacyTop: s.legacyRank != null && s.legacyRank <= n.top_n },
         direction: dir === 'up' ? 'CALL' : 'PUT',
         instrument: quote ? `${s.symbol} ${quote.expiry} ${quote.strike} ${type}` : `${s.symbol} ATM ${type} (simulated)`,
         simulated_option: simulated,
         price_source: quote ? 'dhan_option_chain_ltp' : `simulated: premium ${n.sim_premium_pct}% of spot, delta ${n.sim_delta}`,
         candle_source: source, qty: size.qty, entry_price: premium, entry_underlying: spot,
-        basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: s.rFactor, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated }),
+        basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: rDir, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated }),
       };
       await store.insertTrade(row);
       log(`[paperbot] PAPER entry nse ${row.instrument} x${size.qty} @ ${premium}: ${row.patterns.join(', ')}`);
@@ -118,7 +158,8 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log }) {
 
   async function track(t, pct) {
     if (pct > (t.max_fav_pct || 0) || pct < (t.max_adv_pct || 0)) {
-      await store.updateTrade(t.id, { max_fav_pct: P.round(Math.max(t.max_fav_pct || 0, pct), 2), max_adv_pct: P.round(Math.min(t.max_adv_pct || 0, pct), 2) });
+      // best / worst % so far: kept in memory, written to the database only when the trade closes
+      await store.noteTrade(t.id, { max_fav_pct: P.round(Math.max(t.max_fav_pct || 0, pct), 2), max_adv_pct: P.round(Math.min(t.max_adv_pct || 0, pct), 2) });
     }
   }
 

@@ -42,7 +42,7 @@ function dailySummary({ market, date, trades, allClosed, minTrades = 20 }) {
   const lines = [`NiftyRadar PAPER bot (demo, no real money)`, `${label} summary ${date}`, ''];
   if (!trades.length) lines.push('No trades today.');
   trades.forEach((t, i) => {
-    const score = market === 'nse' ? `R ${t.r_factor}` : `score ${t.r_factor}`;
+    const score = market === 'nse' ? `R ${t.r_factor}${t.legacy_rf != null ? ` (old move-size value ${t.legacy_rf})` : ''}` : `score ${t.r_factor}`;
     lines.push(`${i + 1}) ${t.symbol} ${t.direction} · ${score} · ${(t.patterns || []).join(' + ')}${t.simulated_option ? ' · SIMULATED option price' : ''}`);
     lines.push(`   ${triggerText(t)}`);
     lines.push(`   Why: ${t.basis}`);
@@ -124,9 +124,10 @@ async function sendTelegram(axios, env, text, log = console.log) {
 
 function createReporter({ store, axios, env = process.env, now = Date.now, log = console.log, loadConfig }) {
   async function publish(kind, date, report) {
-    const sent = await sendTelegram(axios, env, report.text, log);
-    await store.saveSummary({ kind, summary_date: date, body: report.text, data: report.data, telegram_sent: sent });
-    log(`[paperbot] ${kind} ${date} stored${sent ? ' and sent to Telegram' : ' (Telegram not sent)'}`);
+    const sent = await sendTelegram(axios, env, report.text, log); // Telegram first: it must not depend on the database
+    let stored = true;
+    try { await store.saveSummary({ kind, summary_date: date, body: report.text, data: report.data, telegram_sent: sent }); } catch (e) { stored = false; log(`[paperbot] ${kind} could not be stored: ${e.message}`); }
+    log(`[paperbot] ${kind} ${date}: ${stored ? 'stored' : 'NOT stored'}, ${sent ? 'sent to Telegram' : 'Telegram not sent'}`);
     return { ...report, telegram_sent: sent };
   }
   return {
