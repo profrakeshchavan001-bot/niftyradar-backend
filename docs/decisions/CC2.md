@@ -67,3 +67,31 @@ If another overnight session picks this up: start with item 3 (exit
 accuracy, checking every candle's high/low since the last check) since it is
 the most isolated correctness bug and the brief itself calls it out
 separately from the bigger judge/SMC rework.
+
+## Item 3 - exit accuracy - half done, on purpose
+
+`src/paper/lib/exitSim.js` (`simulateExit`): walks every closed candle since
+the last check (oldest first), checks the stop and the target against each
+candle's high AND low (not only the latest tick), moves the stop to the
+entry once the chosen fraction of the way to the target is covered by a
+candle's favourable extreme (not its close), and books the stop when one
+candle's range reaches both levels (OHLC alone cannot say which came first,
+so the brief's rule - assume the worse outcome - is followed). 8 hand-worked
+candle-walk tests, all passing; full suite 199/199.
+
+**Deliberately NOT wired into `paperbot/bot.js`'s `cryptoMonitor` tonight.**
+Reason found while building it: `cryptoMonitor` today reads one live tick
+price per open trade per minute (`crypto.price(symbol)`) and the existing
+test rig (`test/paperCryptoLevels.test.js` `rig()`/`at()`, and the replay
+test) drives it entirely through that tick - `at(101)`, `at(100.6)`, `at(100.1)`
+- without adding matching candles to the fixed candle set each step. Swapping
+the monitor's exit check over to candle highs/lows, as item 3 asks, would
+make those hand-verified tests assert against the wrong thing (the fixed
+candle set, not the walked tick price) and they would need to be rebuilt
+alongside the monitor change, in the same PR, to stay honest. That is a
+second, larger, riskier piece of work on a trading-decision path I was not
+willing to rush through in the time left before 04:00 IST without it being
+reviewable on its own. The pure function is finished, tested and ready;
+wiring it in is the next PR, done together with rewriting that test rig
+(build per-tick candles consistent with the walked price, not just the price
+alone) - not something to split across two uncoordinated merges.

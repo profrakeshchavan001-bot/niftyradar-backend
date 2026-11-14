@@ -6,4 +6,5 @@ module.exports = {
   ...require('./indicators'),
   ...require('./levels'),
   ...require('./candleCache'),
+  ...require('./exitSim'),
 };
