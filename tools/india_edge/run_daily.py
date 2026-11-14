@@ -104,6 +104,7 @@ def run(asof=None, replay: int = 0, simulate_next_day: bool = False, out_dir: Pa
     desk = build_desk(market, picks, asof_ts, trade_ts, cfg, vcfg, rates, ledger, session, mode)
     write_desk(desk, out_dir / "morning_desk.json")
     ledger.export_csv(state_dir / "paper_trades.csv")
+    ledger.close()
     if session:
         save_alerts(session["events"], f"{trade_ts:%Y-%m-%d}", state_dir)
         if send:

@@ -29,6 +29,9 @@ class PaperLedger:
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
 
+    def close(self) -> None:
+        self.db.close()
+
     # ------------------------------------------------------------ state
     def realized_pnl(self, day: str | None = None) -> float:
         q, a = "SELECT COALESCE(SUM(pnl),0) FROM trades WHERE status='closed'", ()
