@@ -1,0 +1,22 @@
+{
+  "_note": "Stock lists are the same as SECTOR_MAP in server.js (copied, because server.js cannot be loaded as a module). yahooIndex = Yahoo Finance ticker of the NSE sector index; null = no index ticker confirmed, the sector move is then the plain average of its stocks.",
+  "benchmark": { "name": "Nifty 50", "yahooIndex": "^NSEI" },
+  "sectors": {
+    "IT": { "yahooIndex": "^CNXIT", "stocks": ["TCS", "INFY", "WIPRO", "HCLTECH", "TECHM", "LTIM"] },
+    "Pvt Banks": { "yahooIndex": "^NSEBANK", "stocks": ["HDFCBANK", "ICICIBANK", "AXISBANK", "KOTAKBANK", "INDUSINDBK"] },
+    "PSU Banks": { "yahooIndex": "^CNXPSUBANK", "stocks": ["SBIN", "BANKBARODA", "PNB", "CANBK"] },
+    "Pharma": { "yahooIndex": "^CNXPHARMA", "stocks": ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "LUPIN"] },
+    "Auto": { "yahooIndex": "^CNXAUTO", "stocks": ["TATAMOTORS", "MARUTI", "M&M", "BAJAJ-AUTO", "HEROMOTOCO", "EICHERMOT"] },
+    "FMCG": { "yahooIndex": "^CNXFMCG", "stocks": ["HINDUNILVR", "ITC", "NESTLEIND", "BRITANNIA", "TATACONSUM", "DABUR"] },
+    "Metal": { "yahooIndex": "^CNXMETAL", "stocks": ["TATASTEEL", "HINDALCO", "JSWSTEEL", "VEDL", "SAIL"] },
+    "Energy": { "yahooIndex": "^CNXENERGY", "stocks": ["RELIANCE", "ONGC", "BPCL", "IOC", "GAIL"] },
+    "Power": { "yahooIndex": null, "stocks": ["NTPC", "POWERGRID", "TATAPOWER", "ADANIPOWER"] },
+    "Realty": { "yahooIndex": "^CNXREALTY", "stocks": ["DLF", "GODREJPROP", "OBEROIRLTY", "PRESTIGE"] },
+    "Infra/Cement": { "yahooIndex": "^CNXINFRA", "stocks": ["LT", "ULTRACEMCO", "GRASIM", "AMBUJACEM", "SHREECEM"] },
+    "Media": { "yahooIndex": "^CNXMEDIA", "stocks": ["ZEEL", "SUNTV", "PVRINOX"] },
+    "Telecom": { "yahooIndex": null, "stocks": ["BHARTIARTL", "IDEA", "INDUSTOWER"] },
+    "Insurance": { "yahooIndex": null, "stocks": ["SBILIFE", "HDFCLIFE", "ICICIPRULI", "ICICIGI"] },
+    "NBFC": { "yahooIndex": null, "stocks": ["BAJFINANCE", "BAJAJFINSV", "CHOLAFIN", "MUTHOOTFIN", "SHRIRAMFIN"] },
+    "Consumer": { "yahooIndex": null, "stocks": ["TITAN", "HAVELLS", "VOLTAS", "CROMPTON"] }
+  }
+}
