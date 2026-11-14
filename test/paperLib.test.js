@@ -61,11 +61,16 @@ test('candle cache: a failed fetch is never cached and does not poison the next 
   assert.deepEqual(await cache.get('k', fetcher), ['ok']);
 });
 
-test('plugin loader: no bots/ops/replay plugins yet is a safe no-op', async () => {
-  const dirs = findPluginDirs(path.join(__dirname, '..', 'src', 'paper'), () => {});
+test('plugin loader: an empty bots/ops/replay tree is a safe no-op', async () => {
+  // An isolated empty temp tree, not the live src/paper/ directory: a real plugin now lives there
+  // (src/paper/ops/alerts/, overnight item 7) and finding it there would be the loader working as
+  // designed, not a bug - this test is about the empty case, which belongs in its own fixture.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'paper-plugins-empty-'));
+  fs.mkdirSync(path.join(tmp, 'bots'), { recursive: true });
+  const dirs = findPluginDirs(tmp, () => {});
   assert.deepEqual(dirs, []);
   const logs = [];
-  const result = await loadPlugins({ log: (m) => logs.push(m), baseDir: path.join(__dirname, '..', 'src', 'paper') });
+  const result = await loadPlugins({ log: (m) => logs.push(m), baseDir: tmp });
   assert.deepEqual(result.loaded, []);
 });
 

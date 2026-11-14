@@ -13,9 +13,11 @@ const STALE_MS = 15 * 60 * 1000; // a module with no scan in 15 minutes is a pro
 function createHealthTracker({ now = Date.now } = {}) {
   const jobs = new Map(); // name -> { lastRunAt, ok, error }
   const errors = []; // ring buffer, oldest first, max MAX_ERRORS
+  const consecFailures = new Map(); // name -> consecutive failure count, reset to 0 on a success
 
   function recordRun(name, ok, error = null) {
     jobs.set(name, { lastRunAt: now(), ok, error: error || null });
+    consecFailures.set(name, ok ? 0 : (consecFailures.get(name) || 0) + 1);
     if (!ok) {
       errors.push({ at: now(), job: name, message: String(error || 'unknown error').slice(0, 300) });
       while (errors.length > MAX_ERRORS) errors.shift();
@@ -37,11 +39,16 @@ function createHealthTracker({ now = Date.now } = {}) {
   }
 
   function snapshot() {
-    return { jobs: Object.fromEntries(jobs), errors: errors.slice(-MAX_ERRORS).reverse() };
+    return { jobs: Object.fromEntries(jobs), errors: errors.slice(-MAX_ERRORS).reverse(), consecFailures: Object.fromEntries(consecFailures) };
   }
 
   return { recordRun, wrap, snapshot };
 }
+
+// One tracker shared by the health route, the home page and the alerts plugin, so they all describe the
+// same jobs (same pattern as src/paper/context/news.js's defaultContext()).
+let sharedTracker = null;
+const defaultTracker = () => (sharedTracker || (sharedTracker = createHealthTracker()));
 
 const minutesAgo = (ms, now) => (ms == null ? null : Math.round((now - ms) / 60000));
 const istDateFromMs = (ms) => new Date(ms + 19800000).toISOString().slice(0, 10);
@@ -93,6 +100,14 @@ async function buildHealth({ tracker, store, state, now = Date.now() }) {
     dhan: { status: 'unchecked', note: 'per-source instrumentation not wired yet' },
   };
 
+  // Alerts the alerts plugin (src/paper/ops/alerts/) stored; absent entirely when paper_alerts does not
+  // exist yet (plugin not loaded) or the store has no raw .query - never treated as "no alerts".
+  let recentAlerts = [];
+  if (store && typeof store.query === 'function') {
+    try { recentAlerts = (await store.query('SELECT kind, subject, message, created_at FROM paper_alerts ORDER BY created_at DESC LIMIT 5')).rows; }
+    catch (e) { /* table may not exist yet, or the database is down - already reported via database.ok */ }
+  }
+
   const problems = [];
   if (!state || !state.enabled) problems.push('paper bot disabled (PAPER_BOT_ENABLED=false)');
   else if (!state.ready) problems.push('paper bot still starting');
@@ -113,6 +128,7 @@ async function buildHealth({ tracker, store, state, now = Date.now() }) {
     openTrades,
     today,
     recentErrors: snap.errors,
+    recentAlerts,
   };
 }
 
@@ -124,6 +140,9 @@ function htmlPage(h) {
   const jobRows = Object.entries(h.jobs).map(([name, j]) => row(name, j.lastRunAt ? `${j.minutesAgo}m ago${j.stale ? ' (stale)' : ''}` : 'never')).join('');
   const errRows = h.recentErrors.length
     ? `<h2>Recent errors</h2><ul>${h.recentErrors.map((e) => `<li>${esc(new Date(e.at).toISOString())} - ${esc(e.job)}: ${esc(e.message)}</li>`).join('')}</ul>`
+    : '';
+  const alertRows = (h.recentAlerts || []).length
+    ? `<h2>Alerts</h2><ul>${h.recentAlerts.map((a) => `<li>${esc(new Date(a.created_at).toISOString())} - ${esc(a.kind)} (${esc(a.subject)}): ${esc(a.message)}</li>`).join('')}</ul>`
     : '';
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Paper bot health</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px">
@@ -141,6 +160,7 @@ ${row('today trades', h.today.trades ?? 'n/a')}
 ${row('today skips', h.today.skips ?? 'n/a')}
 </table>
 ${errRows}
+${alertRows}
 </body></html>`;
 }
 
@@ -164,4 +184,4 @@ function attachHealthRoute(app, { secret, okSecret, tracker, state }) {
   });
 }
 
-module.exports = { createHealthTracker, buildHealth, attachHealthRoute, htmlPage, JOB_NAMES, STALE_MS };
+module.exports = { createHealthTracker, defaultTracker, buildHealth, attachHealthRoute, htmlPage, JOB_NAMES, STALE_MS };

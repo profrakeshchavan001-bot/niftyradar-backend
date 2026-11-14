@@ -14,7 +14,7 @@ const { buildReport, chartData } = require('./reportPage');
 const { loadUniverse } = require('./yahoo');
 const { loadConfig, DEFAULTS, merge } = require('./config');
 const { istParts, nseSession } = require('./time');
-const { createHealthTracker, attachHealthRoute } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
+const { defaultTracker, attachHealthRoute } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
 const { newsScore, eventBlock } = require('../src/paper/context/news');
 const { attachNewsCheckRoute } = require('../src/paper/context/newsCheck'); // GET /api/paper/news-check
 const { attachHomeRoute } = require('../src/paper/ops/home'); // GET /api/paper/home
@@ -123,7 +123,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   route('/api/paper/trades', (limit) => state.store.listTrades(limit));
   route('/api/paper/skips', (limit) => state.store.listSkips(limit));
 
-  const healthTracker = createHealthTracker();
+  const healthTracker = defaultTracker(); // shared with the alerts plugin (src/paper/ops/alerts/), if loaded
   attachHealthRoute(app, { secret, okSecret, tracker: healthTracker, state });
   attachNewsCheckRoute(app, { secret, okSecret, newsScore, eventBlock });
   attachHomeRoute(app, { secret, okSecret, tracker: healthTracker, state });
