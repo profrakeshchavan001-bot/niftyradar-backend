@@ -78,6 +78,8 @@ def adjust_corporate_actions(cash: pd.DataFrame, notes: dict, ratio: float = 0.1
     if cash.empty:
         return cash
     c = cash.sort_values(["symbol", "date"]).reset_index(drop=True)
+    for col in ("volume", "deliv_qty"):
+        c[col] = c[col].astype(float)       # pandas 3 refuses to write fractional adjusted volumes into int columns
     g = c.groupby("symbol")
     prev_close_row = g["close"].shift(1)
     gap_days = (c["date"] - g["date"].shift(1)).dt.days
