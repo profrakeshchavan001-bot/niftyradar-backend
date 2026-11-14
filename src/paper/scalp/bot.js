@@ -51,24 +51,33 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
   }
 
   // Walks every open shadow for `bot`, resolves it the same way a real trade of that bot would exit (same evaluateExit, same candles).
+  // CC3 urgent fix: the WHOLE body is now wrapped - previously only the candle fetch was, so a throw from openShadows/resolveShadow
+  // itself (a real Postgres error, not just a dead Binance call) silently killed the ENTIRE resolveShadows() call for every shadow
+  // on that tick, every tick, forever, with only a line in the server's own log (never seen) - exactly how 10 shadows stayed open
+  // 40+ minutes past their target/time stop. It must never again be able to stop real-trade exit processing in cryptoScalpMonitor.
   async function resolveShadows(bot, fetchCandles, intervalMs) {
     if (!shadowStore) return { checked: 0, resolved: 0 };
-    const open = await shadowStore.openShadows(bot);
-    if (!open.length) return { checked: 0, resolved: 0 };
-    const cfg = bot === 'scalp' ? await loadScalpConfig(store) : await loadScalpWideConfig(store);
-    let resolved = 0;
-    for (const sh of open) {
-      let candles;
-      try { candles = await fetchCandles(sh.symbol); } catch (e) { log(`[${bot}] shadow candles for ${sh.symbol} failed: ${e.response?.status || e.message}`); continue; }
-      const ev = evaluateExit({ trade: sh, candles: E.closedOnly(candles, intervalMs, now()), nowMs: now(), cfg });
-      if (!ev.exit) continue;
-      await shadowStore.resolveShadow(sh.id, { resolved_reason: ev.reason, resolved_price: ev.price, resolved_time: new Date(ev.timeMs).toISOString() });
-      log(`[${bot}] shadow resolved ${sh.symbol}: ${ev.reason} @ ${ev.price} (would-be, never a trade)`);
-      resolved += 1;
+    try {
+      const open = await shadowStore.openShadows(bot);
+      if (!open.length) return { checked: 0, resolved: 0 };
+      const cfg = bot === 'scalp' ? await loadScalpConfig(store) : await loadScalpWideConfig(store);
+      let resolved = 0;
+      for (const sh of open) {
+        try {
+          const candles = await fetchCandles(sh.symbol);
+          const ev = evaluateExit({ trade: sh, candles: E.closedOnly(candles, intervalMs, now()), nowMs: now(), cfg });
+          if (!ev.exit) continue;
+          await shadowStore.resolveShadow(sh.id, { resolved_reason: ev.reason, resolved_price: ev.price, resolved_time: new Date(ev.timeMs).toISOString() });
+          log(`[${bot}] shadow resolved ${sh.symbol}: ${ev.reason} @ ${ev.price} (would-be, never a trade)`);
+          resolved += 1;
+        } catch (e) { log(`[${bot}] shadow ${sh.id} (${sh.symbol}) failed to resolve: ${e.response?.status || e.message}`); }
+      }
+      return { checked: open.length, resolved };
+    } catch (e) {
+      log(`[${bot}] resolveShadows failed: ${e.message}`);
+      return { checked: 0, resolved: 0, error: e.message };
     }
-    return { checked: open.length, resolved };
   }
-
   async function cryptoScalpScan() {
     const cfg = await loadScalpConfig(store);
     const date = istParts(now()).date;
@@ -212,7 +221,17 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
     return { ran: false, reason };
   }
 
-  return { cryptoScalpScan, cryptoScalpMonitor, cryptoScalpWideScan, cryptoScalpWideMonitor, nseScalpScan };
+  // CC3 urgent fix item 2: one-time backfill at startup - resolves every OLD open shadow from candle history (a much bigger
+  // window than the regular per-tick fetch, since a shadow stuck from before this fix could be hours old). Idempotent: resolving
+  // an already-resolved shadow never happens (resolveShadows only reads status='open'); running this twice is always safe.
+  async function backfillShadows() {
+    const tight = await resolveShadows('scalp', (symbol) => source1m.candles1m(symbol, 1440), 60000); // 1440 x 1m = 24h back
+    const wide = await resolveShadows('scalp_wide', (symbol) => crypto.candles(symbol), 300000); // crypto.candles() default (330 x 5m = ~27h) already covers this
+    log(`[scalp] shadow backfill: tight ${tight.resolved}/${tight.checked}, wide ${wide.resolved}/${wide.checked}`);
+    return { tight, wide };
+  }
+
+  return { cryptoScalpScan, cryptoScalpMonitor, cryptoScalpWideScan, cryptoScalpWideMonitor, nseScalpScan, backfillShadows };
 }
 
 module.exports = { createScalpBot, MARKET, MARKET_WIDE, basisText, basisTextWide };

@@ -253,6 +253,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
     shadowMonitor: job('shadow monitor', bot.shadowMonitor), // CC2 round 2 item 4 - follows rejected setups on paper, never a trade
   };
   state.ready = true; // the database is only opened when the first job needs it
+  require('./configMigrate').migrateStaleConfigDefaults(store, log).catch((e) => log(`[paperbot] config migration failed: ${e.message}`)); // CC3 urgent fix item 3
   log(`[paperbot] ready (PAPER ONLY, storage: ${store.kind}, Telegram: ${env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID ? 'on' : 'off, summaries are only stored'})`);
 
   // Sleep / wake (Render free plan): a wake is a fresh start. One minute after

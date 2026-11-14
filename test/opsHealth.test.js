@@ -205,3 +205,25 @@ test('telegram: not configured, no sends yet -> configured false, lastSendOk nul
   const h = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
   assert.deepEqual(h.telegram, { configured: false, lastSendOk: null });
 });
+
+// CC3 urgent fix item 4: shadows stuck 60+ min past their own stop/target/time stop means the resolver is not running
+// (docs/decisions/CC3.md - the exact live bug: 10 shadow_setups rows open 40+ minutes past their time stop).
+test('stale shadows (60min+): any count above 0 is a PROBLEM, with the count and reason stated plainly', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const store = { ...createMemoryStore(), query: async (sql) => { assert.match(sql, /shadow_setups/); return { rows: [{ n: 3 }] }; } };
+  const h = await buildHealth({ tracker, store, state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
+  assert.equal(h.status, 'PROBLEM');
+  assert.equal(h.staleShadows, 3);
+  assert.match(h.reason, /3 open shadow\(s\) older than 60 min/);
+});
+
+test('stale shadows: 0 is not a problem; no raw query access (memory mode) reports null, never a false "0"', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const storeWithZero = { ...createMemoryStore(), query: async () => ({ rows: [{ n: 0 }] }) };
+  const ok = await buildHealth({ tracker, store: storeWithZero, state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
+  assert.equal(ok.staleShadows, 0); assert.doesNotMatch(ok.reason, /open shadow/);
+  const memOnly = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
+  assert.equal(memOnly.staleShadows, null);
+});

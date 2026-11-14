@@ -4,6 +4,7 @@
 const P = require('../../../paperbot/patterns');
 const { DEFAULTS, merge } = require('../../../paperbot/config');
 const { istParts } = require('../../../paperbot/time');
+const { loadScalpConfig, loadScalpWideConfig } = require('./config');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const NO_CONCLUSION = 'too few trades, no conclusion';
@@ -48,10 +49,14 @@ async function buildScalpData({ store, now = Date.now, scalpMarket = 'crypto_sca
   const scalpWideClosed = await store.closedTrades(scalpWideMarket);
   const intradayClosed = await store.closedTrades(null); // intraday markets only (nse, crypto)
   const intradayOpen = [...await store.openTrades('nse'), ...await store.openTrades('crypto')];
+  // CC3 urgent fix item 3: the EFFECTIVE config (stored paper_config row laid over the code default - the table always wins),
+  // shown plainly so a stale stored value can never again silently override a later code-default change without anyone noticing.
+  const effectiveConfig = { scalp: await loadScalpConfig(store), scalp_wide: await loadScalpWideConfig(store) };
   return {
     paperOnly: true,
     generatedAt: new Date(now()).toISOString(),
     minTrades,
+    effectiveConfig,
     skipsWindow: `since ${since}`,
     scalp: summarise({ closed: scalpClosed, open: await store.openTrades(scalpMarket), skips: await store.skipsSince(since, scalpMarket), minTrades }),
     scalpWide: summarise({ closed: scalpWideClosed, open: await store.openTrades(scalpWideMarket), skips: await store.skipsSince(since, scalpWideMarket), minTrades }),
@@ -80,6 +85,7 @@ function renderScalpReport(d) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Paper: Scalp vs Intraday</title>
 <style>body{font:15px/1.4 system-ui,sans-serif;margin:0;padding:12px;color:#1c1f24;background:#fff}h1{font-size:18px;margin:0 0 4px}h3{font-size:15px;margin:16px 0 6px}.m{color:#5b6470}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.grid div{border:1px solid #d9dde3;border-radius:8px;padding:8px}.grid b{display:block;font-size:18px}.grid span{color:#5b6470;font-size:12px}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #e5e8ec;padding:5px 6px;text-align:left;font-size:13px;vertical-align:top}button{font:inherit;padding:6px 14px;border:1px solid #1c1f24;background:#fff;border-radius:6px;margin-right:6px}button.on{background:#1c1f24;color:#fff}.tab{display:none}.tab.on{display:block}</style></head><body>
 <h1>NiftyRadar PAPER bot: Scalp vs Intraday</h1><p class="m">Demo only, no real money. Updated ${esc(d.generatedAt)}. Scalp P&amp;L is after fees and slippage.</p>
+<p class="m">Effective config (stored row over the code default - the stored row always wins): scalp min_rr <b>${d.effectiveConfig?.scalp?.min_rr}</b>, scalp_wide min_rr <b>${d.effectiveConfig?.scalp_wide?.min_rr}</b></p>
 <p><button id="b-scalp" class="on" type="button">Scalp</button><button id="b-scalp_wide" type="button">Scalp wide</button><button id="b-intraday" type="button">Intraday</button></p>
 ${block('scalp', d.scalp, d.minTrades).replace('class="tab"', 'class="tab on"')}${block('scalp_wide', d.scalpWide, d.minTrades)}${block('intraday', d.intraday, d.minTrades)}
 <script>(function(){function show(n){['scalp','scalp_wide','intraday'].forEach(function(k){document.getElementById('tab-'+k).className='tab'+(k===n?' on':'');document.getElementById('b-'+k).className=k===n?'on':'';});}

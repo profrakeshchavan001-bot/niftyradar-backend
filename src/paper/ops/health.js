@@ -136,6 +136,17 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
     catch (e) { /* table may not exist yet, or the database is down - already reported via database.ok */ }
   }
 
+  // CC3 urgent fix item 4: a shadow stuck past its own stop/target/time-stop and still "open" 60+ minutes later means the
+  // resolver (src/paper/scalp/bot.js, src/paper/bots/*/bot.js resolveShadows()) is not actually running - exactly the
+  // live bug found 14 Nov (docs/decisions/CC3.md): 10 shadow_setups rows open 40+ minutes past their own time stop.
+  let staleShadows = null; // null = not checked (no raw query access, e.g. memory mode) - never reported as "0" when unknown
+  if (store && typeof store.query === 'function') {
+    try {
+      const r = await store.query("SELECT count(*)::int AS n FROM shadow_setups WHERE status = 'open' AND created_at < now() - interval '60 minutes'");
+      staleShadows = r.rows[0]?.n ?? 0;
+    } catch (e) { /* table may not exist yet, or the database is down - already reported via database.ok */ }
+  }
+
   // PROBLEM: real faults only.
   const problems = [];
   if (!state || !state.enabled) problems.push('paper bot disabled (PAPER_BOT_ENABLED=false)');
@@ -147,6 +158,7 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
   if (dataSources.binance.status === 'failing') problems.push('crypto data source (Binance) failing, no fallback');
   // NSE has a fallback (Dhan -> Yahoo); both down together is a real fault, not just degraded.
   if (dataSources.dhan.status === 'failing' && dataSources.yahoo.status !== 'ok') problems.push('NSE data sources (Dhan and Yahoo) both failing');
+  if (staleShadows > 0) problems.push(`${staleShadows} open shadow(s) older than 60 min (the shadow resolver appears stuck)`);
 
   // DEGRADED: expected / non-fatal conditions, only checked when not already a PROBLEM.
   const degraded = [];
@@ -175,6 +187,7 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
     today,
     recentErrors: snap.errors,
     recentAlerts,
+    staleShadows,
     telegram: { configured: telegramConfigured, lastSendOk: state && state.telegramStats ? state.telegramStats.lastSendOk : null },
   };
 }
@@ -208,6 +221,7 @@ ${row('open trades (nse)', h.openTrades.nse ?? 'n/a')}
 ${row('open trades (crypto)', h.openTrades.crypto ?? 'n/a')}
 ${row('today trades', h.today.trades ?? 'n/a')}
 ${row('today skips', h.today.skips ?? 'n/a')}
+${row('stale shadows (60min+)', h.staleShadows ?? 'n/a')}
 </table>
 ${errRows}
 ${alertRows}

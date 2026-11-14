@@ -39,6 +39,7 @@ function attachScalp({ app, cron, axios, env = process.env, log = console.log, s
   cron.schedule('10 */5 * * * *', guarded('scalp_wide scan', bot.cryptoScalpWideScan, log), tz);
   cron.schedule('40 * * * * *', guarded('scalp_wide monitor', bot.cryptoScalpWideMonitor, log), tz);
   bot.nseScalpScan(); // logs once why NSE scalp does not run
+  bot.backfillShadows().catch((e) => log(`[scalp] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2, fire-and-forget at startup
   log('[scalp] ready (PAPER ONLY, crypto 1-minute scalps + 5-minute scalp_wide; report: /api/paper/scalp-report)');
   return { enabled: true, bot };
 }
