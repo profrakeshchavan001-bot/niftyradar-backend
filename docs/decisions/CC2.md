@@ -68,6 +68,31 @@ accuracy, checking every candle's high/low since the last check) since it is
 the most isolated correctness bug and the brief itself calls it out
 separately from the bigger judge/SMC rework.
 
+## Item 4 - ignore levels closer than 1xATR14(15m) - crypto only (PR follows exit-sim)
+
+`paperbot/cryptoLevels.js` `planTrade`: added `opt.minLevelDistAtr` (default
+1). The target-candidate list is now split into "any level beyond the
+entry" (used for the existing "no level found" message, unchanged) and
+"levels at least `minLevelDistAtr x ATR14(15m)` from the entry" (used to
+pick the actual target - skips a too-close level for the next one out, and
+fails with a new, explicit reason, never a silently wrong trade, when every
+level is too close). Default of 1x ATR does not change the target picked in
+either existing hand-worked test (`test/paperCryptoLevels.test.js`) - both
+nearest levels in those fixtures are already 1+ ATR away - so this is a pure
+addition, not a behaviour change, for every trade taken so far. 2 new
+hand-worked tests (one where a 2x-ATR minimum does change the pick, one
+where every level is excluded); full suite 210/210.
+
+**NSE exits are NOT made level-based tonight** (second half of item 4: "NSE
+exits become level-based like crypto"). NSE trades the OPTION premium, not
+the underlying directly - turning an underlying price level into a target
+premium needs the same simulated-delta translation `simOptionPrice` already
+uses for a missing real option price, done carefully enough to size the
+`legacy_*` A/B columns correctly, and that is a change to the actual NSE
+entry/exit path (`paperbot/bot.js` `nseScan`/`nseMonitor`), not an isolated
+addition like the crypto one above. Left for a dedicated PR with its own
+hand-worked tests.
+
 ## Item 3 - exit accuracy - half done, on purpose
 
 `src/paper/lib/exitSim.js` (`simulateExit`): walks every closed candle since

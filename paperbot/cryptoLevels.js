@@ -79,18 +79,22 @@ function collectLevels({ c5, c15, c1h, nowMs, opt = {} }) {
 // that fired (each with its candles). Any level at or beyond the entry on the
 // target side counts, whatever it was called; the nearest one is the target.
 function planTrade({ entry, direction, patterns, c5, c15, c1h, nowMs, opt = {} }) {
-  const o = { minRr: 1.5, targetBufferPct: 0.1, atrStopMult: 1, ...opt };
+  const o = { minRr: 1.5, targetBufferPct: 0.1, atrStopMult: 1, minLevelDistAtr: 1, ...opt };
   const long = direction === 'up';
   const atr = P.atr(c15, 14);
   if (!(entry > 0) || c15.length < 15 || !(atr > 0)) return { ok: false, reason: 'not enough 15-min candles for ATR14, no stop can be set' };
   const buf = o.targetBufferPct / 100;
 
-  // target: nearest level on the far side whose "0.1% before" price is still beyond the entry
-  const cands = collectLevels({ c5, c15, c1h, nowMs, opt: o })
+  // target: nearest level on the far side whose "0.1% before" price is still beyond the entry,
+  // skipping any level closer than minLevelDistAtr x ATR14(15m) to the entry (CC2 item 4) - too
+  // close to leave room for the trade, so the next one out is used instead.
+  const far = collectLevels({ c5, c15, c1h, nowMs, opt: o })
     .map((l) => ({ ...l, exit: long ? l.price * (1 - buf) : l.price * (1 + buf) }))
     .filter((l) => (long ? l.exit > entry : l.exit < entry))
     .sort((a, b) => (long ? a.price - b.price : b.price - a.price));
-  if (!cands.length) return { ok: false, reason: `no ${long ? 'resistance' : 'support'} level found ${long ? 'above' : 'below'} the entry, so no target` };
+  const cands = far.filter((l) => Math.abs(l.price - entry) >= o.minLevelDistAtr * atr);
+  if (!far.length) return { ok: false, reason: `no ${long ? 'resistance' : 'support'} level found ${long ? 'above' : 'below'} the entry, so no target` };
+  if (!cands.length) return { ok: false, reason: `every ${long ? 'resistance' : 'support'} level found is within ${o.minLevelDistAtr} x ATR14 (${P.round(atr, 6)}) of the entry, no room for a target` };
   const lvl = cands[0];
 
   // stop: beyond the pattern's own low (long) / high (short); if the pattern gives none on that side, the nearest 15-min swing
