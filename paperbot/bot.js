@@ -314,7 +314,20 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       try { if (typeof crypto.hourly === 'function') c1h = E.closedOnly(await crypto.hourly(s.symbol), 12 * FIVE_MIN, now()); } catch (e) { log(`[paperbot] 1-hour candles for ${s.symbol} failed (${e.response?.status || e.message}); 1-hour levels come from the 5-min candles only`); }
       if (!c1h.length) c1h = E.aggregate(a.c5, FIVE_MIN, 12 * FIVE_MIN);
       const planned = L.planTrade({ entry: price, direction: dir, patterns: a.decision.patterns, c5: a.c5, c15: E.aggregate(a.c5), c1h, nowMs: now(), opt: c.levels });
-      if (!planned.ok) { await skip('crypto', s.symbol, planned.reason, a.extra); continue; }
+      if (!planned.ok) {
+        await skip('crypto', s.symbol, planned.reason, a.extra);
+        // Shadow tracking (CC2 round 2 item 4): the setup had a real plan (entry/target/stop) but
+        // failed the reward/risk floor - followed on paper to see if it would have worked anyway,
+        // in its own table, never counted as a trade.
+        if (planned.plan) {
+          await store.insertShadow({
+            market: 'crypto', symbol: s.symbol, shadow_date: istParts(now()).date, direction: dir, reason: planned.reason,
+            entry_price: price, target_price: planned.plan.target, stop_price: planned.plan.stop,
+            entry_time: new Date(now()).toISOString(), basis: `Rejected: ${planned.reason}`,
+          });
+        }
+        continue;
+      }
       const plan = planned.plan;
       const size = E.sizeCrypto({ capital: c.capital_usdt, riskPct: c.risk_pct, stopPct: plan.riskPct, freeCash, price, coins: c.symbols.length });
       if (!size) { await skip('crypto', s.symbol, 'no free virtual USDT balance', a.extra); continue; }
@@ -410,7 +423,34 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     return { checked: open.length, closed };
   }
 
-  return { nseScan, nseMonitor, cryptoScan, cryptoMonitor };
+  // Shadow tracking (CC2 round 2 item 4): follows every open shadow row to its own would-be stop or
+  // target, the SAME way cryptoMonitor's level-based exits work (src/paper/lib/exitSim.js), but it
+  // is never a trade and never read by any entry/exit decision - its own table, its own loop.
+  // breakevenAt: 1 means "the full distance to the target" - with no breakeven feature for shadows,
+  // that threshold is reached only together with the target hit itself, so it never actually fires.
+  async function shadowMonitor() {
+    const open = await store.openShadows('crypto');
+    if (!open.length) return { checked: 0, closed: 0 };
+    let closed = 0;
+    for (const s of open) {
+      let candles = [];
+      try {
+        const raw = await crypto.candles(s.symbol);
+        candles = E.closedOnly(raw, FIVE_MIN, now()).filter((k) => k.t + FIVE_MIN > Date.parse(s.entry_time));
+      } catch (e) { log(`[paperbot] shadow candles for ${s.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      if (!candles.length) continue;
+      const short = s.direction === 'down';
+      const sim = Lib.simulateExit({ entry: s.entry_price, target: s.target_price, stop: s.stop_price, short, breakevenAt: 1, candles });
+      if (sim.exit) {
+        const pct = E.changePct(s.entry_price, sim.price, short);
+        await store.updateShadow(s.id, { status: 'closed', outcome: sim.reason === 'target' ? 'target' : 'stop', result_pct: P.round(pct, 2), exit_time: new Date(now()).toISOString() });
+        closed += 1;
+      }
+    }
+    return { checked: open.length, closed };
+  }
+
+  return { nseScan, nseMonitor, cryptoScan, cryptoMonitor, shadowMonitor };
 }
 
 module.exports = { createBot };

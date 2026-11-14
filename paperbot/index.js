@@ -152,6 +152,29 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   route('/api/paper/summaries', (limit) => state.store.listSummaries(limit));
   route('/api/paper/trades', (limit) => state.store.listTrades(limit));
   route('/api/paper/skips', (limit) => state.store.listSkips(limit));
+  route('/api/paper/shadows', (limit) => state.store.listShadows(limit)); // CC2 round 2 item 4
+
+  // Judge v2 contributions per trade, the ablation table, shadow-tracking results and win rate with
+  // vs. without a favourable EMA cross - all read-only, all PARALLEL data (CC2 round 2 item 5).
+  // Never used by any entry/exit decision; see docs/decisions/CC2.md.
+  route('/api/paper/report2', null, async () => {
+    const { ablation2, shadowSummary, emaCrossWinRate } = require('../src/paper/decision/report2');
+    const closedNse = await state.store.closedTrades('nse');
+    const closedCrypto = await state.store.closedTrades('crypto');
+    const closed = [...closedNse, ...closedCrypto];
+    const shadows = typeof state.store.listShadows === 'function' ? await state.store.listShadows(500, 'crypto') : [];
+    return {
+      body: {
+        judge2Trades: closed.filter((t) => t.judge2_score != null).map((t) => ({
+          id: t.id, market: t.market, symbol: t.symbol, judge2_score: t.judge2_score, judge2_take: t.judge2_take,
+          judge2_contributions: t.judge2_contributions, judge2_basis: t.judge2_basis, judge_score: t.judge_score ?? null, judge_take: t.judge_take ?? null,
+        })),
+        ablation2: ablation2(closed),
+        shadow: shadowSummary(shadows),
+        emaCrossWinRate: emaCrossWinRate(closed),
+      },
+    };
+  });
 
   const healthTracker = defaultTracker(); // shared with the alerts plugin (src/paper/ops/alerts/), if loaded
   attachHealthRoute(app, { secret, okSecret, tracker: healthTracker, state });
@@ -205,6 +228,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   const jobs = {
     nseScan: job('nse scan', healthTracker.wrap('nseScan', bot.nseScan)), nseMonitor: job('nse monitor', healthTracker.wrap('nseMonitor', bot.nseMonitor)),
     cryptoScan: job('crypto scan', healthTracker.wrap('cryptoScan', bot.cryptoScan)), cryptoMonitor: job('crypto monitor', healthTracker.wrap('cryptoMonitor', bot.cryptoMonitor)),
+    shadowMonitor: job('shadow monitor', bot.shadowMonitor), // CC2 round 2 item 4 - follows rejected setups on paper, never a trade
   };
   state.ready = true; // the database is only opened when the first job needs it
   log(`[paperbot] ready (PAPER ONLY, storage: ${store.kind}, Telegram: ${env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID ? 'on' : 'off, summaries are only stored'})`);
@@ -236,6 +260,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   cron.schedule('50 * 9-15 * * 1-5', jobs.nseMonitor, tz); // exits checked every minute
   cron.schedule('25 */5 * * * *', jobs.cryptoScan, tz);
   cron.schedule('55 * * * * *', jobs.cryptoMonitor, tz);
+  cron.schedule('40 */5 * * * *', jobs.shadowMonitor, tz); // same cadence as the crypto scan/monitor
   cron.schedule('45 15 * * 1-5', job('nse summary', async () => {
     const cfg = await loadConfig(store);
     if (cfg.nse.holidays.includes(istParts(Date.now()).date)) return; // no summary on an NSE holiday

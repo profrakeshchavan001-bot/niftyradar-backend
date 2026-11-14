@@ -21,9 +21,13 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
   'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis']; // PARALLEL scorer, src/paper/decision/judge2.js - never a live decision
 const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions', 'judge2_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
-  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'judge2_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr'];
+  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'judge2_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr',
+  'stop_price', 'result_pct']; // shadow tracking (paper_shadows)
 const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec', 'ema_cross', 'smc_tags',
   'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis'];
+// Shadow tracking (CC2 round 2 item 4): a rejected setup followed to its own hypothetical stop/target.
+const SHADOW_COLS = ['market', 'symbol', 'shadow_date', 'direction', 'reason', 'entry_price', 'target_price', 'stop_price',
+  'status', 'outcome', 'result_pct', 'entry_time', 'exit_time', 'basis'];
 
 // scalp markets ('crypto_scalp', 'nse_scalp') stay out of the intraday lists unless asked for by name (docs/SCALP.md)
 const isScalp = (m) => String(m || '').endsWith('_scalp');
@@ -31,7 +35,7 @@ const isScalp = (m) => String(m || '').endsWith('_scalp');
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
 
 function createMemoryStore() {
-  const db = { config: {}, trades: [], skips: [], summaries: [] };
+  const db = { config: {}, trades: [], skips: [], summaries: [], shadows: [] };
   let seq = 0;
   const copy = (x) => JSON.parse(JSON.stringify(x));
   return {
@@ -53,6 +57,12 @@ function createMemoryStore() {
     async listSummaries(limit) { return copy(db.summaries.slice(-clampLimit(limit)).reverse()); },
     async listTrades(limit, market = null) { return copy(db.trades.filter((t) => (market ? t.market === market : !isScalp(t.market))).slice(-clampLimit(limit)).reverse()); },
     async listSkips(limit, market = null) { return copy(db.skips.filter((x) => (market ? x.market === market : !isScalp(x.market))).slice(-clampLimit(limit)).reverse()); },
+    // Shadow tracking (CC2 round 2 item 4): a rejected setup followed to its would-be stop/target,
+    // in its OWN table - never counted as a trade, never read by any entry/exit decision.
+    async insertShadow(s) { const row = { id: ++seq, status: 'open', ...copy(s) }; db.shadows.push(row); return row.id; },
+    async updateShadow(id, fields) { const row = db.shadows.find((t) => t.id === id); if (row) Object.assign(row, copy(fields)); },
+    async openShadows(market) { return copy(db.shadows.filter((t) => t.market === market && t.status === 'open')); },
+    async listShadows(limit, market = null) { return copy(db.shadows.filter((x) => (market ? x.market === market : true)).slice(-clampLimit(limit)).reverse()); },
     _db: db,
   };
 }
@@ -60,7 +70,7 @@ function createMemoryStore() {
 function fromRow(row) {
   const out = { ...row };
   for (const c of NUM_COLS) if (out[c] != null) out[c] = Number(out[c]);
-  for (const c of ['trade_date', 'skip_date', 'summary_date']) {
+  for (const c of ['trade_date', 'skip_date', 'summary_date', 'shadow_date']) {
     if (out[c] instanceof Date) {
       const d = out[c];
       out[c] = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -127,6 +137,21 @@ function createPgStore(getPool) {
     },
     listSummaries: (limit) => q('SELECT * FROM daily_summaries ORDER BY id DESC LIMIT $1', [clampLimit(limit)]),
     listTrades: (limit, market = null) => q("SELECT * FROM paper_trades WHERE (($2::text IS NULL AND market NOT LIKE '%\\_scalp') OR market = $2) ORDER BY id DESC LIMIT $1", [clampLimit(limit), market]),
+    // Shadow tracking (CC2 round 2 item 4): own table, never joined into a trade or skip query.
+    async insertShadow(s) {
+      const cols = SHADOW_COLS.filter((c) => s[c] !== undefined);
+      const rows = await q(`INSERT INTO paper_shadows (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id`,
+        cols.map((c) => toParam(c, s[c])));
+      return rows[0].id;
+    },
+    async updateShadow(id, fields) {
+      const cols = Object.keys(fields).filter((c) => SHADOW_COLS.includes(c));
+      if (!cols.length) return;
+      await pool.query(`UPDATE paper_shadows SET ${cols.map((c, i) => `${c} = $${i + 2}`).join(', ')} WHERE id = $1`,
+        [id, ...cols.map((c) => toParam(c, fields[c]))]);
+    },
+    openShadows: (market) => q("SELECT * FROM paper_shadows WHERE market = $1 AND status = 'open' ORDER BY id", [market]),
+    listShadows: (limit, market = null) => q('SELECT * FROM paper_shadows WHERE ($2::text IS NULL OR market = $2) ORDER BY id DESC LIMIT $1', [clampLimit(limit), market]),
     listSkips: (limit, market = null) => q("SELECT * FROM paper_skips WHERE (($2::text IS NULL AND market NOT LIKE '%\\_scalp') OR market = $2) ORDER BY id DESC LIMIT $1", [clampLimit(limit), market]),
   };
 }

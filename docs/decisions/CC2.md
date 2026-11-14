@@ -312,3 +312,86 @@ given the time left.
 crypto rescale case (sector/news/smc/ema_trend all excluded), no-direction
 case, hard-block case. Full suite: 313/316 (same 3 pre-existing CC4
 failures).
+
+### Items 4 & 5 - shadow tracking + report additions (PR, bundled: last merge this round)
+
+**Item 4 (shadow tracking).** `paper_shadows` (new table, idempotent) and
+store methods (`insertShadow`, `updateShadow`, `openShadows`, `listShadows`)
+on both the memory and Postgres stores. Wired into `cryptoScan`: when
+`cryptoLevels.planTrade` rejects a setup for reward/risk but still returns
+a `plan` (entry/target/stop were computable), a shadow row is inserted with
+that hypothetical entry/target/stop. A new `shadowMonitor()` on the bot
+(own cron tick, `40 */5 * * * *`, same cadence family as the crypto
+scan/monitor) follows every OPEN shadow the same way the real monitor does
+- `simulateExit()` (`src/paper/lib/exitSim.js`, item 1's function, reused
+again) against every closed candle since the shadow's entry - and closes it
+with `outcome: 'target'|'stop'` and `result_pct`. Never written to
+`paper_trades`, never read by any entry/exit decision; 5 hand-worked tests.
+
+**Scope limitation, by design:** only crypto's reward/risk-rejected setups
+are shadowed this round (the ones with a real plan already computed). A
+setup rejected earlier - no level found, not enough candles, the pattern
+disagreeing with the trend, a Judge/Judge-v2 "not taken" - has no
+entry/target/stop to follow without first building one just for the
+shadow, which is a bigger, separate piece of work. NSE is not shadowed at
+all (same reason item 1 didn't reach NSE: no level-based target/stop there
+yet).
+
+**Item 5 (report additions).** `src/paper/decision/report2.js`: `ablation2()`
+(judge.js's `ablation()` convention, for `judge2_contributions`/`HELPERS2`
+instead), `shadowSummary()` (target vs. stop hit counts, would-have-won %,
+average result %), `emaCrossWinRate()` (win rate of closed trades with a
+`fresh_with`/`confirmed_with` EMA cross vs. everything else). 4 hand-worked
+tests. New read-only route `GET /api/paper/report2` (same
+`PAPER_ADMIN_SECRET` convention as the existing admin routes) returning
+judge2 contributions per trade (both markets) alongside the live judge's
+score for comparison, the ablation table, the shadow summary and the EMA
+cross win rate - all JSON, so the existing HTML `renderReport`
+(`paperbot/reportPage.js`, already a large file several sessions have
+touched) was not touched at all, to keep this additive and low-risk. A new
+`GET /api/paper/shadows` admin route (same convention as `/trades`,
+`/skips`) lists shadow rows directly.
+
+**Not live-HTTP-tested** (noted honestly, not hidden): this sandbox has no
+`node_modules` installed (`express` etc. are not resolvable here), so the
+route itself could only be verified by (a) `node -e "require('./paperbot/index.js')"`
+loading without a syntax/reference error, and (b) the pure functions it
+calls being independently unit-tested. The route body is a thin,
+unconditional pass-through to those tested functions plus two already-used
+store methods (`closedTrades`, `listShadows`) - say "not verified live" per
+the brief's instruction for anything the sandbox cannot reach.
+
+Full suite after both items (before the test-file-rename fix below): 372/376 - 4 pre-existing CC4 failures (newsCheck, opsCookieAuth, opsHome, and opsCsvExport which landed on main while this PR was in progress), confirmed unrelated by stashing this diff and re-running on plain main.
+
+## Round 2 summary
+
+4/4 merges used (cap for this round): #38 SMC detectors, #40 wire
+exit-sim + bug fix, #44 Judge v2, and this bundled item 4+5 PR. All 5
+numbered items touched; none fully "live-wired end to end" for NSE (items
+1, 4's NSE half, and the second half of round 1's item 4 all wait on
+level-based NSE exits, which nobody has built yet) - flagged consistently
+across both rounds rather than re-explained per item. VERIFY loop: full
+suite green apart from the 4 pre-existing CC4 failures above; re-read every new
+candle-reading code path in this round for look-ahead (`classifyStructureBreak`
+excludes its own candle from the swing/trend calculation; `tagSmc`/`simulateExit`
+only ever receive `closedOnly`-filtered candles) - found none beyond the
+legacy-branch `continue` bug already described and fixed above.
+
+**Collision caught and fixed before committing:** another window (CC3)
+had already merged its own, unrelated shadow-tracking feature for the
+scalp bots (`src/paper/shadow/store.js`, table `shadow_setups`) - a
+different implementation, but it happened to use the exact same test file
+name, `test/paperShadow.test.js`. Rebasing this branch onto the latest
+`main` and popping my stashed (then-untracked) file of the same name
+silently OVERWROTE CC3's test file in my working tree instead of
+reporting a conflict (git applies a stashed *untracked* addition as a
+plain file write, with no 3-way merge, when the path already exists).
+Caught by checking `git log -- test/paperShadow.test.js` before committing
+and noticing a commit I didn't recognize. Fixed by restoring CC3's file
+from `origin/main` byte for byte and moving my own tests to
+`test/paperCoreShadow.test.js` instead - no code in `paperbot/store.js`,
+`sql/paper_bot.sql` or any route actually collided (my table is
+`paper_shadows`, theirs `shadow_setups`; checked every shared file by hand
+for a second `insertShadow`/`openShadows` definition before concluding
+that). Full suite with both test files present: 380/384 (same 4
+pre-existing CC4 failures).
