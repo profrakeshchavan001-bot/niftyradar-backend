@@ -130,6 +130,7 @@ class LedgerTests(unittest.TestCase):
             self.assertEqual(len(L2.open_trades()), 1)
             out = L2.export_csv(Path(t) / "t.csv")
             self.assertEqual(pd.read_csv(out).iloc[0]["grade"], "A")
+            L2.close()
 
 
 class AlertTests(unittest.TestCase):
@@ -223,3 +224,4 @@ class LedgerCauseColumnTests(unittest.TestCase):
             self.assertEqual(len(L.trades_df()), 1)
             self.assertIsNone(L.trades_df().iloc[0]["cause"])
             self.assertIsNotNone(L.open_trade(DAY, sig("Y"), "t", {"cause": "long_buildup"}))
+            L.close()

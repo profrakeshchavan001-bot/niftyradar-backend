@@ -92,6 +92,7 @@ def run(asof=None, replay: int = 0, simulate_next_day: bool = False, out_dir: Pa
         desk = empty_desk(bad_health(str(exc), asof), ledger, str(exc))
         write_desk(desk, out_dir / "morning_desk.json")
         log(f"desk not built: {exc}")
+        ledger.close()
         return desk
 
     dates = market.dates
@@ -118,6 +119,7 @@ def run(asof=None, replay: int = 0, simulate_next_day: bool = False, out_dir: Pa
         if last is None:
             desk = empty_desk(data_health(market, dates[-1]), ledger, "replay produced no picks")
             write_desk(desk, out_dir / "morning_desk.json")
+            ledger.close()
             return desk
         asof_ts, trade_ts, picks = last
         mode = "replay"
@@ -169,6 +171,7 @@ def run(asof=None, replay: int = 0, simulate_next_day: bool = False, out_dir: Pa
     desk = build_desk(market, picks, asof_ts, trade_ts, cfg, vcfg, rates, ledger, session, mode, health, extra)
     write_desk(desk, out_dir / "morning_desk.json")
     ledger.export_csv(state_dir / "paper_trades.csv")
+    ledger.close()
     events = desk["alerts"]
     save_alerts(events, f"{trade_ts:%Y-%m-%d}", state_dir)
     if send:
