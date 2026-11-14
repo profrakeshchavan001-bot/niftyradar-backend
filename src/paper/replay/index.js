@@ -10,6 +10,7 @@ const { createHistoryClient, loadHistory } = require('./history');
 const { createPgReplayStore, createMemoryReplayStore } = require('./store');
 const { loadScalpConfig, SCALP_DEFAULTS } = require('../scalp/config');
 const { runReplay } = require('./run');
+const { runSweep } = require('./sweep');
 const { codeVersion } = require('./codeVersion');
 
 const SYMBOLS = SCALP_DEFAULTS.symbols;
@@ -76,6 +77,23 @@ function attachReplay({ app, cron, axios, env = process.env, log = console.log, 
     state.running = true;
     startRun(state, env, log, now, 'manual', liveStore).finally(() => { state.running = false; });
     res.json({ started: true, note: 'running in the background; poll /api/paper/replay-report' });
+  });
+
+  // Stop/target parameter sweep (brief "if time allows" extra): on demand only, one symbol at a time (it
+  // is heavier than a normal run -- 25 cells by default). Suggestions only, nothing is applied automatically.
+  route('/api/paper/replay/sweep', async (req, res) => {
+    const symbol = String(req.query.symbol || SYMBOLS[0]);
+    if (!SYMBOLS.includes(symbol)) return res.status(400).json({ error: `symbol must be one of ${SYMBOLS.join(', ')}` });
+    const now_ = now();
+    const windowStartMs = now_ - HISTORY_DAYS * 86400000;
+    const [c1, c5] = await Promise.all([
+      state.store.getCandles(symbol, '1m', { fromT: windowStartMs, toT: now_ }),
+      state.store.getCandles(symbol, '5m', { fromT: windowStartMs, toT: now_ }),
+    ]);
+    const cfg = liveStore ? await loadScalpConfig(liveStore) : SCALP_DEFAULTS;
+    if (c1.length < cfg.min_candles_1m || c5.length < cfg.min_candles_5m) return res.status(503).json({ error: 'not enough stored history for this symbol yet' });
+    const result = runSweep({ symbol, candles1m: c1, candles5m: c5, cfg, windowStartMs, inSampleDays: 20 });
+    res.json({ paperOnly: true, ...result });
   });
 
   if (!enabled || !replayOn) { log('[replay] disabled (PAPER_BOT_ENABLED=false or PAPER_REPLAY_ENABLED=false)'); return { enabled: false }; }

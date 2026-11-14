@@ -80,6 +80,10 @@ symbol's own numbers, the filter study, and every individual replayed trade.
 30-day, 3-coin run can take a while); poll the report route for the result. Automatic runs happen daily at
 02:00 IST and once after a restart if the watched decision files changed since the last stored run.
 
+`GET /api/paper/replay/sweep?key=...&symbol=BTCUSDT` (extra, "if time allows" item): a stop/target multiplier
+grid (`sweep.js`) for one symbol, in-sample next to out-of-sample for each cell. On demand only (heavier than
+a normal run), suggestions only -- nothing here changes the live config.
+
 ## Limits (read before trusting a number)
 
 - **1-minute candles hide the order of moves inside the candle.** If a 1-minute bar's high and low would both
