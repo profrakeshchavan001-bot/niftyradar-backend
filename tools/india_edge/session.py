@@ -34,7 +34,7 @@ def veto_context(market, symbol: str, asof, trade_date, entry=None, target=None)
         ctx["spread_pct"] = float(iv["opt_spread_pct"].iloc[-1] * 100) if len(iv) else None
     ev = market.events
     ctx["event_dates"] = list(ev[ev["symbol"].isin([symbol, "ALL"])]["date"]) if len(ev) else []
-    exp = market.fo.loc[market.fo["symbol"] == symbol, "expiry"].unique()
+    exp = market.fo.loc[(market.fo["symbol"] == symbol) & (market.fo["date"] <= asof), "expiry"].unique()
     ctx["expiries"] = [e for e in pd.to_datetime(pd.Series(exp), errors="coerce").dropna()]
     return ctx
 
@@ -56,9 +56,12 @@ def run_session(market, picks: list[dict], asof, trade_date, ledger, ecfg: dict,
     go_checks: dict[str, list] = {}
     pre = {p["symbol"]: apply_vetoes(veto_context(market, p["symbol"], asof, trade_date), vcfg) for p in picks}
 
-    def emit(ts, symbol, kind, text):
-        events.append(dict(ts=f"{pd.Timestamp(ts):%Y-%m-%d %H:%M}" if ts is not None else None,
-                           symbol=symbol, kind=kind, text=text))
+    def emit(ts, symbol, kind, text, info=None):
+        ev = dict(ts=f"{pd.Timestamp(ts):%Y-%m-%d %H:%M}" if ts is not None else None,
+                  symbol=symbol, kind=kind, text=text)
+        if info is not None:
+            ev["info"] = {k: v for k, v in info.items() if isinstance(v, (str, int, float, bool, type(None), list, dict))}
+        events.append(ev)
 
     # pre-market announcements: Watch (or Vetoed)
     curr = {}
@@ -67,8 +70,8 @@ def run_session(market, picks: list[dict], asof, trade_date, ledger, ecfg: dict,
         why = [c[2] for c in v["checks"] if c[1]]
         curr[p["symbol"]] = dict(stage=A.stage_of("none", v["vetoed"]), symbol=p["symbol"], side=p["side"],
                                  grade=p["grade"], score=p["score"], reasons=why)
-    for m in A.stage_alerts({}, curr):
-        emit(None, "", "alert", m)
+    for m, info in A.stage_changes({}, curr):
+        emit(None, info["symbol"], "alert", m, info)
     stages = {s: c["stage"] for s, c in curr.items()}
     for s, st in stages.items():
         if st == "Vetoed":
@@ -83,7 +86,8 @@ def run_session(market, picks: list[dict], asof, trade_date, ledger, ecfg: dict,
             b = bars[sym]
             sg = {**sg, "entry": float(b["open"].iloc[i])}
             tid = ledger.open_trade(day, sg, ts, dict(grade=pick_by[sym]["grade"], setup=pick_by[sym]["setup"],
-                                                      score=pick_by[sym]["score"]))
+                                                      score=pick_by[sym]["score"], cause=pick_by[sym].get("cause"),
+                                                      early_stage=pick_by[sym].get("early_stage")))
             if tid:
                 emit(ts, sym, "entry", f"paper {sg['side']} {sym} @ {sg['entry']:.2f} SL {sg['stop']:.2f} "
                                        f"TGT {sg['target']:.2f}")
@@ -130,8 +134,8 @@ def run_session(market, picks: list[dict], asof, trade_date, ledger, ecfg: dict,
                     pending[sym] = dict(symbol=sym, side=p["side"], entry=res["entry"], stop=res["stop"],
                                         target=res["target"], trigger=res["trigger"])
             curr[sym] = info
-        for m in A.stage_alerts(stages, curr):
-            emit(ts, "", "alert", m)
+        for m, info in A.stage_changes(stages, curr):
+            emit(ts, info["symbol"], "alert", m, info)
         for s, c in curr.items():
             if c["stage"] == "Vetoed" or A.ORDER[c["stage"]] >= A.ORDER.get(stages.get(s, "Watch"), 0):
                 stages[s] = c["stage"]  # stages only move up (or to Vetoed)

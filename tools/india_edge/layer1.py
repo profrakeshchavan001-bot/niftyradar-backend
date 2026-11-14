@@ -16,7 +16,12 @@ def build_feature_frame(market, cfg: dict, asof=None, symbols=None) -> pd.DataFr
     m = market.truncate(asof) if asof is not None else market
     if symbols is None:
         last = m.cash["date"].max()
-        symbols = compute_universe(m.fo, last, cfg["universe"]["size"], cfg["universe"]["lookback_days"])["symbols"]
+        try:
+            symbols = compute_universe(m.fo, last, cfg["universe"]["size"], cfg["universe"]["lookback_days"])["symbols"]
+        except (ValueError, KeyError):   # no stock-option data: fall back to the most liquid cash stocks
+            recent = m.cash[m.cash["date"] > last - pd.Timedelta(days=40)]
+            val = (recent["close"] * recent["volume"]).groupby(recent["symbol"]).mean()
+            symbols = list(val.nlargest(cfg["universe"]["size"]).index)
     return build_features(m.cash, m.fo, m.idx, symbols, load_sectors(), cfg["lookback"])
 
 

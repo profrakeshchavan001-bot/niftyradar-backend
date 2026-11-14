@@ -35,3 +35,44 @@ paper:
 
 alerts:
   telegram_enabled_env: TELEGRAM_ENABLED   # must be exactly "true" to send anything
+
+cause:                      # Block G: why is it moving
+  delivery_spike_mult: 1.5
+  vol_spike_mult: 2.0       # volume vs its prior 20-day average
+  gap_min_pct: 1.5
+  fade_retrace: 0.6         # share of the gap given back by the close
+  sector_min_abs: 2.0       # sector RS (pts) needed to call a move sector-driven
+  sector_share: 0.6         # sector RS must explain this share of the stock's RS
+  stock_excess: 3.0         # stock RS beyond sector RS (pts) to call it stock-specific
+  tie_margin: 0.05          # top two causes closer than this lower the confidence
+  profile_lookback: 500     # sessions used for the stock behaviour profile
+
+early:                      # Block H: early detection (accumulation -> trigger -> confirmation)
+  deliv_rise: 1.15          # last-5 delivery % vs prior-20 average
+  flat_pct: 2.0             # |5-day price change| at or below this counts as flat
+  oi_build_pct: 8.0         # futures OI rise over 3 days
+  oi_flat_pct: 1.5          # ... while 3-day price change stays within this
+  bb_window: 20
+  bb_pctile: 20             # Bollinger width at or below this percentile of the last 120 days = squeeze
+  rs_window: 10
+  rs_tape_pct: 1.0          # Nifty must have moved at least this much against the stock
+  dryup_ratio: 0.6          # 3-day average volume vs 20-day average
+  near_range_pct: 3.0       # dry-up counts only within this % of the 20-day high/low
+  breakout_lookback: 20
+  trigger_volume: 1.2       # breakout-day volume vs 20-day average
+  confirm_window: 3         # sessions after the trigger to find follow-through
+  min_flags: 2              # flags needed for the accumulation stage
+
+options:                    # Block D: option plan (pure planning, no live data)
+  expiry_min_days: 10
+  expiry_max_days: 15
+  itm_iv_pct: 50            # IV percentile at or above this picks 1-ITM, else ATM
+  risk_pct: 1.0             # clamped to 1-2%
+  max_positions: 2
+  rate: 0.07
+  min_premium_stop_frac: 0.2   # premium SL never below this fraction of premium
+  max_cost_pct_capital: 20.0
+
+robust:
+  corp_action_ratio: 0.10   # |prev_close / yesterday close - 1| above this = split/bonus style adjustment
+  stale_symbol_days: 3

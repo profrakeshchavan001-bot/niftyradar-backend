@@ -37,12 +37,16 @@ def review(trades: pd.DataFrame, week_ending) -> dict:
     end = pd.Timestamp(week_ending).normalize()
     start = end - pd.Timedelta(days=6)
     t = trades[trades["status"] == "closed"].copy()
+    for col in ("cause", "early_stage"):          # ledgers from before these columns existed
+        t[col] = t[col].fillna("unknown") if col in t.columns else "unknown"
     t["d"] = pd.to_datetime(t["trade_date"])
     wk = t[(t["d"] >= start) & (t["d"] <= end)]
     by = lambda col, df: {str(k): stats(g) for k, g in df.groupby(col)}  # noqa: E731
     return dict(week_start=f"{start:%Y-%m-%d}", week_end=f"{end:%Y-%m-%d}", week=stats(wk), all_time=stats(t),
                 by_grade=by("grade", wk), by_setup=by("setup", wk), by_direction=by("side", wk),
-                by_exit=by("exit_reason", wk), all_by_setup=by("setup", t), all_by_grade=by("grade", t))
+                by_exit=by("exit_reason", wk), all_by_setup=by("setup", t), all_by_grade=by("grade", t),
+                by_cause=by("cause", wk), by_early_stage=by("early_stage", wk),
+                all_by_cause=by("cause", t), all_by_early_stage=by("early_stage", t))
 
 
 def _f(v, spec):
@@ -63,7 +67,10 @@ def render_md(r: dict) -> str:
     lines += _table({"This week": r["week"], "All time": r["all_time"]}) + [""]
     for title, key in (("By grade (this week)", "by_grade"), ("By setup type (this week)", "by_setup"),
                        ("By direction (this week)", "by_direction"), ("By exit (this week)", "by_exit"),
-                       ("By grade (all time)", "all_by_grade"), ("By setup type (all time)", "all_by_setup")):
+                       ("By cause label (this week)", "by_cause"), ("By early-detection stage (this week)", "by_early_stage"),
+                       ("By grade (all time)", "all_by_grade"), ("By setup type (all time)", "all_by_setup"),
+                       ("By cause label (all time)", "all_by_cause"),
+                       ("By early-detection stage (all time)", "all_by_early_stage")):
         if r[key]:
             lines += [f"## {title}", ""] + _table(r[key]) + [""]
     return "\n".join(lines)

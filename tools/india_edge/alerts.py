@@ -25,11 +25,11 @@ def _fmt(info: dict) -> str:
     return base
 
 
-def stage_alerts(prev: dict[str, str], curr: dict[str, dict]) -> list[str]:
-    """Messages for every symbol whose stage moved up (or became Vetoed).
+def stage_changes(prev: dict[str, str], curr: dict[str, dict]) -> list[tuple[str, dict]]:
+    """(message, info) for every symbol whose stage moved up (or became Vetoed).
 
     prev: {symbol: stage}; curr: {symbol: {stage, symbol, side, grade, score, entry, stop, target,
-    reasons}}. A symbol absent from prev is treated as not yet announced (Watch is announced)."""
+    reasons, note}}. A symbol absent from prev is treated as not yet announced (Watch is announced)."""
     out = []
     for sym, info in curr.items():
         new, old = info["stage"], prev.get(sym)
@@ -37,17 +37,25 @@ def stage_alerts(prev: dict[str, str], curr: dict[str, dict]) -> list[str]:
             continue
         if new == "Vetoed":
             why = "; ".join(info.get("reasons", [])) or "rule triggered"
-            out.append(f"[VETOED] {_fmt(info)}: {why}. {FOOTER}")
+            out.append((f"[VETOED] {_fmt(info)}: {why}. {FOOTER}", info))
         elif old is None or ORDER[new] > ORDER.get(old, -1):
+            note = info.get("note")
             if new == "Watch":
-                out.append(f"[WATCH] {_fmt(info)} is on today's desk. Waiting for an OB/FVG pullback. {FOOTER}")
+                out.append((f"[WATCH] {_fmt(info)} " + (note or "is on today's desk. Waiting for an OB/FVG pullback.")
+                            + f" {FOOTER}", info))
             elif new == "Ready":
-                out.append(f"[READY] {_fmt(info)} pulled back into its zone. Waiting for BOS/engulfing "
-                           f"and a trade window. {FOOTER}")
+                out.append((f"[READY] {_fmt(info)} " + (note or "pulled back into its zone. Waiting for BOS/engulfing "
+                            "and a trade window.") + f" {FOOTER}", info))
             elif new == "Go":
-                out.append(f"[GO] {_fmt(info)} paper entry {info['entry']:.2f}, SL {info['stop']:.2f}, "
-                           f"target {info['target']:.2f}. {FOOTER}")
+                lv = (f"paper entry {info['entry']:.2f}, SL {info['stop']:.2f}, target {info['target']:.2f}."
+                      if None not in (info.get("entry"), info.get("stop"), info.get("target")) else "levels pending.")
+                out.append((f"[GO] {_fmt(info)} {lv}" + (f" {note}" if note else "") + f" {FOOTER}", info))
     return out
+
+
+def stage_alerts(prev: dict[str, str], curr: dict[str, dict]) -> list[str]:
+    """Messages only; see stage_changes for the matching info dicts."""
+    return [t for t, _ in stage_changes(prev, curr)]
 
 
 def telegram_enabled(env=None) -> bool:
