@@ -1,5 +1,14 @@
 # CC3 overnight (2026-11-14)
 
+**Update, ~18:10 UTC:** the first note below (written right after cloning, before any other PR had landed) said CC2's shared
+`src/paper/lib/` and plugin loader did not exist. That changed: PR #22 ("Shared paper-bot lib + plugin auto-loader + bot interface
+doc") landed on `main` while this session was working, confirming other windows really are active tonight as the brief described.
+Re-read `docs/BOT-INTERFACE.md` and `src/paper/lib/` after that, and used them to build `exhaustion_only` (item 3) as a real plugin
+under `src/paper/bots/` - see the section below. `trend_smc` (item 2, more involved: EMA cross OR BOS/CHoCH + order-block/FVG retest
+with premium/discount zones) was not attempted after that: time was spent instead on exhaustion_only end-to-end (hand-verified tests,
+a real-Postgres check of its own schema) rather than starting a second, more complex bot with less time left to verify it properly.
+
+
 Session scope and decisions, PAPER ONLY, crypto scalp strategy (`src/paper/scalp/`).
 
 ## What this session actually found
@@ -29,4 +38,23 @@ Tests: `node --test test/paperScalp.test.js` (28 passing, including hand-verifie
 Re-reading tonight's own code for cost mistakes and look-ahead mistakes (as the brief's VERIFY loop asks), `sql/paper_bot.sql` has `ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp'))`. `crypto_wide_scalp` was not in that list. The in-memory test store (used by every test above) does not enforce SQL constraints, so all 29 tests passed while a real Postgres would have rejected **every single scalp_wide trade insert** with a constraint violation, the moment it ran on Render. Caught this by starting a local Postgres 16 in this sandbox, applying `sql/paper_bot.sql` to a throwaway database, and inserting a real row with `market = 'crypto_wide_scalp'` — it failed exactly as predicted, confirming the gap before it shipped.
 
 Fix: appended one more idempotent `DROP CONSTRAINT IF EXISTS` / `ADD CONSTRAINT` pair widening the list to include `crypto_wide_scalp` (same pattern the file already uses for every earlier change to this constraint). Verified on the same local Postgres: the schema file re-applies cleanly a second time (idempotent), a `crypto_wide_scalp` row now inserts, and an arbitrary market string is still correctly rejected. Added an offline test (`test/paperScalp.test.js`) that reads `sql/paper_bot.sql` and checks the live constraint text includes `crypto_wide_scalp`, so this exact class of mistake — a bot added to `src/paper/scalp/` without updating the schema's allow-list — fails `npm test` next time instead of only failing in production. `npm run migrate` still needs to be run on deploy, as always (rule 4 / `docs/DEPLOY.md`-equivalent here).
+
+## Item 3: exhaustion_only (done, merged) - a real plugin under src/paper/bots/
+
+Built once CC2's `src/paper/lib/` and `src/paper/pluginLoader.js` landed on `main` (see the update note at the top of this file). Files:
+`src/paper/bots/exhaustion_only/{engine,bot,store,config,register,schema.sql}.js`, worked example in `docs/BOTS.md`, tests in
+`test/exhaustionOnly.test.js` (11 passing, hand-verified numbers).
+
+| # | Topic | What was found | Decision taken | Needs from owner |
+|---|---|---|---|---|
+| 1 | The rule itself | The brief's wording ("4+ of last 6 red, price below VWAP, small red then green closing above its high") is, candle for candle, exactly what `paperbot/patterns.js`'s `exhaustionReversal()` already implements - not a coincidence; it is the same reversal pattern the main bot and the scalp bots already use. | Reused `exhaustionReversal()` directly rather than writing a second copy of the same rule, so there is exactly one implementation of it in the repo (one place to fix if it is ever wrong) and no risk of two slightly different versions drifting apart. The brief's "no other pattern, no trend filter" is satisfied because that function checks only this rule - nothing about the 5-min/15-min trend agreement the scalp bots layer on top of it. | None. |
+| 2 | Target / stop | "Level-based target and stop" was not given exact numbers. | Reused `src/paper/lib/levels.js` `planTrade()` (the shared library CC2 built, the same one the main crypto bot's own target/stop already uses): target = nearest opposite level, 0.1% held back; stop = pattern candle + 1 x ATR14(15-minute). `min_rr` 1.2 after the same 0.23% round-trip cost as the other crypto bots. | OK, or give different numbers. |
+| 3 | Breakeven / time stop | Not mentioned for this bot (unlike scalp and scalp_wide, which both get an explicit breakeven rule). | Gave it neither - plain target/stop exits only, via `src/paper/lib/exitSim.js` `simulateExit()` (candle-accurate, built by CC2; both touched in one candle still books the stop, same worst-case rule as every other bot tonight). | Say if a time stop should exist after all. |
+| 4 | Storage | Could have reused the shared `paper_trades` table (like scalp) or its own tables. | **Own tables** (`exhaustion_only_trades`, `exhaustion_only_skips`, own `schema.sql`, loaded by the plugin loader) rather than widening `paper_trades`'s market CHECK constraint a second time tonight - several windows may be touching that table's constraint concurrently (see the scalp_wide fix above), and a plugin is supposed to bring its own idempotent schema per `docs/BOT-INTERFACE.md`. Verified on a local Postgres: applies idempotently, inserts and reads correctly. | None. |
+| 5 | Config | Rule numbers (min_rr, atr_mult, ...) needed to live somewhere the owner can change without a redeploy. | Reused the *existing* `paper_config` table (key `exhaustion_only`) via the main store the plugin already receives in `register(ctx)`, same convention as `scalp`/`scalp_wide`, rather than inventing a second config mechanism for this one bot. | None. |
+| 6 | 15-minute candles | No native feed; `planTrade()` needs ATR14(15m) and 15-minute swing levels. | Same choice the main crypto bot already made (`paperbot/bot.js`): build them from the 5-minute candles (`E.aggregate`) rather than an extra Binance request. | Say if a native 15m read should be added later (one extra call per symbol per cycle). |
+| 7 | Restart safety | The brief's EXTRA section asked that a redeploy never double-enter a trade. | Same mechanism every bot tonight already uses: the candle's own open time (`trigger_t`) is checked against today's stored trades before entering, so a restart that re-scans the same still-current candle finds the earlier trade and does nothing. This only holds with `PAPER_DATABASE_URL` set (memory mode has no restart safety at all, same caveat as every other bot). Not re-tested beyond that - no actual Render redeploy was available from this sandbox to rehearse. | None. |
+| 8 | GitHub Actions | No workflow file exists. | Merge commit carries `[skip ci]`, same as every PR tonight. | None. |
+
+**Not attempted:** `trend_smc` (item 2 of the overnight brief - EMA cross or BOS/CHoCH + order-block/FVG retest, premium/discount zones), the cross-bot leaderboard (`/api/paper/bots-report`, item 6), shadow-tracking of every skip (item 5), and the suggestion/mix engine (item 7). Each of these is a larger piece than `exhaustion_only` and would have needed either less verification tonight or less sleep than the brief's own 04:00 IST cutoff allows for honestly. Flagging rather than rushing them.
 
