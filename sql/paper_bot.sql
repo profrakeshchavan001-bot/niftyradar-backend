@@ -163,3 +163,7 @@ CREATE TABLE IF NOT EXISTS paper_shadows (
 );
 CREATE INDEX IF NOT EXISTS paper_shadows_market_date_idx ON paper_shadows (market, shadow_date);
 CREATE INDEX IF NOT EXISTS paper_shadows_open_idx ON paper_shadows (market, status);
+
+-- CC3 round 3 (restart safety): a restart mid-cycle that re-scans the still-current candle must never double-enter a trade.
+-- NULL trigger_t (older rows, option trades that never set it) are not compared by a UNIQUE index, so this changes nothing for them.
+CREATE UNIQUE INDEX IF NOT EXISTS paper_trades_once_idx ON paper_trades (market, symbol, trigger_t);

@@ -68,6 +68,7 @@ function createTrendSmcBot({ store, crypto, crypto15, loadCfg, shadowStore, now 
         trend15: d.trend15, zone: d.zone, basis: d.basis, be_moved: false,
       };
       const id = await store.insertTrade(row);
+      if (id == null) continue; // restart safety: the DB's own unique (symbol, trigger_t) index caught a duplicate of this exact candle
       log(`[trend_smc] PAPER entry ${symbol} ${row.direction} @ ${d.entry}: ${d.pattern}; target ${d.target}, stop ${d.stop}, R ${d.rr}`);
       freeCash -= size.value;
       entered.push(symbol); today.push({ ...row, id });

@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS exhaustion_only_trades (
 );
 CREATE INDEX IF NOT EXISTS exhaustion_only_trades_open_idx ON exhaustion_only_trades (symbol, status);
 CREATE INDEX IF NOT EXISTS exhaustion_only_trades_date_idx ON exhaustion_only_trades (trade_date);
+-- CC3 round 3 (restart safety): a restart mid-cycle re-scanning the still-current candle must never double-enter.
+CREATE UNIQUE INDEX IF NOT EXISTS exhaustion_only_trades_once_idx ON exhaustion_only_trades (symbol, trigger_t);
 
 CREATE TABLE IF NOT EXISTS exhaustion_only_skips (
   id          bigserial PRIMARY KEY,

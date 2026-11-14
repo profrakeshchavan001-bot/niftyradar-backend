@@ -66,6 +66,7 @@ function createExhaustionBot({ store, crypto, loadCfg, shadowStore, now = Date.n
         sl_price: d.stop, target_price: d.target, stop_type: d.stopType, target_type: d.targetType, rr: d.rr, basis: d.basis,
       };
       const id = await store.insertTrade(row);
+      if (id == null) continue; // restart safety: the DB's own unique (symbol, trigger_t) index caught a duplicate of this exact candle
       log(`[exhaustion_only] PAPER entry ${symbol} ${row.direction} @ ${d.entry}: ${d.pattern}; target ${d.target}, stop ${d.stop}, R ${d.rr}`);
       freeCash -= size.value;
       entered.push(symbol); today.push({ ...row, id });

@@ -98,7 +98,8 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
         qty: size.qty, entry_price: plan.entry, entry_time: new Date(now()).toISOString(), entry_underlying: plan.entry,
         sl_price: plan.stopPrice, target_price: plan.targetPrice, max_fav_pct: 0, max_adv_pct: 0, basis: basisText(plan, symbol),
       };
-      await store.insertTrade(row);
+      const id = await store.insertTrade(row);
+      if (id == null) continue; // restart safety: the DB's own unique (market, symbol, trigger_t) index caught a duplicate of this exact candle
       log(`[scalp] PAPER entry ${symbol} ${row.direction} @ ${plan.entry}: ${row.patterns.join(', ')}; target ${plan.targetPrice}, stop ${plan.stopPrice}, R ${plan.rr}`);
       freeCash -= size.value;
       entered.push(symbol);
@@ -171,7 +172,8 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
         qty: size.qty, entry_price: plan.entry, entry_time: new Date(now()).toISOString(), entry_underlying: plan.entry,
         sl_price: plan.stopPrice, target_price: plan.targetPrice, max_fav_pct: 0, max_adv_pct: 0, basis: basisTextWide(plan, symbol),
       };
-      await store.insertTrade(row);
+      const id = await store.insertTrade(row);
+      if (id == null) continue; // restart safety: the DB's own unique (market, symbol, trigger_t) index caught a duplicate of this exact candle
       log(`[scalp_wide] PAPER entry ${symbol} ${row.direction} @ ${plan.entry}: ${row.patterns.join(', ')}; target ${plan.targetPrice}, stop ${plan.stopPrice}, R ${plan.rr}`);
       freeCash -= size.value;
       entered.push(symbol);

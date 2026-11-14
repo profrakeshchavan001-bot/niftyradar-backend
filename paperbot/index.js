@@ -82,8 +82,9 @@ function universeInfo({ live, fallback, cfg }) {
 // share ONE fetch instead of one each (EXTRA item in the overnight brief: fit every bot on one Render Free instance, never fetch the
 // same candles twice). Only the plain, most-recent-candles call is cached; a custom range (the report page's chart) or a non-default
 // limit always goes straight to the network, so nothing that needs an exact window is ever served a cached answer meant for another one.
-function createCachedCrypto(raw) {
-  const cache = createCandleCache({ ttlMs: 50000 }); // well under the 5-minute candle close, long enough to dedupe same-tick callers
+// `cache` is created by the caller and shared with create15mCrypto() below (CC3 round 3: one cache, every timeframe, so two
+// separate caches can never both hold their own copy of the same symbol+timeframe fetch).
+function createCachedCrypto(raw, cache = createCandleCache({ ttlMs: 50000 })) {
   return {
     ...raw,
     candles(symbol, limit, range) {
@@ -95,6 +96,12 @@ function createCachedCrypto(raw) {
       return cache.get(keyOf(symbol, '1h'), () => raw.hourly(symbol), { ttlMs: 240000 }); // hourly candles change far less often
     },
   };
+}
+
+// trend_smc's own native 15-minute Binance source (src/paper/bots/trend_smc/register.js create15mSource), wrapped with the SAME
+// cache as createCachedCrypto above - CC3 round 3 item 3: one shared cache across every timeframe, no duplicate Binance calls.
+function create15mCrypto(raw15m, cache) {
+  return { candles15: (symbol, limit) => (limit != null && limit !== 100 ? raw15m.candles15(symbol, limit) : cache.get(keyOf(symbol, '15m'), () => raw15m.candles15(symbol), { ttlMs: 50000 })) };
 }
 
 // Runs a job, never lets it overlap with itself, never lets it crash the server.
@@ -216,7 +223,9 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   state.store = store;
   const yahoo = createYahooSource({ axios, log }); // free NSE candle fallback, asked only when Dhan has no data
   const nse = createNseSource({ axios, log, yahoo, ...deps });
-  const cryptoSrc = createCachedCrypto(createCryptoSource({ axios, log }));
+  const candleCache = createCandleCache({ ttlMs: 50000 }); // one cache, every crypto timeframe (5m/1h/15m) - CC3 round 3 item 3
+  const cryptoSrc = createCachedCrypto(createCryptoSource({ axios, log }), candleCache);
+  const crypto15mSrc = create15mCrypto(require('../src/paper/bots/trend_smc/register').create15mSource({ axios, log }), candleCache);
   state.nse = nse;
   state.crypto = cryptoSrc;
   state.yahoo = yahoo; // overnight item 3: health.js reads state.yahoo.stats for the real per-source status
@@ -254,13 +263,14 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
     app, cron, env, log, state, store, guarded, tz,
     pool: typeof store.query === 'function' ? { query: store.query } : null,
     cachedCrypto: cryptoSrc, // already-wrapped shared candle cache, so a bots/ plugin needing Binance candles reuses it instead of making its own
+    cached15mCrypto: crypto15mSrc, // same shared cache, 15-minute timeframe (trend_smc) - CC3 round 3 item 3
   }).catch((e) => log(`[paper-plugins] loadPlugins failed: ${e.message}`));
 
   cron.schedule('20 */5 9-15 * * 1-5', jobs.nseScan, tz); // 20 s after each 5-min candle closes
   cron.schedule('50 * 9-15 * * 1-5', jobs.nseMonitor, tz); // exits checked every minute
   cron.schedule('25 */5 * * * *', jobs.cryptoScan, tz);
   cron.schedule('55 * * * * *', jobs.cryptoMonitor, tz);
-  cron.schedule('40 */5 * * * *', jobs.shadowMonitor, tz); // same cadence as the crypto scan/monitor
+  cron.schedule('42 */5 * * * *', jobs.shadowMonitor, tz); // CC3 round 3 item 2: moved from :40 to :42, staggered away from scalp_wide monitor's every-minute :40
   cron.schedule('45 15 * * 1-5', job('nse summary', async () => {
     const cfg = await loadConfig(store);
     if (cfg.nse.holidays.includes(istParts(Date.now()).date)) return; // no summary on an NSE holiday
@@ -272,4 +282,4 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   return state;
 }
 
-module.exports = { attachPaperBot, guarded, buildStore, pgOptions, universeInfo, createCachedCrypto };
+module.exports = { attachPaperBot, guarded, buildStore, pgOptions, universeInfo, createCachedCrypto, create15mCrypto };

@@ -245,18 +245,23 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
 }
 
 // Binance PUBLIC market data. No key, no account, no orders.
-function createCryptoSource({ axios, log = console.log, now = Date.now, hosts = ['https://data-api.binance.vision', 'https://api.binance.com'] }) {
+function createCryptoSource({ axios, log = console.log, now = Date.now, hosts = ['https://data-api.binance.vision', 'https://api.binance.com'], timeoutMs = 8000, backoffMs = 400, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   let fx = { rate: null, time: 0 };
   // Overnight item 3: a real per-source status for GET /api/paper/health, instead of "unchecked".
   const stats = { ok: 0, fail: 0, lastError: null, lastSuccessAt: null, lastErrorAt: null };
+  // CC3 round 3 (stability): 8 s timeout (was 15 s - too slow on a 512 MB Render Free box with several bots waiting their
+  // turn) and one backoff pass across every host before giving up, instead of failing the instant every host's first try does.
   async function get(pathname, params) {
     let lastErr;
-    for (const h of hosts) {
-      try {
-        const data = (await axios.get(`${h}${pathname}`, { params, timeout: 15000 })).data;
-        stats.ok += 1; stats.lastSuccessAt = now();
-        return data;
-      } catch (e) { lastErr = e; }
+    for (const attempt of [0, 1]) {
+      if (attempt === 1) await sleep(backoffMs);
+      for (const h of hosts) {
+        try {
+          const data = (await axios.get(`${h}${pathname}`, { params, timeout: timeoutMs })).data;
+          stats.ok += 1; stats.lastSuccessAt = now();
+          return data;
+        } catch (e) { lastErr = e; }
+      }
     }
     stats.fail += 1; stats.lastErrorAt = now();
     stats.lastError = lastErr.response?.status ? `HTTP ${lastErr.response.status}` : lastErr.message;
@@ -282,7 +287,7 @@ function createCryptoSource({ axios, log = console.log, now = Date.now, hosts = 
     async usdtInr(fallback) {
       if (fx.rate && now() - fx.time < 600000) return { rate: fx.rate, source: 'coingecko' };
       try {
-        const res = await axios.get('https://api.coingecko.com/api/v3/simple/price', { params: { ids: 'tether', vs_currencies: 'inr' }, timeout: 15000 });
+        const res = await axios.get('https://api.coingecko.com/api/v3/simple/price', { params: { ids: 'tether', vs_currencies: 'inr' }, timeout: timeoutMs });
         const rate = res.data?.tether?.inr;
         if (!(rate > 0)) throw new Error('no rate');
         fx = { rate, time: now() };
