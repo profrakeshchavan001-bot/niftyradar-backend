@@ -1,0 +1,101 @@
+'use strict';
+// trend_smc orchestration (crypto, 5-minute candles). PAPER ONLY: no order API anywhere. Dependencies are injected so tests drive it
+// with fake candles and a fake clock, same pattern as src/paper/bots/exhaustion_only/bot.js.
+const { closedOnly, sizeCrypto } = require('../../../../paperbot/engine');
+const { istParts } = require('../../../../paperbot/time');
+const { decide, evaluateExit, settle } = require('./engine');
+
+const MARKET = 'crypto_trend_smc';
+const FIVE = 5 * 60000;
+const FIFTEEN = 15 * 60000;
+const HOUR = 3600000;
+
+function createTrendSmcBot({ store, crypto, crypto15, loadCfg, shadowStore, now = Date.now, log = console.log }) {
+  const skipSeen = new Set();
+
+  async function skip(symbol, reason, extra = {}) {
+    const date = istParts(now()).date;
+    const key = `${date}|${symbol}|${reason}`;
+    if (skipSeen.has(key)) return;
+    if (skipSeen.size > 5000) skipSeen.clear();
+    skipSeen.add(key);
+    log(`[trend_smc] skip ${symbol}: ${reason}`);
+    await store.insertSkip({ symbol, skip_date: date, reason });
+    if (extra.shadowPlan && shadowStore) {
+      await shadowStore.insertShadow({ bot: 'trend_smc', symbol, setup_date: date, trigger_t: extra.shadowPlan.trigger_t, direction: extra.shadowPlan.direction, entry_price: extra.shadowPlan.entry_price, sl_price: extra.shadowPlan.sl_price, target_price: extra.shadowPlan.target_price, skip_reason: reason });
+    }
+  }
+
+  async function resolveShadows() {
+    if (!shadowStore) return { checked: 0, resolved: 0 };
+    const open = await shadowStore.openShadows('trend_smc');
+    if (!open.length) return { checked: 0, resolved: 0 };
+    let resolved = 0;
+    for (const sh of open) {
+      let c5;
+      try { c5 = await crypto.candles(sh.symbol); } catch (e) { log(`[trend_smc] shadow candles for ${sh.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const ev = evaluateExit({ trade: sh, candles: closedOnly(c5, FIVE, now()) });
+      if (!ev.exit) continue;
+      await shadowStore.resolveShadow(sh.id, { resolved_reason: ev.reason, resolved_price: ev.price, resolved_time: new Date(ev.timeMs).toISOString() });
+      log(`[trend_smc] shadow resolved ${sh.symbol}: ${ev.reason} @ ${ev.price} (would-be, never a trade)`);
+      resolved += 1;
+    }
+    return { checked: open.length, resolved };
+  }
+
+  async function scan() {
+    const cfg = await loadCfg();
+    const date = istParts(now()).date;
+    const today = await store.tradesForDay(date);
+    const open = await store.allOpenTrades();
+    let freeCash = cfg.capital_usdt - open.reduce((s, t) => s + t.entry_price * t.qty, 0);
+    const entered = [];
+    for (const symbol of cfg.symbols) {
+      if (open.some((t) => t.symbol === symbol) || entered.includes(symbol)) continue; // 1 open trade per coin; no daily cap, no cooldown
+      let c5; let c1h; let c15;
+      try { [c5, c1h, c15] = await Promise.all([crypto.candles(symbol), crypto.hourly(symbol), crypto15 ? crypto15.candles15(symbol) : null]); } catch (e) { log(`[trend_smc] candles for ${symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const closed5 = closedOnly(c5, FIVE, now());
+      const d = decide(closed5, { c15: c15 ? closedOnly(c15, FIFTEEN, now()) : null, c1h: closedOnly(c1h, HOUR, now()), nowMs: now(), cfg });
+      if (!d.take) { if (!d.quiet) await skip(symbol, d.reason, d.extra || {}); continue; }
+      if (today.some((t) => t.symbol === symbol && t.trigger_t === d.trigger_t)) continue; // this candle was already traded
+      const stopPct = Math.abs(d.entry - d.stop) / d.entry * 100;
+      const size = sizeCrypto({ capital: cfg.capital_usdt, riskPct: cfg.risk_pct, stopPct, freeCash, price: d.entry, coins: cfg.symbols.length });
+      if (!size) { await skip(symbol, 'no free virtual USDT balance for trend_smc'); continue; }
+      const row = {
+        symbol, trade_date: date, status: 'open', direction: d.direction === 'up' ? 'LONG' : 'SHORT',
+        trigger_t: d.trigger_t, entry_price: d.entry, entry_time: new Date(now()).toISOString(), qty: size.qty,
+        sl_price: d.stop, target_price: d.target, stop_type: d.stopType, target_type: d.targetType, rr: d.rr,
+        trend15: d.trend15, zone: d.zone, basis: d.basis, be_moved: false,
+      };
+      const id = await store.insertTrade(row);
+      log(`[trend_smc] PAPER entry ${symbol} ${row.direction} @ ${d.entry}: ${d.pattern}; target ${d.target}, stop ${d.stop}, R ${d.rr}`);
+      freeCash -= size.value;
+      entered.push(symbol); today.push({ ...row, id });
+    }
+    return { ran: true, entered };
+  }
+
+  async function monitor() {
+    const cfg = await loadCfg();
+    const open = await store.allOpenTrades();
+    if (!open.length) { await resolveShadows(); return { checked: 0, closed: 0 }; }
+    let closed = 0;
+    for (const t of open) {
+      let c5;
+      try { c5 = await crypto.candles(t.symbol); } catch (e) { log(`[trend_smc] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const ev = evaluateExit({ trade: t, candles: closedOnly(c5, FIVE, now()) });
+      if (!ev.exit) { if (ev.action === 'breakeven' && !t.be_moved) await store.updateTrade(t.id, { be_moved: true, sl_price: t.entry_price }); continue; }
+      const fx = await crypto.usdtInr(cfg.usdt_inr_fallback);
+      const s = settle({ trade: t, exitPrice: ev.price, cfg, fxRate: fx.rate });
+      await store.updateTrade(t.id, { status: 'closed', exit_price: ev.price, exit_time: new Date(ev.timeMs).toISOString(), exit_reason: ev.reason, ...s, fx_rate: fx.rate, fx_source: fx.source, be_moved: ev.reason === 'breakeven' ? true : t.be_moved });
+      log(`[trend_smc] PAPER exit ${t.symbol}: ${ev.reason}, gross ${s.gross_pnl_usdt} net ${s.net_pnl_usdt} USDT (Rs ${s.pnl_inr})`);
+      closed += 1;
+    }
+    await resolveShadows();
+    return { checked: open.length, closed };
+  }
+
+  return { scan, monitor };
+}
+
+module.exports = { createTrendSmcBot, MARKET };
