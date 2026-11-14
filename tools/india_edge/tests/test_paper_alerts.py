@@ -224,3 +224,4 @@ class LedgerCauseColumnTests(unittest.TestCase):
             self.assertEqual(len(L.trades_df()), 1)
             self.assertIsNone(L.trades_df().iloc[0]["cause"])
             self.assertIsNotNone(L.open_trade(DAY, sig("Y"), "t", {"cause": "long_buildup"}))
+            L.close()
