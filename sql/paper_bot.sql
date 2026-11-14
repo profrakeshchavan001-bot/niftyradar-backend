@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   basis            text NOT NULL,               -- plain-English reason
   created_at       timestamptz NOT NULL DEFAULT now()
 );
+-- Follow-up: real risk-reward R factor. r_factor = R of the traded direction,
+-- legacy_rf = the old size-of-move value (|% change| x 1.8 + 0.5), r_detail =
+-- both directions, ATR, levels and both ranks, so the two rankings can be compared.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS legacy_rf numeric;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS r_detail jsonb;
 CREATE INDEX IF NOT EXISTS paper_trades_market_date_idx ON paper_trades (market, trade_date);
 CREATE INDEX IF NOT EXISTS paper_trades_open_idx ON paper_trades (market, status);
 

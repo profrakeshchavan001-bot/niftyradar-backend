@@ -8,14 +8,6 @@ const { newsCheck, createCandleAggregator } = require('../paperbot/sources');
 const { istParts, nseSession, istDayStart } = require('../paperbot/time');
 const { merge, DEFAULTS } = require('../paperbot/config');
 
-test('R-factor proxy: |% change| / basket median, top N', () => {
-  const stocks = [{ symbol: 'A', price: 10, pct: 2 }, { symbol: 'B', price: 10, pct: -4 }, { symbol: 'C', price: 10, pct: 1 }, { symbol: 'D', price: 10, pct: 0.5 }, { symbol: 'E', price: 10, pct: -1 }];
-  // |pct| = 2, 4, 1, 0.5, 1 -> median 1 -> R = 2, 4, 1, 0.5, 1
-  assert.deepEqual(E.rankRFactor(stocks, 3).map((s) => [s.symbol, s.rFactor]), [['B', 4], ['A', 2], ['C', 1]]);
-  assert.deepEqual(E.rankRFactor([{ symbol: 'A', price: 10, pct: 0 }], 5), []); // nothing is moving: no ranking, no fake numbers
-  assert.deepEqual(E.rankRFactor(null, 5), []);
-});
-
 test('crypto momentum score', () => {
   const c = Array.from({ length: 20 }, (_, i) => ({ t: i, o: 100, h: 101, l: 99, c: 100, v: 100 }));
   c.push({ t: 20, o: 100, h: 103, l: 99, c: 102, v: 300 });
