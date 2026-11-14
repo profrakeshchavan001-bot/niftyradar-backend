@@ -140,3 +140,26 @@ ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_score         numeric;
 ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_take          boolean;
 ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_contributions jsonb;
 ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS judge2_basis         text;
+
+-- Shadow tracking (CC2 round 2 item 4): a setup the bot REJECTED, followed on paper to its own
+-- hypothetical stop/target. Its own table - never joined into paper_trades or counted as a trade.
+CREATE TABLE IF NOT EXISTS paper_shadows (
+  id           bigserial PRIMARY KEY,
+  market       text NOT NULL,
+  symbol       text NOT NULL,
+  shadow_date  date NOT NULL,
+  direction    text NOT NULL,          -- 'up' / 'down'
+  reason       text NOT NULL,          -- why the real setup was rejected
+  entry_price  numeric NOT NULL,       -- the price it would have entered at
+  target_price numeric NOT NULL,
+  stop_price   numeric NOT NULL,
+  status       text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  outcome      text,                   -- 'target' / 'stop' / null (still open)
+  result_pct   numeric,
+  basis        text,
+  entry_time   timestamptz NOT NULL,
+  exit_time    timestamptz,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS paper_shadows_market_date_idx ON paper_shadows (market, shadow_date);
+CREATE INDEX IF NOT EXISTS paper_shadows_open_idx ON paper_shadows (market, status);
