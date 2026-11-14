@@ -18,6 +18,7 @@ const { defaultTracker, attachHealthRoute } = require('../src/paper/ops/health')
 const { newsScore, eventBlock } = require('../src/paper/context/news');
 const { attachNewsCheckRoute } = require('../src/paper/context/newsCheck'); // GET /api/paper/news-check
 const { attachHomeRoute } = require('../src/paper/ops/home'); // GET /api/paper/home
+const { createCandleCache, keyOf } = require('../src/paper/lib/candleCache'); // one cache shared by every bot (CC3, overnight EXTRA item)
 
 // The bot has its OWN database: PAPER_DATABASE_URL (any Postgres URL, for
 // example a free Supabase project, direct port 5432 or the pooler). It never
@@ -72,6 +73,26 @@ function universeInfo({ live, fallback, cfg }) {
       hours: `Mon-Fri 09:15-15:30 IST, new entries until ${cfg.nse.no_new_entry_after_ist}, not on: ${cfg.nse.holidays.join(', ') || 'no holiday listed'}`,
     },
     crypto: { source: 'Binance public 5-minute candles', symbols: cfg.crypto.symbols, picked: `every coin with a momentum score of at least ${cfg.crypto.min_momentum_score}; one open trade per coin, no daily limit` },
+  };
+}
+
+// Wraps a crypto source with the shared candle cache (src/paper/lib/candleCache.js, CC2), so the main crypto bot, the scalp bots and
+// the src/paper/bots/ plugins - all asking Binance for the same symbol's 5-minute or 1-hour candles within the same short window -
+// share ONE fetch instead of one each (EXTRA item in the overnight brief: fit every bot on one Render Free instance, never fetch the
+// same candles twice). Only the plain, most-recent-candles call is cached; a custom range (the report page's chart) or a non-default
+// limit always goes straight to the network, so nothing that needs an exact window is ever served a cached answer meant for another one.
+function createCachedCrypto(raw) {
+  const cache = createCandleCache({ ttlMs: 50000 }); // well under the 5-minute candle close, long enough to dedupe same-tick callers
+  return {
+    ...raw,
+    candles(symbol, limit, range) {
+      if (range || (limit != null && limit !== 330)) return raw.candles(symbol, limit, range); // non-default window: never cached
+      return cache.get(keyOf(symbol, '5m'), () => raw.candles(symbol, limit));
+    },
+    hourly(symbol, limit) {
+      if (limit != null && limit !== 400) return raw.hourly(symbol, limit);
+      return cache.get(keyOf(symbol, '1h'), () => raw.hourly(symbol), { ttlMs: 240000 }); // hourly candles change far less often
+    },
   };
 }
 
@@ -164,7 +185,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   state.store = store;
   const yahoo = createYahooSource({ axios, log }); // free NSE candle fallback, asked only when Dhan has no data
   const nse = createNseSource({ axios, log, yahoo, ...deps });
-  const cryptoSrc = createCryptoSource({ axios, log });
+  const cryptoSrc = createCachedCrypto(createCryptoSource({ axios, log }));
   state.nse = nse;
   state.crypto = cryptoSrc;
   const judgeOn = String(env.PAPER_JUDGE_ON ?? 'true').toLowerCase() !== 'false'; // the judge decides NSE entries (docs/JUDGE.md); PAPER_JUDGE_ON=false switches it off
@@ -199,6 +220,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   require('../src/paper/pluginLoader').loadPlugins({
     app, cron, env, log, state, store, guarded, tz,
     pool: typeof store.query === 'function' ? { query: store.query } : null,
+    cachedCrypto: cryptoSrc, // already-wrapped shared candle cache, so a bots/ plugin needing Binance candles reuses it instead of making its own
   }).catch((e) => log(`[paper-plugins] loadPlugins failed: ${e.message}`));
 
   cron.schedule('20 */5 9-15 * * 1-5', jobs.nseScan, tz); // 20 s after each 5-min candle closes
@@ -215,4 +237,4 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   return state;
 }
 
-module.exports = { attachPaperBot, guarded, buildStore, pgOptions, universeInfo };
+module.exports = { attachPaperBot, guarded, buildStore, pgOptions, universeInfo, createCachedCrypto };
