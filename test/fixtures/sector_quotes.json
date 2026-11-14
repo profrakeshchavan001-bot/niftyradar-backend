@@ -1,0 +1,36 @@
+{
+  "asOf": "2026-11-13T10:00:00.000Z",
+  "nifty": { "pct": 0.4, "closes": [24000, 24100, 24050, 24200, 24296.8] },
+  "sectors": {
+    "IT": {
+      "index": { "symbol": "^CNXIT", "pct": 1, "closes": [39000, 40000, 40200, 40392, 40800] },
+      "stocks": [
+        { "symbol": "TCS", "price": 4040, "prevClose": 4000 },
+        { "symbol": "INFY", "price": 1818, "prevClose": 1800 },
+        { "symbol": "WIPRO", "price": 505, "prevClose": 500 },
+        { "symbol": "HCLTECH", "price": 1515, "prevClose": 1500 },
+        { "symbol": "TECHM", "price": 1485, "prevClose": 1500 }
+      ]
+    },
+    "Metal": {
+      "index": { "symbol": "^CNXMETAL", "pct": -1.6, "closes": [10000, 10000, 9900, 9800, 9643.2] },
+      "stocks": [
+        { "symbol": "TATASTEEL", "price": 147, "prevClose": 150 },
+        { "symbol": "HINDALCO", "price": 640, "prevClose": 650, "vwap": 645 },
+        { "symbol": "JSWSTEEL", "price": 890, "prevClose": 900 },
+        { "symbol": "VEDL", "price": 441, "prevClose": 450 },
+        { "symbol": "SAIL", "price": 121, "prevClose": 120, "vwap": 122 }
+      ]
+    },
+    "Power": {
+      "index": null,
+      "stocks": [
+        { "symbol": "NTPC", "price": 303, "prevClose": 300 },
+        { "symbol": "POWERGRID", "price": 297, "prevClose": 300 },
+        { "symbol": "TATAPOWER", "price": 404, "prevClose": 400 },
+        { "symbol": "ADANIPOWER", "price": 505, "prevClose": 500 }
+      ]
+    },
+    "Pharma": { "index": null, "stocks": [{ "symbol": "CIPLA", "price": 1510, "prevClose": 1500 }] }
+  }
+}
