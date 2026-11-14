@@ -15,11 +15,15 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
   'sl_price', 'target_price', // exit levels fixed at entry (option price for NSE, coin price for crypto)
   // crypto level-based exits: stop in force now (moves to the entry at breakeven), what the levels are, reward/risk,
   // and the old fixed +2% / -1% rule followed in parallel for comparison only
-  'stop_active', 'breakeven_time', 'target_type', 'stop_type', 'rr', 'legacy_target', 'legacy_stop', 'legacy_result'];
+  'stop_active', 'breakeven_time', 'target_type', 'stop_type', 'rr', 'legacy_target', 'legacy_stop', 'legacy_result',
+  'strategy', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr', 'be_moved']; // scalp: docs/SCALP.md
 const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
-  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop'];
+  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr'];
 const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec'];
+
+// scalp markets ('crypto_scalp', 'nse_scalp') stay out of the intraday lists unless asked for by name (docs/SCALP.md)
+const isScalp = (m) => String(m || '').endsWith('_scalp');
 
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
 
@@ -37,15 +41,15 @@ function createMemoryStore() {
     async noteTrade(id, fields) { return this.updateTrade(id, fields); },
     async openTrades(market) { return copy(db.trades.filter((t) => t.market === market && t.status === 'open')); },
     async tradesForDay(market, date) { return copy(db.trades.filter((t) => t.market === market && t.trade_date === date)); },
-    async closedTrades(market) { return copy(db.trades.filter((t) => t.status === 'closed' && (!market || t.market === market))); },
+    async closedTrades(market) { return copy(db.trades.filter((t) => t.status === 'closed' && (market ? t.market === market : !isScalp(t.market)))); },
     async insertSkip(s) { db.skips.push({ id: ++seq, ...copy(s) }); },
     async getTrade(id) { const row = db.trades.find((t) => t.id === id); return row ? copy(row) : null; },
     async legacyPending(market) { return copy(db.trades.filter((t) => t.market === market && t.legacy_target != null && t.legacy_result == null)); },
-    async skipsSince(date) { return copy(db.skips.filter((s) => s.skip_date >= date)); },
+    async skipsSince(date, market = null) { return copy(db.skips.filter((s) => s.skip_date >= date && (market ? s.market === market : !isScalp(s.market)))); },
     async saveSummary(s) { db.summaries.push({ id: ++seq, ...copy(s) }); },
     async listSummaries(limit) { return copy(db.summaries.slice(-clampLimit(limit)).reverse()); },
-    async listTrades(limit) { return copy(db.trades.slice(-clampLimit(limit)).reverse()); },
-    async listSkips(limit) { return copy(db.skips.slice(-clampLimit(limit)).reverse()); },
+    async listTrades(limit, market = null) { return copy(db.trades.filter((t) => (market ? t.market === market : !isScalp(t.market))).slice(-clampLimit(limit)).reverse()); },
+    async listSkips(limit, market = null) { return copy(db.skips.filter((x) => (market ? x.market === market : !isScalp(x.market))).slice(-clampLimit(limit)).reverse()); },
     _db: db,
   };
 }
@@ -105,12 +109,12 @@ function createPgStore(getPool) {
     },
     openTrades: (market) => q("SELECT * FROM paper_trades WHERE market = $1 AND status = 'open' ORDER BY id", [market]),
     tradesForDay: (market, date) => q('SELECT * FROM paper_trades WHERE market = $1 AND trade_date = $2 ORDER BY id', [market, date]),
-    closedTrades: (market) => q("SELECT * FROM paper_trades WHERE status = 'closed' AND ($1::text IS NULL OR market = $1) ORDER BY id", [market || null]),
+    closedTrades: (market) => q("SELECT * FROM paper_trades WHERE status = 'closed' AND (($1::text IS NULL AND market NOT LIKE '%\\_scalp') OR market = $1) ORDER BY id", [market || null]),
     async insertSkip(s) {
       await pool.query(`INSERT INTO paper_skips (${SKIP_COLS.join(', ')}) VALUES (${SKIP_COLS.map((_, i) => `$${i + 1}`).join(', ')})`,
         SKIP_COLS.map((c) => toParam(c, s[c])));
     },
-    skipsSince: (date) => q('SELECT * FROM paper_skips WHERE skip_date >= $1 ORDER BY id', [date]),
+    skipsSince: (date, market = null) => q("SELECT * FROM paper_skips WHERE skip_date >= $1 AND (($2::text IS NULL AND market NOT LIKE '%\\_scalp') OR market = $2) ORDER BY id", [date, market]),
     async getTrade(id) { return (await q('SELECT * FROM paper_trades WHERE id = $1', [id]))[0] || null; },
     legacyPending: (market) => q('SELECT * FROM paper_trades WHERE market = $1 AND legacy_target IS NOT NULL AND legacy_result IS NULL ORDER BY id', [market]),
     async saveSummary(s) {
@@ -118,8 +122,8 @@ function createPgStore(getPool) {
         [s.kind, s.summary_date, s.body, JSON.stringify(s.data || null), !!s.telegram_sent]);
     },
     listSummaries: (limit) => q('SELECT * FROM daily_summaries ORDER BY id DESC LIMIT $1', [clampLimit(limit)]),
-    listTrades: (limit) => q('SELECT * FROM paper_trades ORDER BY id DESC LIMIT $1', [clampLimit(limit)]),
-    listSkips: (limit) => q('SELECT * FROM paper_skips ORDER BY id DESC LIMIT $1', [clampLimit(limit)]),
+    listTrades: (limit, market = null) => q("SELECT * FROM paper_trades WHERE (($2::text IS NULL AND market NOT LIKE '%\\_scalp') OR market = $2) ORDER BY id DESC LIMIT $1", [clampLimit(limit), market]),
+    listSkips: (limit, market = null) => q("SELECT * FROM paper_skips WHERE (($2::text IS NULL AND market NOT LIKE '%\\_scalp') OR market = $2) ORDER BY id DESC LIMIT $1", [clampLimit(limit), market]),
   };
 }
 

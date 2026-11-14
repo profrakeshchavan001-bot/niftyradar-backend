@@ -180,6 +180,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   // Live price samples for the fallback candle builder (memory only).
   setInterval(() => { try { nse.sample(); } catch (e) { /* sampling must never break the server */ } }, 10000).unref();
 
+  require('../src/paper/scalp').attachScalp({ app, cron, axios, env, log, state, store, crypto: cryptoSrc, secret, okSecret, enabled, guarded }); // scalp strategy + /api/paper/scalp-report (docs/SCALP.md)
   cron.schedule('20 */5 9-15 * * 1-5', jobs.nseScan, tz); // 20 s after each 5-min candle closes
   cron.schedule('50 * 9-15 * * 1-5', jobs.nseMonitor, tz); // exits checked every minute
   cron.schedule('25 */5 * * * *', jobs.cryptoScan, tz);

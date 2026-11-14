@@ -1,0 +1,104 @@
+'use strict';
+// Scalp bot orchestration (crypto, 1-minute entries). PAPER ONLY: no order API anywhere. Every dependency is injected, so tests drive it with fake candles and a fake clock.
+// Trades live under market 'crypto_scalp' with strategy 'scalp', so the intraday monitor, reports and judge never see them.
+const P = require('../../../paperbot/patterns');
+const E = require('../../../paperbot/engine');
+const { istParts, istDayStart } = require('../../../paperbot/time');
+const { loadScalpConfig } = require('./config');
+const { analyse, evaluateExit, settle } = require('./engine');
+
+const MARKET = 'crypto_scalp';
+
+function basisText(plan, symbol) {
+  const p = plan.hits.map((h) => `${h.name.replace(/_/g, ' ')} (${h.note})`).join('; ');
+  const lvl = plan.level ? `nearest ${plan.long ? 'resistance' : 'support'} ${plan.level.price} is ${plan.level.pct}% away` : 'no level in the way, target at the cap';
+  return `Scalp ${plan.long ? 'LONG' : 'SHORT'} on ${symbol}: the 1-min chart showed ${p}. 5-min trend ${plan.trend5}, price ${plan.ctx5.price} vs VWAP ${plan.ctx5.vwap}. `
+    + `Target +${plan.targetPct}% (${lvl}), stop ${plan.stopPct}% (beyond the pattern candle + 0.5 x ATR), costs ${plan.costPct}% round trip, reward/risk ${plan.rr} after costs. `
+    + 'Exits: target, stop, stop moved to breakeven half way, or out after the time stop.';
+}
+
+function createScalpBot({ store, crypto, source1m, now = Date.now, log = console.log }) {
+  const skipSeen = new Set();
+  const nseNoted = new Set();
+
+  async function skip(symbol, reason, extra = {}) {
+    const date = istParts(now()).date;
+    const key = `${date}|${symbol}|${reason}|${extra.trigger_t || ''}`;
+    if (skipSeen.has(key)) return;
+    if (skipSeen.size > 5000) skipSeen.clear();
+    skipSeen.add(key);
+    log(`[scalp] skip ${symbol}: ${reason}`);
+    await store.insertSkip({ market: MARKET, symbol, skip_date: date, reason, r_factor: extra.r_factor ?? null, patterns: extra.patterns || null, trend_state: extra.trend_state || null, data_source: 'binance_public', data_delay_sec: null });
+  }
+
+  async function cryptoScalpScan() {
+    const cfg = await loadScalpConfig(store);
+    const date = istParts(now()).date;
+    const today = await store.tradesForDay(MARKET, date);
+    const open = await store.openTrades(MARKET);
+    let freeCash = cfg.capital_usdt - open.reduce((s, t) => s + t.entry_price * t.qty, 0);
+    const entered = [];
+    for (const symbol of cfg.symbols) {
+      if (open.some((t) => t.symbol === symbol) || entered.includes(symbol)) continue; // 1 open scalp per coin; no daily cap, no cooldown
+      let c1; let c5;
+      try { [c1, c5] = await Promise.all([source1m.candles1m(symbol, 120), crypto.candles(symbol)]); } catch (e) { log(`[scalp] candles for ${symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const a = analyse({ c1raw: c1, c5raw: c5, now: now(), cfg, dayStartMs: istDayStart(now()) });
+      if (!a.ok) { if (!a.quiet) await skip(symbol, a.reason, a.extra || {}); continue; }
+      const plan = a.plan;
+      if (today.some((t) => t.symbol === symbol && t.trigger_t === plan.last.t)) continue; // this candle was already traded
+      const size = E.sizeCrypto({ capital: cfg.capital_usdt, riskPct: cfg.risk_pct, stopPct: plan.stopPct, freeCash, price: plan.entry, coins: cfg.symbols.length });
+      if (!size) { await skip(symbol, 'no free virtual USDT balance for scalps', { patterns: plan.hits.map((h) => h.name), trigger_t: plan.last.t }); continue; }
+      const long = plan.long;
+      const row = {
+        market: MARKET, strategy: 'scalp', symbol, trade_date: date, status: 'open', r_factor: plan.rr, score_source: 'scalp reward/risk after costs (target / stop, fees and slippage included)',
+        direction: long ? 'LONG' : 'SHORT', patterns: plan.hits.map((h) => h.name),
+        trigger_candles: plan.hits.map((h) => ({ pattern: h.name, direction: h.direction, note: h.note, candles: h.candles })),
+        trigger_t: plan.last.t, trend_state: { ...plan.ctx5, trend5: plan.trend5, atr1m: P.round(plan.atr, 6), level: plan.level },
+        smc_tags: plan.hits.filter((h) => h.kind === 'smc').map((h) => h.name), news_filter: 'not applied to crypto',
+        instrument: `${symbol} spot (paper scalp)`, simulated_option: false, price_source: 'binance_public_1m_close', candle_source: 'binance_public_klines_1m_and_5m',
+        data_source: 'binance_public', data_delay_sec: Math.round((now() - (plan.last.t + 60000)) / 1000),
+        qty: size.qty, entry_price: plan.entry, entry_time: new Date(now()).toISOString(), entry_underlying: plan.entry,
+        sl_price: plan.stopPrice, target_price: plan.targetPrice, max_fav_pct: 0, max_adv_pct: 0, basis: basisText(plan, symbol),
+      };
+      await store.insertTrade(row);
+      log(`[scalp] PAPER entry ${symbol} ${row.direction} @ ${plan.entry}: ${row.patterns.join(', ')}; target ${plan.targetPrice}, stop ${plan.stopPrice}, R ${plan.rr}`);
+      freeCash -= size.value;
+      entered.push(symbol);
+    }
+    return { ran: true, entered };
+  }
+
+  async function cryptoScalpMonitor() {
+    const open = await store.openTrades(MARKET);
+    if (!open.length) return { checked: 0, closed: 0 };
+    const cfg = await loadScalpConfig(store);
+    let closed = 0;
+    for (const t of open) {
+      let candles;
+      try { candles = await source1m.candles1m(t.symbol, 40); } catch (e) { log(`[scalp] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const ev = evaluateExit({ trade: t, candles: E.closedOnly(candles, 60000, now()), nowMs: now(), cfg });
+      if (!ev.exit) { if (ev.favPct > (t.max_fav_pct || 0) || ev.advPct < (t.max_adv_pct || 0)) await store.noteTrade(t.id, { max_fav_pct: ev.favPct, max_adv_pct: ev.advPct }); continue; }
+      const fx = await crypto.usdtInr(cfg.usdt_inr_fallback);
+      const s = settle({ trade: t, exitPrice: ev.price, cfg, fxRate: fx.rate });
+      await store.updateTrade(t.id, {
+        status: 'closed', exit_price: ev.price, exit_underlying: ev.price, exit_time: new Date(ev.timeMs).toISOString(), exit_reason: ev.reason,
+        ...s, fx_rate: fx.rate, fx_source: fx.source, max_fav_pct: ev.favPct, max_adv_pct: ev.advPct, be_moved: ev.beMoved,
+      });
+      log(`[scalp] PAPER exit ${t.symbol}: ${ev.reason}, gross ${s.gross_pnl_usdt} net ${s.net_pnl_usdt} USDT (Rs ${s.pnl_inr})`);
+      closed += 1;
+    }
+    return { checked: open.length, closed };
+  }
+
+  // NSE scalp needs 1-minute NSE candles. The bot has none (Dhan is wired for 5-minute candles; the free Yahoo feed is delayed), so it does not run and says why.
+  async function nseScalpScan() {
+    const reason = 'NSE scalp is off: no 1-minute NSE candle source (Dhan is wired for 5-minute candles only and the free Yahoo feed is delayed)';
+    const day = istParts(now()).date;
+    if (!nseNoted.has(day)) { nseNoted.add(day); log(`[scalp] ${reason}`); }
+    return { ran: false, reason };
+  }
+
+  return { cryptoScalpScan, cryptoScalpMonitor, nseScalpScan };
+}
+
+module.exports = { createScalpBot, MARKET, basisText };
