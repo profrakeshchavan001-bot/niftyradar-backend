@@ -780,6 +780,20 @@ app.get('/api/options/:symbol', async (req, res) => {
 });
 
 // ============================================
+// PAPER-TRADING BOT (demo only, no real orders) - see paperbot/ and
+// docs/PAPER-BOT.md. Switch off with PAPER_BOT_ENABLED=false.
+// ============================================
+require('./paperbot').attachPaperBot({
+  app, cron, axios,
+  deps: {
+    queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSecurityId,
+    getMovers: () => cache.movers,
+    getLotSize: (symbol) => lotSizes[symbol],
+    fetchNews: fetchMarketNews,
+  },
+});
+
+// ============================================
 // START
 // ============================================
 const PORT = process.env.PORT || 3000;
