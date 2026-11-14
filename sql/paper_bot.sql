@@ -80,3 +80,8 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_score         numeric;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_take          boolean;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_contributions jsonb;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS judge_basis         text;
+
+-- NSE candle feed of each trade: "dhan" or "yahoo" (free fallback, paperbot/yahoo.js), and the observed data delay in seconds
+-- (how long ago the latest closed candle ended when the trade was decided).
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS data_source    text;
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS data_delay_sec numeric;

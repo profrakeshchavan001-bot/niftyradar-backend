@@ -1,0 +1,12 @@
+{
+  "_note": "Universe of the FREE Yahoo candle fallback (paperbot/yahoo.js): at most 60 liquid NSE F&O stocks. Static list = the site's Nifty 50 basket plus 10 heavily traded F&O names. OWNER: please check it against the current F&O turnover list; a symbol Yahoo does not know is skipped and logged, never guessed. The adapter never asks for more than the first 60.",
+  "symbols": [
+    "RELIANCE", "TCS", "HDFCBANK", "ICICIBANK", "INFY", "ITC", "SBIN", "BHARTIARTL", "LT", "HINDUNILVR",
+    "KOTAKBANK", "AXISBANK", "BAJFINANCE", "ASIANPAINT", "MARUTI", "SUNPHARMA", "TITAN", "ULTRACEMCO",
+    "TATAMOTORS", "WIPRO", "NESTLEIND", "ONGC", "NTPC", "ADANIENT", "ADANIPORTS", "POWERGRID", "M&M",
+    "HCLTECH", "TATASTEEL", "JSWSTEEL", "TECHM", "GRASIM", "DRREDDY", "CIPLA", "COALINDIA", "BAJAJFINSV",
+    "BRITANNIA", "EICHERMOT", "HEROMOTOCO", "DIVISLAB", "APOLLOHOSP", "BPCL", "HINDALCO", "INDUSINDBK",
+    "SBILIFE", "HDFCLIFE", "TATACONSUM", "BAJAJ-AUTO", "UPL", "SHRIRAMFIN",
+    "BANKBARODA", "PNB", "CANBK", "BEL", "HAL", "TRENT", "DLF", "VEDL", "TATAPOWER", "IRCTC"
+  ]
+}

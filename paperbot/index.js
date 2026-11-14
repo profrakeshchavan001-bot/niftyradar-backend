@@ -9,6 +9,8 @@ const { createBot } = require('./bot');
 const { createMemoryStore, createPgStore, createCachedStore } = require('./store');
 const { createNseSource, createCryptoSource } = require('./sources');
 const { createReporter } = require('./report');
+const { createYahooSource } = require('./yahoo');
+const { buildReport } = require('./reportPage');
 const { loadConfig, DEFAULTS } = require('./config');
 const { istParts, nseSession } = require('./time');
 
@@ -93,11 +95,25 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   route('/api/paper/trades', (limit) => state.store.listTrades(limit));
   route('/api/paper/skips', (limit) => state.store.listSkips(limit));
 
+  // Read-only report page (plain HTML, for a phone). Same secret, sent as ?key= (or the x-paper-secret header).
+  app.get('/api/paper/report', async (req, res) => {
+    res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+    if (!secret) return res.status(503).type('text').send('PAPER_ADMIN_SECRET not configured');
+    if (!okSecret(req.get('x-paper-secret') || req.query.key)) return res.status(401).type('text').send('Unauthorized');
+    if (!enabled || !state.ready) return res.status(503).type('text').send(enabled ? 'paper bot is starting' : 'paper bot is disabled (PAPER_BOT_ENABLED=false)');
+    try {
+      res.type('html').send(await buildReport({ store: state.store }));
+    } catch (e) {
+      res.status(500).type('text').send('could not read paper bot data');
+    }
+  });
+
   if (!enabled) { log('[paperbot] disabled (PAPER_BOT_ENABLED=false)'); return state; }
 
   const store = buildStore(env, log);
   state.store = store;
-  const nse = createNseSource({ axios, log, ...deps });
+  const yahoo = createYahooSource({ axios, log }); // free NSE candle fallback, asked only when Dhan has no data
+  const nse = createNseSource({ axios, log, yahoo, ...deps });
   const cryptoSrc = createCryptoSource({ axios, log });
   const judgeOn = String(env.PAPER_JUDGE_ON ?? 'true').toLowerCase() !== 'false'; // the judge decides NSE entries (docs/JUDGE.md); PAPER_JUDGE_ON=false switches it off
   const bot = createBot({ store, nse, crypto: cryptoSrc, log, onConfig: (cfg) => { state.holidays = cfg.nse.holidays; }, judgeOn });
