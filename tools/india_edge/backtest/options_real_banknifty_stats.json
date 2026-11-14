@@ -1,0 +1,403 @@
+{
+ "generated": "2026-10-31",
+ "first": "2015-01-01",
+ "last": "2026-10-30",
+ "n_days": 2919,
+ "train": "entries to 2022-12-31",
+ "test": "entries from 2023-01-01",
+ "cost_multiplier": 2.0,
+ "lot": 30,
+ "symbol": "BANKNIFTY",
+ "strategies": {
+  "condor": {
+   "train": {
+    "trades": 59,
+    "win_pct": 71.2,
+    "avg_inr": 1711.0,
+    "avg_r": 0.045,
+    "total_inr": 100960.0,
+    "max_dd_inr": 77976.0,
+    "worst_inr": -26429.0,
+    "worst_vs_sl": 1.46,
+    "costs_inr": 59984.0
+   },
+   "test": {
+    "trades": 35,
+    "win_pct": 65.7,
+    "avg_inr": 1144.0,
+    "avg_r": 0.019,
+    "total_inr": 40040.0,
+    "max_dd_inr": 55617.0,
+    "worst_inr": -30770.0,
+    "worst_vs_sl": 1.1,
+    "costs_inr": 37062.0
+   },
+   "walk_forward": {
+    "windows": {
+     "2015": {
+      "trades": 9,
+      "total_inr": 30373.0
+     },
+     "2016": {
+      "trades": 8,
+      "total_inr": -16455.0
+     },
+     "2017": {
+      "trades": 8,
+      "total_inr": -6715.0
+     },
+     "2018": {
+      "trades": 6,
+      "total_inr": 825.0
+     },
+     "2019": {
+      "trades": 4,
+      "total_inr": 24171.0
+     },
+     "2020": {
+      "trades": 6,
+      "total_inr": 29163.0
+     },
+     "2021": {
+      "trades": 9,
+      "total_inr": 45415.0
+     },
+     "2022": {
+      "trades": 9,
+      "total_inr": -5816.0
+     },
+     "2023": {
+      "trades": 7,
+      "total_inr": 6979.0
+     },
+     "2024": {
+      "trades": 11,
+      "total_inr": 52059.0
+     },
+     "2025": {
+      "trades": 10,
+      "total_inr": -10671.0
+     },
+     "2026": {
+      "trades": 7,
+      "total_inr": -8328.0
+     }
+    },
+    "total_inr": 141000.0,
+    "positive_windows": 7,
+    "n_windows": 12
+   },
+   "survivor": true,
+   "verdict": "survives",
+   "exit_reasons": {
+    "TP50": 48,
+    "15DTE": 32,
+    "SL100": 14
+   },
+   "avg_adjustments": 0.0,
+   "trades_over_1_1x_sl": 13,
+   "open_fallback_entries": 41,
+   "stale_mark_trades": 2,
+   "margin_est_inr": {
+    "median": 58419.0,
+    "max": 104438.0
+   },
+   "return_on_margin_pct_test": 68.5,
+   "skipped": 48,
+   "open_at_end": 1
+  },
+  "strangle_d18": {
+   "train": {
+    "trades": 90,
+    "win_pct": 50.0,
+    "avg_inr": -1130.0,
+    "avg_r": -0.087,
+    "total_inr": -101733.0,
+    "max_dd_inr": 149812.0,
+    "worst_inr": -28544.0,
+    "worst_vs_sl": 2.2,
+    "costs_inr": 75191.0
+   },
+   "test": {
+    "trades": 45,
+    "win_pct": 71.1,
+    "avg_inr": 3945.0,
+    "avg_r": 0.303,
+    "total_inr": 177526.0,
+    "max_dd_inr": 57145.0,
+    "worst_inr": -34554.0,
+    "worst_vs_sl": 2.66,
+    "costs_inr": 39312.0
+   },
+   "walk_forward": {
+    "windows": {
+     "2015": {
+      "trades": 12,
+      "total_inr": 24255.0
+     },
+     "2016": {
+      "trades": 11,
+      "total_inr": 2152.0
+     },
+     "2017": {
+      "trades": 12,
+      "total_inr": -8122.0
+     },
+     "2018": {
+      "trades": 12,
+      "total_inr": 2237.0
+     },
+     "2019": {
+      "trades": 10,
+      "total_inr": -37237.0
+     },
+     "2020": {
+      "trades": 10,
+      "total_inr": -27093.0
+     },
+     "2021": {
+      "trades": 11,
+      "total_inr": -9753.0
+     },
+     "2022": {
+      "trades": 12,
+      "total_inr": -48171.0
+     },
+     "2023": {
+      "trades": 12,
+      "total_inr": 32307.0
+     },
+     "2024": {
+      "trades": 12,
+      "total_inr": 15934.0
+     },
+     "2025": {
+      "trades": 12,
+      "total_inr": 77488.0
+     },
+     "2026": {
+      "trades": 9,
+      "total_inr": 51798.0
+     }
+    },
+    "total_inr": 75795.0,
+    "positive_windows": 7,
+    "n_windows": 12
+   },
+   "survivor": true,
+   "verdict": "survives",
+   "exit_reasons": {
+    "TP": 51,
+    "SL": 38,
+    "EXPIRY": 29,
+    "7DTE_UNSTABLE": 17
+   },
+   "avg_adjustments": 1.27,
+   "trades_over_1_1x_sl": 38,
+   "open_fallback_entries": 40,
+   "stale_mark_trades": 2,
+   "margin_est_inr": {
+    "median": 113104.0,
+    "max": 209309.0
+   },
+   "return_on_margin_pct_test": 157.0,
+   "skipped": 6,
+   "open_at_end": 1
+  },
+  "strangle_p100": {
+   "train": {
+    "trades": 95,
+    "win_pct": 55.8,
+    "avg_inr": -958.0,
+    "avg_r": -0.074,
+    "total_inr": -90999.0,
+    "max_dd_inr": 175720.0,
+    "worst_inr": -32534.0,
+    "worst_vs_sl": 2.5,
+    "costs_inr": 68085.0
+   },
+   "test": {
+    "trades": 45,
+    "win_pct": 75.6,
+    "avg_inr": 1693.0,
+    "avg_r": 0.13,
+    "total_inr": 76192.0,
+    "max_dd_inr": 67045.0,
+    "worst_inr": -33435.0,
+    "worst_vs_sl": 2.57,
+    "costs_inr": 23934.0
+   },
+   "walk_forward": {
+    "windows": {
+     "2015": {
+      "trades": 12,
+      "total_inr": 12545.0
+     },
+     "2016": {
+      "trades": 12,
+      "total_inr": 23685.0
+     },
+     "2017": {
+      "trades": 12,
+      "total_inr": -24768.0
+     },
+     "2018": {
+      "trades": 12,
+      "total_inr": 13680.0
+     },
+     "2019": {
+      "trades": 12,
+      "total_inr": -90333.0
+     },
+     "2020": {
+      "trades": 11,
+      "total_inr": -30336.0
+     },
+     "2021": {
+      "trades": 12,
+      "total_inr": 9042.0
+     },
+     "2022": {
+      "trades": 12,
+      "total_inr": -4514.0
+     },
+     "2023": {
+      "trades": 12,
+      "total_inr": 29528.0
+     },
+     "2024": {
+      "trades": 12,
+      "total_inr": 33703.0
+     },
+     "2025": {
+      "trades": 12,
+      "total_inr": 25224.0
+     },
+     "2026": {
+      "trades": 9,
+      "total_inr": -12262.0
+     }
+    },
+    "total_inr": -14806.0,
+    "positive_windows": 7,
+    "n_windows": 12
+   },
+   "survivor": false,
+   "verdict": "dies",
+   "exit_reasons": {
+    "EXPIRY": 73,
+    "SL": 32,
+    "7DTE_UNSTABLE": 19,
+    "TP": 16
+   },
+   "avg_adjustments": 1.07,
+   "trades_over_1_1x_sl": 29,
+   "open_fallback_entries": 42,
+   "stale_mark_trades": 3,
+   "margin_est_inr": {
+    "median": 108037.5,
+    "max": 209309.0
+   },
+   "return_on_margin_pct_test": 70.5,
+   "skipped": 1,
+   "open_at_end": 1
+  },
+  "calendar": {
+   "train": {
+    "trades": 200,
+    "win_pct": 54.5,
+    "avg_inr": -338.0,
+    "avg_r": -0.056,
+    "total_inr": -67696.0,
+    "max_dd_inr": 173605.0,
+    "worst_inr": -20434.0,
+    "worst_vs_sl": 3.41,
+    "costs_inr": 348337.0
+   },
+   "test": {
+    "trades": 73,
+    "win_pct": 52.1,
+    "avg_inr": -1641.0,
+    "avg_r": -0.274,
+    "total_inr": -119808.0,
+    "max_dd_inr": 138380.0,
+    "worst_inr": -33860.0,
+    "worst_vs_sl": 5.64,
+    "costs_inr": 133730.0
+   },
+   "walk_forward": {
+    "windows": {
+     "2015": {
+      "trades": 12,
+      "total_inr": -38344.0
+     },
+     "2016": {
+      "trades": 16,
+      "total_inr": -22917.0
+     },
+     "2017": {
+      "trades": 25,
+      "total_inr": -34387.0
+     },
+     "2018": {
+      "trades": 29,
+      "total_inr": -62441.0
+     },
+     "2019": {
+      "trades": 27,
+      "total_inr": 37072.0
+     },
+     "2020": {
+      "trades": 28,
+      "total_inr": 11425.0
+     },
+     "2021": {
+      "trades": 32,
+      "total_inr": 34932.0
+     },
+     "2022": {
+      "trades": 31,
+      "total_inr": 6964.0
+     },
+     "2023": {
+      "trades": 28,
+      "total_inr": -69654.0
+     },
+     "2024": {
+      "trades": 24,
+      "total_inr": -55745.0
+     },
+     "2025": {
+      "trades": 11,
+      "total_inr": -715.0
+     },
+     "2026": {
+      "trades": 10,
+      "total_inr": 6305.0
+     }
+    },
+    "total_inr": -187505.0,
+    "positive_windows": 5,
+    "n_windows": 12
+   },
+   "survivor": false,
+   "verdict": "dies",
+   "exit_reasons": {
+    "PRE_EXPIRY": 162,
+    "TP": 76,
+    "SL": 35
+   },
+   "avg_adjustments": 1.7,
+   "trades_over_1_1x_sl": 41,
+   "open_fallback_entries": 45,
+   "stale_mark_trades": 2,
+   "margin_est_inr": {
+    "median": 56966.0,
+    "max": 109332.0
+   },
+   "return_on_margin_pct_test": -210.3,
+   "skipped": 12,
+   "open_at_end": 0
+  }
+ }
+}
