@@ -93,6 +93,46 @@ entry/exit path (`paperbot/bot.js` `nseScan`/`nseMonitor`), not an isolated
 addition like the crypto one above. Left for a dedicated PR with its own
 hand-worked tests.
 
+## Item 5 - EMA crossover (done: storage + wiring; report split deferred)
+
+`src/paper/lib/emaCross.js`: `emaCrossState(candles, fastN, slowN)` (is the
+fast EMA above/below the slow one, and did that side just change between the
+last two closes - a "fresh" cross) and `classifyEmaCross({direction, c5,
+c15, c1h})`, which combines the 5-min EMA9/21 (primary) with the 15-min and
+1-hour EMA20/50 into one label: `fresh_with` / `fresh_against` (a cross just
+happened, with or against the trade) / `confirmed_with` / `confirmed_against`
+/ `mixed` (no fresh cross; a majority of the three timeframes agree or
+disagree, or split evenly) / `unknown` (not enough 5-min candles - never
+guessed). Exactly the brief's rule: a fresh cross *for* the trade is a
+strong confirmation, a cross *against* is a warning, neither ever blocks or
+changes an entry/exit by itself.
+
+Wired into `paperbot/bot.js`'s shared `analyse()` (used by both NSE and
+crypto), so every trade AND every skip row gets `ema_cross` - a new,
+additive, nullable `text` column on `paper_trades` and `paper_skips`
+(`sql/paper_bot.sql`, `npm run migrate` needed). Direction used for a
+skipped setup (patterns fired but the entry rule said no) falls back to the
+first pattern's own direction, since `decision.direction` is only set when
+the bot actually enters.
+
+10 hand-worked tests for the pure functions (small fastN/slowN so the EMA
+arithmetic is checkable by hand - the production call site still uses the
+brief's real 9/21 and 20/50 periods, the combining logic under test does not
+change with the period) plus one wiring test (a real `cryptoScan()` stores
+some valid label on the trade it opens). Full suite: 228/230 passing as merged - the 2 failures
+(`test/newsCheck.test.js`, `test/opsHome.test.js`) pre-exist on `main` before
+this change (confirmed by stashing this diff and re-running them: they fail
+identically on plain `main`), in files under `src/paper/context/` and
+`src/paper/ops/` owned by other windows tonight. Not touched or caused by
+this PR; flagging rather than silently ignoring.
+
+**Not done tonight: "report win rate with and without it."** That is a
+`paperbot/report.js` / `reportPage.js` aggregation change (group closed
+trades by `ema_cross`, compute win rate per group) on files already carrying
+a lot of other sessions' report logic (R-factor, judge, scalp costs) - a
+real but separable follow-up now that the data itself is being recorded. No
+report change was made, so nothing there could have broken.
+
 ## Item 3 - exit accuracy - half done, on purpose
 
 `src/paper/lib/exitSim.js` (`simulateExit`): walks every closed candle since
