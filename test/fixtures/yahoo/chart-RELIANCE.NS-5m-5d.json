@@ -1,0 +1,8 @@
+{"chart":{"result":[{"meta":{"currency":"INR","symbol":"RELIANCE.NS","exchangeName":"NSI","fullExchangeName":"NSE","instrumentType":"EQUITY","regularMarketTime":1794542815,"exchangeDataDelayedBy":0,"gmtoffset":19800,"timezone":"IST","exchangeTimezoneName":"Asia/Kolkata","regularMarketPrice":1512.0,"regularMarketVolume":500000,"chartPreviousClose":1480.0,"dataGranularity":"5m","range":"5d"},
+"timestamp":[1794476700,1794477000,1794477300,1794541500,1794541800,1794542100,1794542400,1794542700,1794542815],
+"indicators":{"quote":[{
+"open":[1497.0,1498.0,1499.0,1502.0,1505.0,null,1507.0,1511.0,1512.0],
+"high":[1499.0,1500.0,1501.0,1506.0,1508.0,null,1512.0,1513.0,1512.0],
+"low":[1496.0,1497.0,1498.0,1501.0,1503.0,null,1506.0,1510.0,1512.0],
+"close":[1498.0,1499.0,1500.0,1505.0,1507.0,null,1511.0,1512.0,1512.0],
+"volume":[90000,80000,110000,200000,150000,null,120000,30000,0]}]}}],"error":null}}

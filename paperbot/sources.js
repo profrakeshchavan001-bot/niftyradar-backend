@@ -1,7 +1,8 @@
 'use strict';
 // Paper bot data sources. READ-ONLY market data: Dhan quotes / intraday
-// candles / option chain (the keys the backend already uses), the existing
-// Economic Times news feed, and Binance PUBLIC klines (no API key).
+// candles / option chain (the keys the backend already uses), the FREE Yahoo
+// chart fallback for NSE candles when Dhan is not available (./yahoo.js), the
+// existing Economic Times news feed, and Binance PUBLIC klines (no API key).
 // There is no order-placing call anywhere in this file or this folder.
 const { istParts, istDayStart } = require('./time');
 
@@ -70,12 +71,21 @@ function createCandleAggregator(maxCandles = 400) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSecurityId, getMovers, getLotSize, fetchNews, log = console.log, now = Date.now }) {
+// `yahoo` (optional, ./yahoo.js): free fallback used automatically when Dhan has no candles / no live quotes.
+function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSecurityId, getMovers, getLotSize, fetchNews, yahoo = null, log = console.log, now = Date.now }) {
   const aggregator = createCandleAggregator();
   const expiryCache = new Map(); // symbol -> { date, expiry }
   let news = { items: null, time: 0 };
   let lastChainCall = 0;
   let warnedIntraday = false;
+  let dhanRetryAt = 0; // after a failed Dhan candle read, Dhan is not asked again for 15 minutes
+  let lastYahooNote = '';
+  const DHAN_RETRY_MS = 3 * FIVE_MIN;
+  const dhanQuotes = () => {
+    const m = getMovers();
+    if (!m || !m.data || now() - m.time > 120000) return null;
+    return m.data.all || null;
+  };
 
   const fmt = (ms) => { const p = istParts(ms); return `${p.date} ${p.hhmm}:00`; };
 
@@ -103,24 +113,63 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
   }
 
   return {
-    // Live quotes of the basket (the same data the Movers page shows).
+    // Live quotes of the basket (the same data the Movers page shows). When
+    // Dhan has none, the quotes Yahoo sent with its candles (top 60 F&O stocks).
     ranking() {
-      const m = getMovers();
-      if (!m || !m.data || now() - m.time > 120000) return null;
-      return m.data.all || null;
+      const live = dhanQuotes();
+      if (live) return live;
+      const rows = yahoo ? yahoo.quotes() : [];
+      return rows.length ? rows : null;
     },
-    sample() { const r = this.ranking(); if (r) aggregator.record(r, now()); },
-    spot(symbol) { return (this.ranking() || []).find((s) => s.symbol === symbol)?.price || null; },
+    // Called once at the start of every scan. With Dhan quotes live it does
+    // nothing; without them it refreshes the Yahoo cache (staggered, at most
+    // one request per stock per 5-minute window). A failure is logged, never hidden.
+    async prepare() {
+      if (!yahoo || dhanQuotes()) return { source: 'dhan' };
+      const r = await yahoo.refreshAll();
+      const sample = yahoo.quotes().find((q) => q.quoteLagSec != null);
+      const note = `${r.ok} of ${r.ok + r.failed.length} stocks read${r.failed.length ? `, ${r.failed.length} failed and are skipped (${r.failed.slice(0, 3).map((f) => f.error).join('; ')}${r.failed.length > 3 ? '; ...' : ''})` : ''}`;
+      if (note !== lastYahooNote || r.failed.length) log(`[paperbot] NSE data source: yahoo (Dhan quotes not available). ${note}${sample ? `. Observed delay of the Yahoo quote: ${sample.quoteLagSec} s` : ''}`);
+      lastYahooNote = note;
+      return { source: 'yahoo', ok: r.ok, failed: r.failed };
+    },
+    sample() { const r = dhanQuotes(); if (r) aggregator.record(r, now()); },
+    // Last real price of a stock. Yahoo price only if its last trade is at most 2 candles old.
+    spot(symbol) {
+      const live = dhanQuotes();
+      if (live) return live.find((s) => s.symbol === symbol)?.price || null;
+      const q = yahoo ? yahoo.quote(symbol) : null;
+      if (!q || q.marketTime == null || now() - q.marketTime > 2 * FIVE_MIN) return null;
+      return q.price;
+    },
+    // For the exit check of an open trade when Dhan quotes are gone: one Yahoo read per 5-minute window.
+    async refreshSpot(symbol) {
+      if (!yahoo || dhanQuotes()) return;
+      try { await yahoo.get(symbol); } catch (e) { log(`[paperbot] ${e.message}; no price for the open ${symbol} trade right now`); }
+    },
+    // 5-minute candles: Dhan first, then Yahoo, then candles built from live
+    // Dhan prices. dataSource says where they came from ("dhan" or "yahoo").
     async candles(symbol) {
-      try {
-        return { candles: await dhanIntraday(symbol), source: 'dhan_intraday_5m' };
-      } catch (e) {
-        if (!warnedIntraday) {
-          warnedIntraday = true;
-          log(`[paperbot] Dhan intraday candles not available (${e.response?.status || e.message}); using 5-min candles built from live prices instead`);
+      if (now() >= dhanRetryAt) {
+        try {
+          return { candles: await dhanIntraday(symbol), source: 'dhan_intraday_5m', dataSource: 'dhan' };
+        } catch (e) {
+          if (!/^no security id/.test(e.message)) dhanRetryAt = now() + DHAN_RETRY_MS;
+          if (!warnedIntraday) {
+            warnedIntraday = true;
+            log(`[paperbot] Dhan intraday candles not available (${e.response?.status || e.message}); using ${yahoo ? 'the free Yahoo chart fallback (top 60 F&O stocks)' : '5-min candles built from live prices'} instead`);
+          }
         }
-        return { candles: aggregator.candles(symbol), source: 'built_from_live_prices' };
       }
+      if (yahoo) {
+        try {
+          const y = await yahoo.get(symbol);
+          return { candles: y.candles, source: 'yahoo_chart_5m', dataSource: 'yahoo', quoteLagSec: y.quoteLagSec, exchangeDelayMin: y.meta.exchangeDelayMin };
+        } catch (e) {
+          log(`[paperbot] ${e.message}; ${symbol} is skipped`);
+        }
+      }
+      return { candles: aggregator.candles(symbol), source: 'built_from_live_prices', dataSource: 'dhan' };
     },
     // Real ATM option price from the Dhan option chain, or null (never guessed).
     async optionQuote(symbol, direction, fixed) {

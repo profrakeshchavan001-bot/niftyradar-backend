@@ -99,6 +99,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     if (!session.open) return { ran: false, reason: session.reason };
     const p = istParts(now());
     if (p.minutes >= toMinutes(n.no_new_entry_after_ist)) return { ran: false, reason: 'too late for new entries' };
+    if (typeof nse.prepare === 'function') await nse.prepare(); // Dhan quotes gone: refresh the free Yahoo fallback (never more than once per 5 min per stock)
     const quotes = nse.ranking();
     if (!quotes) { log('[paperbot] NSE scan: no fresh live quotes, nothing done'); return { ran: false, reason: 'no live quotes' }; }
     const top = await rankNse(quotes, n, cfg);
@@ -110,7 +111,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
 
     for (const s of top) {
       if (open.some((t) => t.symbol === s.symbol) || entered.includes(s.symbol)) continue; // 1 open trade per stock
-      const { candles, source } = await candlesFor(s.symbol, FIVE_MIN);
+      const { candles, source, dataSource, quoteLagSec, exchangeDelayMin } = await candlesFor(s.symbol, FIVE_MIN);
       const a = await analyse('nse', s.symbol, candles, n, s.rFactor);
       if (!a) continue;
       if (today.some((t) => t.symbol === s.symbol && t.trigger_t === a.last.t)) continue; // this candle was already traded
@@ -136,6 +137,8 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       if (!size) { await skip('nse', s.symbol, `one lot (${lot} x Rs ${premium}) is bigger than the 2% risk size or the free cash`, a.extra); continue; }
 
       const type = dir === 'up' ? 'CE' : 'PE';
+      // Observed data delay: how long ago the latest closed candle ended when the trade was decided (always at most 2 candles, see analyse()).
+      const delaySec = Math.round((now() - (a.last.t + FIVE_MIN)) / 1000);
       const rDir = dir === 'up' ? s.r.long.r : s.r.short.r; // R of the direction actually traded
       const row = {
         ...tradeRow('nse', s.symbol, rDir, 'r_factor_v2 (target distance / stop distance, 15-min ATR and swing levels)', a, news.reason),
@@ -145,12 +148,12 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
         instrument: quote ? `${s.symbol} ${quote.expiry} ${quote.strike} ${type}` : `${s.symbol} ATM ${type} (simulated)`,
         simulated_option: simulated,
         price_source: quote ? 'dhan_option_chain_ltp' : `simulated: premium ${n.sim_premium_pct}% of spot, delta ${n.sim_delta}`,
-        candle_source: source, qty: size.qty, entry_price: premium, entry_underlying: spot,
+        candle_source: source, data_source: dataSource || null, data_delay_sec: delaySec, qty: size.qty, entry_price: premium, entry_underlying: spot,
         basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: rDir, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated }),
         ...(jd ? tradeFields(jd) : {}),
       };
       await store.insertTrade(row);
-      log(`[paperbot] PAPER entry nse ${row.instrument} x${size.qty} @ ${premium}: ${row.patterns.join(', ')}`);
+      log(`[paperbot] PAPER entry nse ${row.instrument} x${size.qty} @ ${premium}: ${row.patterns.join(', ')} · data_source ${row.data_source || 'unknown'}, latest candle closed ${delaySec} s ago${quoteLagSec != null ? `, quote lag ${quoteLagSec} s` : ''}${exchangeDelayMin != null ? `, delay declared by the feed ${exchangeDelayMin} min` : ''}`);
       taken += 1;
       freeCash -= size.value;
       entered.push(s.symbol);
@@ -185,6 +188,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       const force = t.trade_date < p.date ? 'carried_over_exit' : p.minutes >= toMinutes(n.force_exit_ist) ? `time_exit_${n.force_exit_ist}` : null;
       const dir = t.direction === 'CALL' ? 'up' : 'down';
       let price = null;
+      if (typeof nse.refreshSpot === 'function') await nse.refreshSpot(t.symbol);
       let spot = nse.spot(t.symbol);
       let extra = {};
       if (!t.simulated_option) {

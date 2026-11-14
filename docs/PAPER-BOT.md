@@ -59,8 +59,23 @@ If the service did sleep, a wake is a fresh start. One minute after start the bo
 
 `GET /api/paper/summaries`, `/api/paper/trades`, `/api/paper/skips` with `?key=<PAPER_ADMIN_SECRET>&limit=50`. `GET /api/paper/ping` is open (keep-alive only).
 
+## NSE candles without Dhan (free Yahoo fallback)
+
+When Dhan has no candles or no live quotes (expired token), the bot reads 5-minute candles from Yahoo Finance's public chart
+endpoint (`SYMBOL.NS`) by itself: `paperbot/yahoo.js`. Only the 60 stocks in `data/nse-fno-top60.json`, about 1 request per second,
+one request per stock per 5 minutes, backoff on 429 / 5xx. Every NSE trade stores `data_source` ("dhan" or "yahoo") and
+`data_delay_sec`; the entry log line shows the delay. A latest candle older than 2 candles means no trade. If Yahoo fails, the
+stock is skipped and the failure is logged; no value is ever filled in. Dhan takes over again by itself when it answers.
+The R-factor ranking is unchanged.
+
+## Report page
+
+`GET /api/paper/report?key=<PAPER_ADMIN_SECRET>`: one plain HTML page for the phone (no script, nothing external): day totals,
+today's trades with the basis sentence, open trades, and win rate / average P&L per pattern since the start ("too few trades"
+under 20). Read-only.
+
 ## Tests
 
-`npm test` (offline): pattern detection, rules, sizing, stats, and a replay of recorded candles through the real bot.
+`npm test` (offline): pattern detection, rules, sizing, stats, a replay of recorded candles through the real bot, the Yahoo adapter on fixture answers, and the report page.
 
 Open points and defaults taken: `docs/DECISIONS-PENDING.md`.
