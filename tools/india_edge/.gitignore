@@ -7,6 +7,17 @@ out/*
 universe.json
 __pycache__/
 .venv/
+data/idxopt/
+data/idxopt_raw/
+data/nifty/
+data/idxopt_nifty.parquet
+data/idxopt_banknifty.parquet
+backtest/out/
+backtest/results/
+logs/
+data/quarantine/
+data/manifest.json
+data/idxopt_audit.json
 backtest/out/*
 !backtest/out/.gitkeep
 data/manifest.json
