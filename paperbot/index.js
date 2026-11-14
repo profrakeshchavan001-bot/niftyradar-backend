@@ -99,7 +99,8 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   state.store = store;
   const nse = createNseSource({ axios, log, ...deps });
   const cryptoSrc = createCryptoSource({ axios, log });
-  const bot = createBot({ store, nse, crypto: cryptoSrc, log, onConfig: (cfg) => { state.holidays = cfg.nse.holidays; } });
+  const judgeOn = String(env.PAPER_JUDGE_ON ?? 'true').toLowerCase() !== 'false'; // the judge decides NSE entries (docs/JUDGE.md); PAPER_JUDGE_ON=false switches it off
+  const bot = createBot({ store, nse, crypto: cryptoSrc, log, onConfig: (cfg) => { state.holidays = cfg.nse.holidays; }, judgeOn });
   const reporter = createReporter({ store, axios, env, log, loadConfig });
   const tz = { timezone: 'Asia/Kolkata' };
   const job = (name, fn) => guarded(name, fn, log);

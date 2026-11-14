@@ -9,8 +9,11 @@ const R = require('./rfactor');
 const { loadConfig } = require('./config');
 const { newsCheck, FIVE_MIN } = require('./sources');
 const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
+const { createJudge, loadJudgeConfig, tradeFields } = require('../src/paper/decision/judge');
 
-function createBot({ store, nse, crypto, now = Date.now, log = console.log, onConfig = () => {} }) {
+// judgeOn: the judge (src/paper/decision/judge.js, docs/JUDGE.md) decides every NSE entry; index.js turns it on unless PAPER_JUDGE_ON=false.
+// judgeHelpers: test seam for { stockSectorView, newsScore, eventBlock }; by default the real modules are used when they exist.
+function createBot({ store, nse, crypto, now = Date.now, log = console.log, onConfig = () => {}, judgeOn = false, judgeHelpers = {} }) {
   const skipSeen = new Set();
   const candleCache = new Map(); // symbol -> { candles, source, at }
 
@@ -116,6 +119,13 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       if (taken >= n.max_trades_per_day) { await skip('nse', s.symbol, `max ${n.max_trades_per_day} trades for the day already taken`, a.extra); continue; }
 
       const dir = a.decision.direction;
+      let jd = null;
+      if (judgeOn) { // ONE decision from every helper; a hard block or a score under the threshold means no trade
+        const niftyTrend = typeof nse.niftyTrend === 'function' ? await nse.niftyTrend() : undefined; // no Nifty candle source yet: that helper then earns half its points
+        const judge = createJudge({ config: await loadJudgeConfig(store), ...judgeHelpers });
+        jd = await judge({ symbol: s.symbol, market: 'nse', direction: dir === 'up' ? 'long' : 'short', rFactor: dir === 'up' ? s.r.long.r : s.r.short.r, patterns: a.decision.patterns, niftyTrend, time: now() });
+        if (!jd.take) { await skip('nse', s.symbol, `judge ${jd.score}/100: ${jd.basis}`, a.extra); continue; }
+      }
       const lot = nse.lotSize(s.symbol);
       if (!lot) { await skip('nse', s.symbol, 'lot size not known for this stock', a.extra); continue; }
       const quote = await nse.optionQuote(s.symbol, dir);
@@ -137,6 +147,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
         price_source: quote ? 'dhan_option_chain_ltp' : `simulated: premium ${n.sim_premium_pct}% of spot, delta ${n.sim_delta}`,
         candle_source: source, qty: size.qty, entry_price: premium, entry_underlying: spot,
         basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: rDir, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated }),
+        ...(jd ? tradeFields(jd) : {}),
       };
       await store.insertTrade(row);
       log(`[paperbot] PAPER entry nse ${row.instrument} x${size.qty} @ ${premium}: ${row.patterns.join(', ')}`);
