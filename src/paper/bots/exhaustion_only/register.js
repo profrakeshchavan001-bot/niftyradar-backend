@@ -49,11 +49,12 @@ module.exports = {
     ctx.exhaustionMemoryStore = eStore; // so the report route above can read it even without a pool
 
     const shadowStore = pool ? createPgShadowStore(pool) : createMemoryShadowStore();
-    if (pool) pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[exhaustion_only] shadow schema failed: ${e.message}`));
+    const shadowSchemaReady = pool ? pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[exhaustion_only] shadow schema failed: ${e.message}`)) : Promise.resolve();
 
     const bot = createExhaustionBot({ store: eStore, crypto, loadCfg: () => loadExhaustionConfig(mainStore), shadowStore, log });
     cron.schedule('15 */5 * * * *', guarded('exhaustion_only scan', bot.scan, log), tz);
     cron.schedule('45 * * * * *', guarded('exhaustion_only monitor', bot.monitor, log), tz);
+    shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[exhaustion_only] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
     log(`[exhaustion_only] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/exhaustion-report)`);
   },
 };

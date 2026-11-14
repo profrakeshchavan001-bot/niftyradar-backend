@@ -43,6 +43,9 @@ function createMemoryStore() {
     async init() {},
     async getConfig() { return copy(db.config); },
     async setConfigIfMissing(key, value) { if (!(key in db.config)) db.config[key] = copy(value); },
+    // CC3 urgent fix item 3: unconditional upsert, used ONLY by the one-time stale-default migrations (paperbot/configMigrate.js)
+    // - setConfigIfMissing on purpose never overwrites a row the owner may have hand-edited.
+    async setConfig(key, value) { db.config[key] = copy(value); },
     // CC3 round 3 (restart safety): a restart that re-scans the current, still-open candle must never double-enter - the same
     // dedupe a real UNIQUE (market, symbol, trigger_t) constraint gives the Postgres store below.
     async insertTrade(t) {
@@ -114,6 +117,9 @@ function createPgStore(getPool) {
     async setConfigIfMissing(key, value) {
       await pool.query('INSERT INTO paper_config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING', [key, JSON.stringify(value)]);
     },
+    async setConfig(key, value) {
+      await pool.query('INSERT INTO paper_config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, JSON.stringify(value)]);
+    },
     async insertTrade(t) {
       const cols = TRADE_COLS.filter((c) => t[c] !== undefined);
       // CC3 round 3 (restart safety): ON CONFLICT DO NOTHING on the (market, symbol, trigger_t) unique index (sql/paper_bot.sql) -
@@ -183,6 +189,7 @@ function createCachedStore(inner, { now = Date.now, configTtlMs = 600000 } = {})
       return copy(cfg.value);
     },
     async setConfigIfMissing(key, value) { await inner.setConfigIfMissing(key, value); cfg = null; },
+    async setConfig(key, value) { await inner.setConfig(key, value); cfg = null; },
     async openTrades(market) {
       if (!open.has(market)) open.set(market, await inner.openTrades(market));
       return copy(open.get(market));

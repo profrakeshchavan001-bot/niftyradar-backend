@@ -169,3 +169,60 @@ that could change a trade decision: nothing does - every change is a timeout val
 or a restart-safety null-check; no stop/target/reward-risk/pattern/trend calculation was touched. Binance/Yahoo not verified live
 (no route from this sandbox); every number in `docs/STABILITY.md` came from fixtures against a real local throwaway Postgres, said
 so there and here.
+
+# CC3 urgent fix (14 Nov, ~21:35-22:00 UTC): live evidence from Supabase
+
+## (a) 10 shadow_setups rows stuck open 40+ minutes past their stop/target/time stop
+
+Root cause, found by re-reading the live wiring rather than just the tests: `resolveShadows()` (src/paper/scalp/bot.js,
+src/paper/bots/exhaustion_only/bot.js, src/paper/bots/trend_smc/bot.js) only wrapped the CANDLE FETCH in a try/catch - a throw
+from `shadowStore.openShadows()` or `shadowStore.resolveShadow()` itself (a real Postgres error - connection hiccup, a transient
+Supabase blip, anything) killed the WHOLE function for every shadow on that tick, logged once to a line nobody was watching, and
+repeated forever on every later tick since the row never moved past status='open'. The cron wiring itself was correct (`scalp
+monitor` at `:35`, every minute, calls `resolveShadows` at the end either way) - this was not a missing/clashing cron line, it
+was an unguarded throw. CC2's SEPARATE `paper_shadows`/`shadowMonitor` (the main bot's own shadow tracking) is a different table
+and a different job; no clash with this session's `shadow_setups`.
+
+Fix: wrapped the ENTIRE body of `resolveShadows()` in try/catch (outer: the whole function; inner: per-shadow, so one bad row
+never blocks the rest), with the real error message logged instead of swallowed. Added `test/paperShadowResolver.test.js`: boots
+the REAL `attachScalp()`/`exhaustion_only` `register()` wiring (not just `createScalpBot()` directly), with a `createScalpSource`-
+shaped axios mock (real Binance-kline array format), and proves (1) the scan/monitor crons are actually registered - fails loudly
+if not - and (2) the exact scheduled monitor function resolves a real shadow to its target, end to end.
+
+**Backfill (item 2):** `backfillShadows()` added to every bot, run once (fire-and-forget) right after each plugin's `register()`
+finishes wiring its crons - uses a bigger candle window than the regular per-tick fetch (24h of 1-minute candles for scalp; the
+5-minute source's own 330-candle/~27h default already covers scalp_wide/exhaustion_only/trend_smc). Idempotent: `resolveShadows`
+only ever reads `status = 'open'` rows, so running it twice, or on a database already caught up, is always a safe no-op.
+**Not verified live** - this sandbox cannot reach Binance; the 10 real stuck rows in Supabase will be picked up by this backfill
+on the next deploy, not by this session directly.
+
+## (b) scalp skips still say "below 1.3" though PR #25 set the code default to 1.0
+
+Root cause: the precedence rule was already correct and already documented ("the stored row wins") - the bug was that the
+`scalp` row in `paper_config` was written ONCE, by `setConfigIfMissing`, before PR #25 existed, so it still holds the
+pre-PR#25 default (`min_rr: 1.3`) and silently overrides the new code default on every deploy since. `setConfigIfMissing` is
+right to never overwrite a value the owner might have hand-tuned - the real fix is a one-time, named migration of that ONE
+known-stale value, not a change to the precedence rule itself.
+
+Fix: `paperbot/configMigrate.js`, a small table of `{key, field, from, to}` one-time corrections (currently just
+`scalp.min_rr: 1.3 -> 1.0`), run once at startup, idempotent (checks the stored value is STILL exactly the old default before
+touching it - never touches a value the owner changed to something else on purpose). Added `store.setConfig()` (unconditional
+upsert) alongside the existing `setConfigIfMissing()`, on the memory store, the Postgres store and the cached wrapper.
+`GET /api/paper/scalp-report` now shows the EFFECTIVE config (`effectiveConfig.scalp.min_rr` / `.scalp_wide.min_rr`, both JSON and
+the HTML page) so a stale stored value can never again hide silently.
+
+**Checked scalp_wide, exhaustion_only, trend_smc for the same class of bug:** none found - their `min_rr` defaults (1.0, 1.2, 1.5
+respectively) were set correctly on their very first deploy and have never been changed in a later PR, so there is no
+pre-existing stale row for them to migrate. Only `scalp` had a code default that changed AFTER its config row was first created.
+
+## Item 4: /api/paper/health
+
+`staleShadows`: a raw count of `shadow_setups` rows `status='open'` and `created_at` older than 60 minutes, across every bot
+(one query, not per-bot - the count alone is the signal). `null` when there is no raw `store.query` access (memory mode / bot
+not ready) - never reported as a false "0". Any count above 0 is a `PROBLEM`, with the count stated in the reason text, same
+severity tier as a stale job or a down data source.
+
+**VERIFY:** `node --test test/*.test.js` - 465 passing, 0 failing. The `setConfig` UPSERT and the stale-shadow COUNT query were
+both run by hand against a local Postgres 16 (not just asserted in the test suite): the upsert correctly replaces an existing
+row's value, and the count query correctly found 1 row inserted 90 minutes in the past. Not verified against live Binance or the
+real Supabase database - fixtures and a local throwaway Postgres only, as every round this session.

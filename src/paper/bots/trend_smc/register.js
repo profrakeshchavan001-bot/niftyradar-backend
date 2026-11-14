@@ -70,7 +70,7 @@ module.exports = {
     ctx.trendSmcMemoryStore = tStore; // so the report route (and the leaderboard) can read it even without a pool
 
     const shadowStore = pool ? createPgShadowStore(pool) : createMemoryShadowStore();
-    if (pool) pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[trend_smc] shadow schema failed: ${e.message}`));
+    const shadowSchemaReady = pool ? pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[trend_smc] shadow schema failed: ${e.message}`)) : Promise.resolve();
 
     // Reuse the main bot's already-cached 15-minute source when the caller provides one (paperbot/index.js builds it with the
     // SAME candle cache as the 5m/1h source - see createCachedCrypto/create15mCrypto there); a test or standalone caller still
@@ -81,6 +81,7 @@ module.exports = {
     // (nse scan/monitor also use :20/:50 during market hours; shadowMonitor uses :40 every 5 min).
     cron.schedule('22 */5 * * * *', guarded('trend_smc scan', bot.scan, log), tz);
     cron.schedule('58 * * * * *', guarded('trend_smc monitor', bot.monitor, log), tz);
+    shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[trend_smc] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
     log(`[trend_smc] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/trend-smc-report)`);
   },
   create15mSource,

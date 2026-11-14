@@ -24,21 +24,28 @@ function createExhaustionBot({ store, crypto, loadCfg, shadowStore, now = Date.n
     }
   }
 
+  // CC3 urgent fix: whole body wrapped so a throw anywhere in here (not just the candle fetch) can never block real-trade exits.
   async function resolveShadows() {
     if (!shadowStore) return { checked: 0, resolved: 0 };
-    const open = await shadowStore.openShadows('exhaustion_only');
-    if (!open.length) return { checked: 0, resolved: 0 };
-    let resolved = 0;
-    for (const sh of open) {
-      let c5;
-      try { c5 = await crypto.candles(sh.symbol); } catch (e) { log(`[exhaustion_only] shadow candles for ${sh.symbol} failed: ${e.response?.status || e.message}`); continue; }
-      const ev = evaluateExit({ trade: sh, candles: closedOnly(c5, FIVE, now()) });
-      if (!ev.exit) continue;
-      await shadowStore.resolveShadow(sh.id, { resolved_reason: ev.reason, resolved_price: ev.price, resolved_time: new Date(ev.timeMs).toISOString() });
-      log(`[exhaustion_only] shadow resolved ${sh.symbol}: ${ev.reason} @ ${ev.price} (would-be, never a trade)`);
-      resolved += 1;
+    try {
+      const open = await shadowStore.openShadows('exhaustion_only');
+      if (!open.length) return { checked: 0, resolved: 0 };
+      let resolved = 0;
+      for (const sh of open) {
+        try {
+          const c5 = await crypto.candles(sh.symbol);
+          const ev = evaluateExit({ trade: sh, candles: closedOnly(c5, FIVE, now()) });
+          if (!ev.exit) continue;
+          await shadowStore.resolveShadow(sh.id, { resolved_reason: ev.reason, resolved_price: ev.price, resolved_time: new Date(ev.timeMs).toISOString() });
+          log(`[exhaustion_only] shadow resolved ${sh.symbol}: ${ev.reason} @ ${ev.price} (would-be, never a trade)`);
+          resolved += 1;
+        } catch (e) { log(`[exhaustion_only] shadow ${sh.id} (${sh.symbol}) failed to resolve: ${e.response?.status || e.message}`); }
+      }
+      return { checked: open.length, resolved };
+    } catch (e) {
+      log(`[exhaustion_only] resolveShadows failed: ${e.message}`);
+      return { checked: 0, resolved: 0, error: e.message };
     }
-    return { checked: open.length, resolved };
   }
 
   async function scan() {
@@ -94,7 +101,14 @@ function createExhaustionBot({ store, crypto, loadCfg, shadowStore, now = Date.n
     return { checked: open.length, closed };
   }
 
-  return { scan, monitor };
+  // CC3 urgent fix item 2: one-time backfill at startup. Idempotent (resolveShadows only reads status='open').
+  async function backfillShadows() {
+    const r = await resolveShadows();
+    log(`[exhaustion_only] shadow backfill: ${r.resolved}/${r.checked}`);
+    return r;
+  }
+
+  return { scan, monitor, backfillShadows };
 }
 
 module.exports = { createExhaustionBot, MARKET };
