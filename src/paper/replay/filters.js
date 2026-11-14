@@ -10,6 +10,11 @@
 // which pattern fired), which is not a true ablation and is labelled as such everywhere it is shown.
 const { replayScalp } = require('./simulator');
 const { buildReport } = require('./stats');
+const { classifyEmaCross } = require('../lib/emaCross');
+const { aggregate } = require('../../../paperbot/engine');
+
+const SMC_TAGS = ['order_block', 'fvg_retest', 'liquidity_sweep'];
+const FIVE_MIN = 5 * 60000;
 
 function minRrGateStudy({ symbol, candles1m, candles5m, cfg, fxRate }) {
   const on = replayScalp({ symbol, candles1m, candles5m, cfg, fxRate });
@@ -30,6 +35,37 @@ function byPatternBreakdown(trades) {
   return out;
 }
 
+// Round 2 item 3: "each SMC tag, with/without" -- still descriptive (see header: SMC tags are not a config
+// knob), but now a real with/without split per tag, not just a first-pattern grouping.
+function bySmcTagBreakdown(trades) {
+  const out = {};
+  for (const tag of SMC_TAGS) {
+    const has = trades.filter((t) => (t.patterns || []).includes(tag));
+    const without = trades.filter((t) => !(t.patterns || []).includes(tag));
+    out[tag] = { withTag: buildReport(has).overall, withoutTag: buildReport(without).overall };
+  }
+  return out;
+}
+
+// Round 2 item 3: EMA cross with/without, using the REAL, imported classifyEmaCross() (src/paper/lib/emaCross.js,
+// CC2) recomputed at each trade's own trigger candle from the stored history -- descriptive (the live bot
+// never hard-blocks on this either, "a warning, never certain", docs/BOT-INTERFACE.md item 5), grouping
+// trades into whether the EMA cross agreed with the trade's direction at entry or not.
+function byEmaCrossBreakdown(trades, candles5m) {
+  const groups = { fresh_with: [], confirmed_with: [], fresh_against: [], confirmed_against: [], mixed: [], fresh_flat: [], unknown: [] };
+  for (const t of trades) {
+    const upto = candles5m.filter((k) => k.t + FIVE_MIN <= t.entry_t);
+    const c15 = aggregate(upto);
+    const c1h = aggregate(upto, FIVE_MIN, 3600000);
+    const direction = t.direction === 'LONG' ? 'up' : 'down';
+    const label = classifyEmaCross({ direction, c5: upto, c15, c1h });
+    (groups[label] || (groups[label] = [])).push(t);
+  }
+  const out = {};
+  for (const [label, rows] of Object.entries(groups)) out[label] = buildReport(rows).overall;
+  return out;
+}
+
 function runFilterStudy({ symbol, candles1m, candles5m, cfg, fxRate, baseTrades }) {
   return {
     note: 'Suggestions only; nothing here changes the live bot automatically.',
@@ -39,7 +75,9 @@ function runFilterStudy({ symbol, candles1m, candles5m, cfg, fxRate, baseTrades 
         + 'The pattern/SMC-tag list and the trend+VWAP agreement check are hard-coded in the imported analyse(), not config knobs, so they cannot be switched off here.',
       ...byPatternBreakdown(baseTrades),
     },
+    bySmcTag: { note: 'Descriptive only: with vs without each SMC tag present on the trade.', ...bySmcTagBreakdown(baseTrades) },
+    byEmaCross: { note: 'Descriptive only: the live bot never hard-blocks on EMA cross, only warns ("a warning, never certain").', ...byEmaCrossBreakdown(baseTrades, candles5m) },
   };
 }
 
-module.exports = { runFilterStudy, minRrGateStudy, byPatternBreakdown };
+module.exports = { runFilterStudy, minRrGateStudy, byPatternBreakdown, bySmcTagBreakdown, byEmaCrossBreakdown };

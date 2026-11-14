@@ -99,3 +99,63 @@ a normal run), suggestions only -- nothing here changes the live config.
   Binance history. **Not verified against a real Render run yet** — Binance is blocked from this sandbox (one
   `curl` to `data-api.binance.vision` here returned a proxy 403), so everything was tested against the fixture
   candles in `test/fixtures/replay/`. Watch the first live run's logs and `/api/paper/replay-report` on Render.
+
+## Round 2: three more adapters, a safety guard, a bigger filter study
+
+Three more strategies are replayed now, all through `src/paper/replay/run.js`, same "past data, not proof of
+future results" label and the same checks (look-ahead, random baseline, doubled cost, in/out-of-sample):
+
+- **scalp_wide** (`replayScalpWide()` in `simulator.js`): the real `analyseWide()` from
+  `src/paper/scalp/engine.js`, single 5-minute candle stream, same `evaluateExit()`/`settle()` the tight
+  scalp uses (including that function's own 1-minute-granularity exit-timestamp math, which scalp_wide's
+  live code also just reuses as-is -- this replay matches that, bug-for-bug, rather than fixing it, since the
+  rule is to replay the live code exactly).
+- **exhaustion_only** (`src/paper/replay/adapters/exhaustionOnly.js`): a thin wrapper around CC3's own
+  `decide`/`evaluateExit`/`settle` (`src/paper/bots/exhaustion_only/engine.js`), which already follows
+  `docs/BOT-INTERFACE.md`'s pure-function shape. No bot-specific replay code was needed beyond the window/
+  context shaping in that one file -- the actual decision and exit logic is 100% the live bot's own.
+- **intraday_crypto** (`src/paper/replay/adapters/intradayCrypto.js`): the original "intraday crypto" bot
+  (`paperbot/bot.js` `cryptoScan`/`cryptoMonitor`). This one composes real, imported pieces that were not
+  already shaped as `decide()`/`evaluateExit()` live: `momentumScore` + `decideEntry` (`paperbot/engine.js`),
+  pattern detection (`paperbot/patterns.js`), and level-based target/stop (`paperbot/cryptoLevels.js`
+  `planTrade`, the SAME function `exhaustion_only` uses via `src/paper/lib/levels.js`). Two deliberate,
+  documented differences from the live bot, both stated here plainly:
+  - **Exit**: the live `cryptoMonitor` checks a single tick price once a minute (`manageTrade`), not
+    candle-accurate yet by the owner's own choice (`docs/decisions/CC2.md`). Historical data has no ticks, and
+    every replay adapter in this lane follows the brief's own rule ("stop and target checked on each candle's
+    high and low, both = stop"), so this adapter uses the shared `src/paper/lib/exitSim.js` `simulateExit()`
+    instead -- a different, more accurate exit rule than the live bot currently uses, not a copy of it.
+  - **Costs**: the live crypto bot's own P&L has no fee/slippage deduction at all. This replay applies the
+    same uniform cost model every other adapter uses (0.1%/side + 0.03% slippage) so the report always shows
+    the honest, after-cost picture -- which is the whole point of this engine. Replayed intraday_crypto
+    numbers will not match what the live paper P&L shows, by design; this is why.
+- A generic adapter layer (`scanDecideSignals`/`resolveDecideTrade`/`replayDecideBot`/`replayRandomGeneric`
+  in `simulator.js`) means any FUTURE bot that already follows `docs/BOT-INTERFACE.md` (trend_smc, when it
+  lands) gets a replay, a random baseline and a look-ahead check for the cost of one small adapter file like
+  `adapters/exhaustionOnly.js` -- no new simulator code.
+- **Entry price**: every adapter uses the live decide-function's own entry price (the close of the signal
+  candle, `entry: last.c`), not the brief's stated "entry at the next candle's open" -- because that is what
+  every live bot here genuinely executes at, and the point of this engine is to replay what the live code
+  would really have done, not a theoretical fill convention.
+
+**Live-bot safety** (`src/paper/replay/safety.js`): automatic runs happen ONLY at 02:00 IST now (the former
+"run again if the code changed" startup trigger from round 1 is removed). Before that scheduled run starts,
+`shouldSkipAutoRun()` reads the live bot's own health snapshot (`src/paper/ops/health.js`, the same one
+`/api/paper/health` shows) and this process's own memory; if health is `PROBLEM` or memory is over 400 MB
+(Render Free is 512 MB), the run is skipped and logged, never started. A manual run (`/api/paper/replay/run`)
+is never blocked by this -- the owner asked for it directly.
+
+**Filter study, extended** (`filters.js`, still scalp-only -- its config knobs and recorded tags live there):
+alongside the `min_rr` gate, there is now a with/without split for each SMC tag (`order_block`, `fvg_retest`,
+`liquidity_sweep`) and an EMA-cross breakdown using the real, imported `classifyEmaCross()`
+(`src/paper/lib/emaCross.js`) recomputed at each trade's own entry. Both are descriptive, not a true ablation
+-- same reasoning as the pattern breakdown above: EMA cross and the SMC tags are never a hard block in the
+live `decide()` functions either ("a warning, never certain"), so there is nothing to switch off; this shows
+how the trades that were actually taken did, split by whether the signal agreed with these or not.
+Suggestions only; nothing here changes the live bot automatically.
+
+**Report**: `/api/paper/replay-report` now shows a "last run" line (run id, trigger, status, start time,
+candles loaded, runtime) above the results table, and the breakdown covers all four strategies. A small
+`lastRunStatus(state)` function is exported from `src/paper/replay/index.js` (`getLastRunStatus()` on the
+object `attachReplay()` returns) so another page -- the health page -- can read the same status without an
+HTTP round trip; wiring that in is left to whoever owns that page, to stay out of this lane's folder.

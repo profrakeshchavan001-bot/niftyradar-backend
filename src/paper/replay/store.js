@@ -35,9 +35,12 @@ function createMemoryReplayStore() {
       db.runs.push(row);
       return row.id;
     },
-    async finishRun(id, { status, error = null }) {
+    async finishRun(id, { status, error = null, candlesLoaded = null, runtimeMs = null }) {
       const row = db.runs.find((r) => r.id === id);
-      if (row) { row.status = status; row.error = error; row.finished_at = new Date().toISOString(); }
+      if (row) {
+        row.status = status; row.error = error; row.finished_at = new Date().toISOString();
+        row.params = { ...(row.params || {}), ...(candlesLoaded != null ? { candlesLoaded } : {}), ...(runtimeMs != null ? { runtimeMs } : {}) };
+      }
     },
     async saveResult({ runId, strategy, variant, segment, scope, metrics }) {
       db.results.push({ id: ++resultSeq, run_id: runId, strategy, variant, segment, scope, metrics, created_at: new Date().toISOString() });
@@ -93,8 +96,9 @@ function createPgReplayStore(getPool) {
       const r = await pool.query('INSERT INTO replay_runs (trigger, code_version, params) VALUES ($1, $2, $3) RETURNING id', [trigger, codeVersion, JSON.stringify(params || {})]);
       return r.rows[0].id;
     },
-    async finishRun(id, { status, error = null }) {
-      await pool.query('UPDATE replay_runs SET status = $2, error = $3, finished_at = now() WHERE id = $1', [id, status, error]);
+    async finishRun(id, { status, error = null, candlesLoaded = null, runtimeMs = null }) {
+      const extra = { ...(candlesLoaded != null ? { candlesLoaded } : {}), ...(runtimeMs != null ? { runtimeMs } : {}) };
+      await pool.query('UPDATE replay_runs SET status = $2, error = $3, finished_at = now(), params = params || $4::jsonb WHERE id = $1', [id, status, error, JSON.stringify(extra)]);
     },
     async saveResult({ runId, strategy, variant, segment, scope, metrics }) {
       await pool.query('INSERT INTO replay_results (run_id, strategy, variant, segment, scope, metrics) VALUES ($1, $2, $3, $4, $5, $6)',

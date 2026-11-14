@@ -4,14 +4,19 @@
 // reachable from there. PAPER_REPLAY_ENABLED (default true; "false" turns the whole lane off).
 //   - history: catches up stored candles for BTCUSDT/ETHUSDT/SOLUSDT (1m/5m/15m/1h) on an interval, resumable
 //   - GET /api/paper/replay-report (+&format=json): latest stored run, same secret as the other paper routes
-//   - GET /api/paper/replay/run: starts a run in the background, same secret; answers immediately
-//   - 02:00 IST daily automatic run, and once on startup if the watched code files changed since the last run
+//   - GET /api/paper/replay/run: starts a run in the background, same secret; answers immediately (manual
+//     runs are NEVER blocked by the safety guard below -- the owner asked for it directly)
+//   - automatic runs ONLY at 02:00 IST (round 2, item 2); skipped (never started) if the live bot's own
+//     health page would report PROBLEM, or if this process's memory is already high (src/paper/replay/safety.js)
 const { createHistoryClient, loadHistory } = require('./history');
 const { createPgReplayStore, createMemoryReplayStore } = require('./store');
-const { loadScalpConfig, SCALP_DEFAULTS } = require('../scalp/config');
+const { loadScalpConfig, loadScalpWideConfig, SCALP_DEFAULTS } = require('../scalp/config');
+const { loadExhaustionConfig } = require('../bots/exhaustion_only/config');
+const { loadConfig: loadLiveConfig } = require('../../../paperbot/config');
+const { INTRADAY_CRYPTO_DEFAULTS } = require('./adapters/intradayCrypto');
 const { runReplay } = require('./run');
 const { runSweep } = require('./sweep');
-const { codeVersion } = require('./codeVersion');
+const { shouldSkipAutoRun } = require('./safety');
 
 const SYMBOLS = SCALP_DEFAULTS.symbols;
 const INTERVALS = ['1m', '5m', '15m', '1h'];
@@ -29,24 +34,29 @@ function buildReplayStore(env, log) {
   return createPgReplayStore(() => pool);
 }
 
+const STRATEGY_LABEL = { scalp: 'Scalp (1m/5m)', scalp_wide: 'Scalp wide (5m/15m)', exhaustion_only: 'Exhaustion only (5m)', intraday_crypto: 'Intraday crypto (5m)' };
+
 function renderReport(result) {
   if (!result) return '<!doctype html><title>Replay</title><p>No replay run yet. GET /api/paper/replay/run?key=... to start one.</p>';
   const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const row = (label, m) => `<tr><td>${esc(label)}</td><td>${m.tooFew ? 'too few trades, no conclusion' : `${m.trades} trades, ${m.winRatePct}% win, net ₹${m.netInr}, avg win ₹${m.avgWinInr}, avg loss ₹${m.avgLossInr}, max DD ₹${m.maxDrawdownInr}, longest losing streak ${m.longestLosingStreak}`}</td></tr>`;
   const c = result.combined || {};
+  const strategyRows = Object.keys(STRATEGY_LABEL).map((name) => {
+    const s = c[name];
+    if (!s) return '';
+    return `${row(`${STRATEGY_LABEL[name]}, in-sample`, s.base?.inSample || { tooFew: true })}${row(`${STRATEGY_LABEL[name]}, out-of-sample`, s.base?.outSample || { tooFew: true })}`
+      + `${row(`${STRATEGY_LABEL[name]}, random baseline`, s.randomBaseline?.full || { tooFew: true })}${row(`${STRATEGY_LABEL[name]}, doubled cost`, s.doubledCost?.full || { tooFew: true })}`;
+  }).join('');
+  const params = result.params || {};
+  const lastRunLine = `Last run: #${esc(result.runId)} (${esc(result.trigger || 'unknown')}), ${esc(result.status)}, started ${esc(result.startedAt)}, `
+    + `candles loaded ${esc(params.candlesLoaded ?? 'n/a')}, runtime ${esc(params.runtimeMs != null ? `${Math.round(params.runtimeMs / 1000)}s` : 'n/a')}.`;
   return `<!doctype html><title>Replay report</title>
-<p><b>Past data, not proof of future results.</b> Run #${esc(result.runId)}. Look-ahead check: ${result.lookAheadOk ? 'passed' : 'FAILED'}.</p>
-<table border="1" cellpadding="4">
-${row('Scalp, in-sample', c.base?.inSample || { tooFew: true })}
-${row('Scalp, out-of-sample', c.base?.outSample || { tooFew: true })}
-${row('Scalp, full 30 days', c.base?.full || { tooFew: true })}
-${row('Random baseline (same stops/targets), full', c.randomBaseline?.full || { tooFew: true })}
-${row('Doubled cost, full', c.doubledCost?.full || { tooFew: true })}
-</table>
+<p><b>Past data, not proof of future results.</b> ${lastRunLine} Look-ahead check: ${result.lookAheadOk ? 'passed' : 'FAILED'}.</p>
+<table border="1" cellpadding="4">${strategyRows}</table>
 <p>Per-symbol detail, filter study and look-ahead checks: ?format=json</p>`;
 }
 
-function attachReplay({ app, cron, axios, env = process.env, log = console.log, secret, okSecret, enabled, guarded, now = Date.now, liveStore = null }) {
+function attachReplay({ app, cron, axios, env = process.env, log = console.log, secret, okSecret, enabled, guarded, now = Date.now, liveStore = null, liveState = null }) {
   const replayOn = env.PAPER_REPLAY_ENABLED !== 'false';
   const state = { store: null, running: false, lastResult: null };
 
@@ -59,16 +69,8 @@ function attachReplay({ app, cron, axios, env = process.env, log = console.log, 
   });
 
   route('/api/paper/replay-report', async (req, res) => {
-    const latest = await state.store.latestRun();
-    let result = null;
-    if (latest) {
-      const resultsRows = await state.store.resultsForRun(latest.id);
-      const trades = await state.store.tradesForRun(latest.id);
-      const combined = {};
-      for (const r of resultsRows) { combined[r.variant] = combined[r.variant] || {}; combined[r.variant][r.segment] = r.metrics; }
-      result = { runId: latest.id, status: latest.status, startedAt: latest.started_at, finishedAt: latest.finished_at, error: latest.error, combined, trades: req.query.format === 'json' ? trades : undefined, lookAheadOk: latest.status !== 'failed' };
-    }
-    if (req.query.format === 'json') return res.json({ paperOnly: true, result });
+    const result = await lastRunStatus(state);
+    if (req.query.format === 'json') return res.json({ paperOnly: true, result, trades: req.query.trades === '1' && result ? await state.store.tradesForRun(result.runId) : undefined });
     return res.type('html').send(renderReport(result));
   });
 
@@ -109,35 +111,58 @@ function attachReplay({ app, cron, axios, env = process.env, log = console.log, 
   setTimeout(historyTick, 15000).unref();
   cron.schedule('*/15 * * * *', historyTick);
 
-  cron.schedule('0 2 * * *', guarded('replay run (scheduled)', () => startRun(state, env, log, now, 'scheduled', liveStore), log), { timezone: 'Asia/Kolkata' });
+  // Automatic run: ONLY 02:00 IST (round 2, item 2), and only when the live bot's own health is not a
+  // PROBLEM and memory is not already high -- never started otherwise. A skip is logged, not an error.
+  cron.schedule('0 2 * * *', guarded('replay run (scheduled)', async () => {
+    const check = await shouldSkipAutoRun({ liveState, liveStore, now, log });
+    if (check.skip) { log(`[replay] scheduled run skipped: ${check.reason}`); return; }
+    await startRun(state, env, log, now, 'scheduled', liveStore);
+  }, log), { timezone: 'Asia/Kolkata' });
 
-  // Also run once on startup if the watched code changed since the last stored run (brief item 6).
-  setTimeout(async () => {
-    try {
-      const latest = await state.store.latestRun();
-      if (!latest || latest.code_version !== codeVersion()) {
-        // small delay so it runs after the first history catch-up has had a chance to add candles
-        setTimeout(() => startRun(state, env, log, now, 'code_change', liveStore), 60000).unref();
-      }
-    } catch (e) { log(`[replay] could not check code version: ${e.message}`); }
-  }, 20000).unref();
-
-  log('[replay] ready (PAPER ONLY; report: /api/paper/replay-report, run: /api/paper/replay/run)');
-  return { enabled: true, state };
+  log('[replay] ready (PAPER ONLY; report: /api/paper/replay-report, run: /api/paper/replay/run, sweep: /api/paper/replay/sweep)');
+  return { enabled: true, state, getLastRunStatus: () => lastRunStatus(state) };
 }
 
-// `liveStore` is the main paperbot store (paper_trades/paper_config), used ONLY to read the scalp config
-// (so a rule change the owner made in paper_config is reflected here too); replay never writes to it.
-// Without it (liveStore is null, e.g. the live store could not be built) the scalp defaults are used.
+// Small, read-only status for another page to call directly (round 2 item 4: "export a small function CC4's
+// health page can call"). Never throws -- a store error here must not break whoever calls it.
+async function lastRunStatus(state) {
+  if (!state.store) return null;
+  try {
+    const latest = await state.store.latestRun();
+    if (!latest) return null;
+    const resultsRows = await state.store.resultsForRun(latest.id);
+    const combined = {};
+    for (const r of resultsRows) { combined[r.strategy] = combined[r.strategy] || {}; combined[r.strategy][r.variant] = combined[r.strategy][r.variant] || {}; combined[r.strategy][r.variant][r.segment] = r.metrics; }
+    return {
+      runId: latest.id, status: latest.status, trigger: latest.trigger, startedAt: latest.started_at, finishedAt: latest.finished_at,
+      error: latest.error, params: latest.params || {}, combined, lookAheadOk: latest.status !== 'failed',
+    };
+  } catch (e) {
+    return { error: `could not read the last replay run: ${e.message}` };
+  }
+}
+
+// `liveStore` is the main paperbot store (paper_trades/paper_config), used to read each strategy's own live
+// config (so an owner change in paper_config is honoured everywhere); replay never writes to it. Without it
+// (liveStore is null) every strategy falls back to its own defaults.
 async function startRun(state, env, log, now, trigger, liveStore) {
   try {
     const cfg = liveStore ? await loadScalpConfig(liveStore) : SCALP_DEFAULTS;
-    const result = await runReplay({ store: state.store, symbols: SYMBOLS, cfg, days: HISTORY_DAYS, inSampleDays: 20, now: now(), trigger, log });
+    const cfgs = {};
+    if (liveStore) {
+      try { cfgs.scalp_wide = await loadScalpWideConfig(liveStore); } catch (e) { log(`[replay] could not read scalp_wide config: ${e.message}`); }
+      try { cfgs.exhaustion_only = await loadExhaustionConfig(liveStore); } catch (e) { log(`[replay] could not read exhaustion_only config: ${e.message}`); }
+      try {
+        const live = await loadLiveConfig(liveStore);
+        cfgs.intraday_crypto = { ...live.crypto, patternOpt: live.patterns, fee_pct_per_side: INTRADAY_CRYPTO_DEFAULTS.fee_pct_per_side, slippage_pct: INTRADAY_CRYPTO_DEFAULTS.slippage_pct, min_trades_for_conclusion: INTRADAY_CRYPTO_DEFAULTS.min_trades_for_conclusion };
+      } catch (e) { log(`[replay] could not read intraday_crypto config: ${e.message}`); }
+    }
+    const result = await runReplay({ store: state.store, symbols: SYMBOLS, cfg, cfgs, days: HISTORY_DAYS, inSampleDays: 20, now: now(), trigger, log });
     state.lastResult = result;
-    log(`[replay] run #${result.runId} (${trigger}) done, look-ahead ${result.lookAheadOk ? 'passed' : 'FAILED'}`);
+    log(`[replay] run #${result.runId} (${trigger}) done, look-ahead ${result.lookAheadOk ? 'passed' : 'FAILED'}, candles ${result.candlesLoaded}, ${Math.round(result.runtimeMs / 1000)}s`);
   } catch (e) {
     log(`[replay] run (${trigger}) failed: ${e.message}`);
   }
 }
 
-module.exports = { attachReplay, SYMBOLS, INTERVALS, HISTORY_DAYS };
+module.exports = { attachReplay, lastRunStatus, SYMBOLS, INTERVALS, HISTORY_DAYS };
