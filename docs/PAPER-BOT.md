@@ -11,7 +11,7 @@ Solves: "trade the top R-factor stocks in demo using candle patterns, log WHY ea
 | every 5 min, Mon-Fri 09:15-15:00 | NSE scan: top 5 by the real risk-reward R factor (`docs/R-FACTOR.md`), 5-min candles, patterns, entry |
 | every minute, Mon-Fri | NSE exit check: target +10 %, stop -5 %, forced exit 15:15 |
 | every 5 min, all days | Crypto scan: BTCUSDT, ETHUSDT, SOLUSDT (Binance public candles, no key); one open trade per coin, no daily limit |
-| every minute, all days | Crypto exit check: target +2 %, stop -1 % |
+| every minute, all days | Crypto exit check: level-based target and stop, breakeven move (see "Crypto exits" below) |
 | 15:45 Mon-Fri | NSE summary to Telegram + `daily_summaries` |
 | 23:55 daily | Crypto summary |
 | Sunday 10:00 | Weekly suggestions report (nothing is applied) |
@@ -58,6 +58,25 @@ If the service did sleep, a wake is a fresh start. One minute after start the bo
 ## Read-only routes
 
 `GET /api/paper/summaries`, `/api/paper/trades`, `/api/paper/skips` with `?key=<PAPER_ADMIN_SECRET>&limit=50`. `GET /api/paper/ping` is open (keep-alive only).
+
+## Crypto exits (from price levels, not a fixed %)
+
+- **Target** = the nearest support (for a short) or resistance (for a long) beyond the entry, exit 0.1 % before it. Levels looked at:
+  swing highs / lows on 15-minute and 1-hour candles, order blocks, fair value gap edges, previous day and previous week high / low (UTC; week = Monday to Sunday).
+- **Stop** = beyond the high / low of the candles that fired the pattern (or the nearest 15-minute swing if the pattern gives none), plus 1 x ATR14 on 15-minute candles.
+- **Reward / risk** = distance to the target / distance to the stop. Under 1.5 the trade is not taken and the reason goes to `paper_skips`. No level found = no trade.
+- **Breakeven**: once the price has covered 50 % of the way to the target, the stop moves to the entry (`stop_active`, `breakeven_time`). Exit reasons: `target`, `stop`, `breakeven_stop`.
+- **Old rule for comparison only**: the fixed +2 % / -1 % levels are stored on every trade (`legacy_target`, `legacy_stop`) and followed at every minute check, also after the trade has closed, until one is hit (`legacy_result` = `target` or `stop`; `undecided after 48 h` if neither). They never cause an exit.
+- **Best / worst %** (`max_fav_pct`, `max_adv_pct`) of every open trade is written at every 5-minute scan; for crypto from the highs and lows of the candles since entry.
+- Stored per trade: `sl_price` and `target_price` (as set at entry), `target_type` (for example "swing low 1h at 3012.5"), `stop_type`, `rr`. The report page shows them in the table, on the chart lines and in the "why" text.
+- Settings: `paper_config`, key `crypto`: `levels.minRr` 1.5, `levels.targetBufferPct` 0.1, `levels.atrStopMult` 1, `breakeven_at` 0.5, `legacy_max_hours` 48; `target_pct` 2 and `stop_pct` 1 are now only the old rule's numbers.
+
+Compare the two rules later:
+
+```sql
+SELECT exit_reason AS level_rule_ended, legacy_result AS old_rule_would_have_ended, count(*) AS trades, round(sum(pnl_inr)) AS level_rule_pnl_inr
+FROM paper_trades WHERE market = 'crypto' AND status = 'closed' AND legacy_target IS NOT NULL GROUP BY 1, 2 ORDER BY 3 DESC;
+```
 
 ## NSE candles without Dhan (free Yahoo fallback)
 

@@ -12,10 +12,13 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
   'exit_underlying', 'exit_reason', 'pnl_inr', 'fx_rate', 'fx_source', 'max_fav_pct', 'max_adv_pct', 'basis', 'legacy_rf', 'r_detail',
   'judge_score', 'judge_take', 'judge_contributions', 'judge_basis', // judge_*: docs/JUDGE.md
   'data_source', 'data_delay_sec', // candle feed of the trade ("dhan", "yahoo_delayed", "binance_public") and the observed delay in seconds
-  'sl_price', 'target_price']; // exit levels fixed at entry (option price for NSE, coin price for crypto)
+  'sl_price', 'target_price', // exit levels fixed at entry (option price for NSE, coin price for crypto)
+  // crypto level-based exits: stop in force now (moves to the entry at breakeven), what the levels are, reward/risk,
+  // and the old fixed +2% / -1% rule followed in parallel for comparison only
+  'stop_active', 'breakeven_time', 'target_type', 'stop_type', 'rr', 'legacy_target', 'legacy_stop', 'legacy_result'];
 const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
-  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec', 'sl_price', 'target_price'];
+  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop'];
 const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec'];
 
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
@@ -37,6 +40,7 @@ function createMemoryStore() {
     async closedTrades(market) { return copy(db.trades.filter((t) => t.status === 'closed' && (!market || t.market === market))); },
     async insertSkip(s) { db.skips.push({ id: ++seq, ...copy(s) }); },
     async getTrade(id) { const row = db.trades.find((t) => t.id === id); return row ? copy(row) : null; },
+    async legacyPending(market) { return copy(db.trades.filter((t) => t.market === market && t.legacy_target != null && t.legacy_result == null)); },
     async skipsSince(date) { return copy(db.skips.filter((s) => s.skip_date >= date)); },
     async saveSummary(s) { db.summaries.push({ id: ++seq, ...copy(s) }); },
     async listSummaries(limit) { return copy(db.summaries.slice(-clampLimit(limit)).reverse()); },
@@ -55,7 +59,7 @@ function fromRow(row) {
       out[c] = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
   }
-  for (const c of ['entry_time', 'exit_time', 'created_at']) if (out[c] instanceof Date) out[c] = out[c].toISOString();
+  for (const c of ['entry_time', 'exit_time', 'created_at', 'breakeven_time']) if (out[c] instanceof Date) out[c] = out[c].toISOString();
   return out;
 }
 
@@ -108,6 +112,7 @@ function createPgStore(getPool) {
     },
     skipsSince: (date) => q('SELECT * FROM paper_skips WHERE skip_date >= $1 ORDER BY id', [date]),
     async getTrade(id) { return (await q('SELECT * FROM paper_trades WHERE id = $1', [id]))[0] || null; },
+    legacyPending: (market) => q('SELECT * FROM paper_trades WHERE market = $1 AND legacy_target IS NOT NULL AND legacy_result IS NULL ORDER BY id', [market]),
     async saveSummary(s) {
       await pool.query('INSERT INTO daily_summaries (kind, summary_date, body, data, telegram_sent) VALUES ($1, $2, $3, $4, $5)',
         [s.kind, s.summary_date, s.body, JSON.stringify(s.data || null), !!s.telegram_sent]);

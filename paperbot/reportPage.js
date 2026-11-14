@@ -163,7 +163,7 @@ function tradeView(t, cfg) {
     pnl: t.status === 'closed' ? inr(t.pnl_inr) : '', pnlSign: t.status === 'closed' ? Math.sign(t.pnl_inr || 0) : 0,
     when: `${t.trade_date || ''} ${istTime(t.entry_time)}`.trim(),
     basis: t.basis || 'No basis sentence stored.',
-    dataLine: `Patterns: ${(t.patterns || []).join(', ').replace(/_/g, ' ') || 'none recorded'} · data: ${t.data_source || 'not recorded'}${t.data_delay_sec != null ? `, latest candle ${t.data_delay_sec} s old at entry` : ''}${t.simulated_option ? ' · option price SIMULATED (delta 0.5), not a real quote' : ''}${t.market === 'nse' ? ' · entry / SL / target are OPTION prices' : ''}`,
+    dataLine: `Patterns: ${(t.patterns || []).join(', ').replace(/_/g, ' ') || 'none recorded'} · data: ${t.data_source || 'not recorded'}${t.data_delay_sec != null ? `, latest candle ${t.data_delay_sec} s old at entry` : ''}${t.simulated_option ? ' · option price SIMULATED (delta 0.5), not a real quote' : ''}${t.market === 'nse' ? ' · entry / SL / target are OPTION prices' : ''}${t.target_type ? ` · target: before ${t.target_type} · stop: ${t.stop_type} · reward/risk ${t.rr}${t.breakeven_time ? ' · stop moved to entry (breakeven)' : ''}` : ''}${t.legacy_target != null ? ` · old fixed rule (target ${t.legacy_target}, stop ${t.legacy_stop}) would have ended: ${t.legacy_result || 'not decided yet'}` : ''}`,
     tradingView: tradingViewUrl(t),
   };
 }
@@ -197,7 +197,8 @@ function howBox(cfg) {
 <li><b>Trend and VWAP.</b> The pattern's direction must agree with the 15-minute trend AND the side of today's VWAP. Only the exhaustion reversal may go against the trend. Patterns pointing both ways mean no trade.</li>
 <li><b>Momentum (crypto).</b> A coin needs a momentum score of at least ${esc(c.min_momentum_score)} (volume spike + bigger candle range + distance from the 20-candle average). One open trade per coin, no daily limit.</li>
 <li><b>News.</b> An NSE stock named in a headline today is skipped. The judge (if on) also weighs sector, news score and time of day and can refuse a trade; the reason is in the skipped list.</li>
-<li><b>Exits.</b> NSE option: target +${esc(n.target_pct)}%, stop -${esc(n.stop_pct)}%, forced exit ${esc(n.force_exit_ist)} IST, at most ${esc(n.max_trades_per_day)} trades a day. Crypto: target +${esc(c.target_pct)}%, stop -${esc(c.stop_pct)}% on the coin price.</li>
+<li><b>Exits.</b> NSE option: target +${esc(n.target_pct)}%, stop -${esc(n.stop_pct)}%, forced exit ${esc(n.force_exit_ist)} IST, at most ${esc(n.max_trades_per_day)} trades a day.</li>
+<li><b>Crypto exits come from price levels.</b> Target = ${esc(c.levels.targetBufferPct)}% before the nearest support / resistance (swing high or low on 15-minute and 1-hour candles, order block, fair value gap edge, previous day or week high / low). Stop = beyond the pattern's own high / low plus ${esc(c.levels.atrStopMult)} x ATR. A trade is taken only if reward / risk is at least ${esc(c.levels.minRr)}. After ${esc(Math.round(c.breakeven_at * 100))}% of the way to the target the stop moves to the entry. The old fixed +${esc(c.target_pct)}% / -${esc(c.stop_pct)}% rule is only tracked next to it for comparison.</li>
 </ul></details>`;
 }
 
@@ -354,7 +355,12 @@ async function chartData({ store, nse, crypto, id, now = Date.now }) {
   const lines = [];
   let exitPrice = t.exit_price;
   if (t.market === 'crypto') {
-    lines.push({ kind: 'entry', price: t.entry_price, label: 'Entry' }, { kind: 'sl', price: lv.sl, label: 'SL' }, { kind: 'target', price: lv.target, label: 'Target' });
+    const moved = t.breakeven_time && t.stop_active != null;
+    lines.push({ kind: 'entry', price: t.entry_price, label: moved ? 'Entry = stop now (breakeven)' : 'Entry' },
+      // short labels on the chart (a phone is narrow); the full wording is in the note under it
+      { kind: 'sl', price: lv.sl, label: t.stop_type ? `SL: ${t.r_detail?.plan?.stopType || t.stop_type}` : 'SL' },
+      { kind: 'target', price: lv.target, label: t.target_type ? `Target: ${t.r_detail?.plan?.targetType || t.target_type}` : 'Target' });
+    if (t.target_type) note += `Target ${lv.target} sits just before the ${t.target_type}. Stop ${lv.sl}: ${t.stop_type}.${moved ? ` Stop was moved to the entry at ${istTime(t.breakeven_time)}.` : ''} `;
   } else if (t.entry_underlying > 0 && lv.sl != null) {
     const d = cfg.nse.sim_delta;
     const sign = up ? 1 : -1;
