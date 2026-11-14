@@ -185,3 +185,34 @@ reviewable on its own. The pure function is finished, tested and ready;
 wiring it in is the next PR, done together with rewriting that test rig
 (build per-tick candles consistent with the walked price, not just the price
 alone) - not something to split across two uncoordinated merges.
+
+## Round 2 (18:20-22:30 UTC, same 14-15 Nov night) - merge cap raised to 4
+
+### Item 2 - SMC/ICT detectors, src/paper/lib/smc/ (PR, merged FIRST as asked)
+
+6 files: `structure.js` (BOS/CHoCH - prior trend from `trendOf`, excluding the
+breakout candle itself, against the most recent swing high/low from `prior`
+only - never the candle being judged), `liquidity.js` (equal highs/lows
+pools, clustered within a tolerance %; re-exports the existing
+`liquiditySweep` and `previousPeriods` rather than duplicating them),
+`orderBlocks.js` / `fvg.js` (re-export the existing detector + level-list
+pairs under one SMC namespace), `premiumDiscount.js` (50% of the recent
+range), `displacement.js` (body vs. the average of the candles before it),
+`sessions.js` (crypto: Asia/London/New York by UTC hour, a documented
+simplifying assumption of non-overlapping bands, not a claim about real
+session overlap; NSE: open_drive/lunch/mid_session/close by IST minute,
+reusing `istParts`). One hand-worked test per detector (`test/paperSmc.test.js`,
+15 tests) plus a wiring test for the combined `tagSmc()`.
+
+Wired into `paperbot/bot.js`'s shared `analyse()`: `smc_tags` on every trade
+AND skip now (previously trades only got the kind==='smc' entry patterns,
+skips got nothing) - new additive `paper_skips.smc_tags` column
+(`npm run migrate` needed). Purely informational, like `ema_cross` - nothing
+in `tagSmc()` feeds an entry/exit decision. `tagSmc()` wraps every detector
+in try/catch so one failing on short data just shortens the tag list, never
+crashes a scan.
+
+Full suite: 292/295 - the 3 failures (`newsCheck`, `opsCookieAuth`,
+`opsHome`) all pre-exist on `main` before this PR (confirmed by stashing
+this diff); CC4's folders, not touched here, not CC2's to fix per this
+round's brief.

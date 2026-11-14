@@ -21,7 +21,7 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
 const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
   'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr'];
-const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec', 'ema_cross'];
+const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec', 'ema_cross', 'smc_tags'];
 
 // scalp markets ('crypto_scalp', 'nse_scalp') stay out of the intraday lists unless asked for by name (docs/SCALP.md)
 const isScalp = (m) => String(m || '').endsWith('_scalp');

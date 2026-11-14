@@ -124,3 +124,7 @@ ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market 
 -- 'confirmed_with' / 'confirmed_against' / 'mixed' / 'unknown'. Informational only - never changes entry/exit.
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS ema_cross text;
 ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS ema_cross text;
+
+-- smc_tags on every skip too (paper_trades already had it): BOS/CHoCH, liquidity pools/sweeps, order
+-- blocks, FVG retests, premium/discount, displacement, session - src/paper/lib/smc/, CC2 round 2 item 2.
+ALTER TABLE paper_skips ADD COLUMN IF NOT EXISTS smc_tags jsonb;
