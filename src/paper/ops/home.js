@@ -27,7 +27,7 @@ function routeExists(app, path) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function htmlHome({ status, reason, key, links, latestSummary }) {
+function htmlHome({ status, reason, key, links, latestSummary, recentAlerts = [] }) {
   const color = status === 'ALIVE' ? '#1a7f37' : '#c23';
   const qs = (path) => `${path}?key=${encodeURIComponent(key || '')}`;
   const linkRows = links.map((l) => `<a href="${esc(qs(l.path))}" style="display:block;padding:12px 14px;margin:8px 0;border:1px solid #ddd;border-radius:10px;text-decoration:none;color:#111">
@@ -40,10 +40,17 @@ function htmlHome({ status, reason, key, links, latestSummary }) {
         <div style="color:#666;font-size:13px">${esc(latestSummary.market || '')} &middot; ${esc(latestSummary.summary_date || '')}</div>
       </div>`
     : `<div style="margin-top:8px;color:#999;font-size:13px">No summary stored yet.</div>`;
+  const alertsBlock = recentAlerts.length
+    ? `<div style="margin-top:8px;padding:12px 14px;border:1px solid #f3c;border-radius:10px;background:#fff4f6">
+        <div style="font-weight:600;color:#c23">${recentAlerts.length} alert(s)</div>
+        <div style="color:#666;font-size:13px">${esc(recentAlerts[0].message)}</div>
+      </div>`
+    : '';
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Paper bot</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px">
 <h1 style="color:${color};font-size:32px;margin:4px 0">${esc(status)}</h1>
 <p style="color:#444">${esc(reason)}</p>
+${alertsBlock}
 ${summaryBlock}
 <h2 style="font-size:16px;color:#666;margin-top:20px">Pages</h2>
 ${linkRows}
@@ -64,7 +71,7 @@ function attachHomeRoute(app, { secret, okSecret, tracker, state }) {
       if (state.store) {
         try { const rows = await state.store.listSummaries(1); latestSummary = rows[0] || null; } catch (e) { /* home page still loads without it */ }
       }
-      res.type('html').send(htmlHome({ status: h.status, reason: h.reason, key, links, latestSummary }));
+      res.type('html').send(htmlHome({ status: h.status, reason: h.reason, key, links, latestSummary, recentAlerts: h.recentAlerts }));
     } catch (e) {
       res.status(500).type('text').send('could not build the home page');
     }
