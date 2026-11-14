@@ -1,0 +1,4630 @@
+{
+ "generated": "2026-10-31",
+ "cost_multiplier": 2.0,
+ "oos_split": "2022-01-01",
+ "families": {
+  "BANKNIFTY/monthly/strangle_d18": {
+   "sets": {
+    "base": {
+     "params": {},
+     "trades": 135,
+     "train": {
+      "trades": 90,
+      "win_pct": 50.0,
+      "avg_inr": -1130.0,
+      "avg_r": -0.087,
+      "total_inr": -101733.0,
+      "max_dd_inr": 149812.0,
+      "worst_inr": -28544.0,
+      "worst_vs_sl": 2.2,
+      "costs_inr": 75191.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 71.1,
+      "avg_inr": 3945.0,
+      "avg_r": 0.303,
+      "total_inr": 177526.0,
+      "max_dd_inr": 57145.0,
+      "worst_inr": -34554.0,
+      "worst_vs_sl": 2.66,
+      "costs_inr": 39312.0
+     },
+     "walk_forward_total": 75795.0,
+     "years": {
+      "2019": -37237,
+      "2020": -27093,
+      "2021": -9753,
+      "2022": -48171,
+      "2023": 32307,
+      "2024": 15934,
+      "2025": 77488,
+      "2026": 51798
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 34,
+       "total_inr": 9429,
+       "win_pct": 55.9
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 88360,
+       "win_pct": 59.4
+      },
+      "vix_mid": {
+       "trades": 37,
+       "total_inr": -21995,
+       "win_pct": 54.1
+      },
+      "other_weeks": {
+       "trades": 135,
+       "total_inr": 75793,
+       "win_pct": 57.0
+      }
+     },
+     "exit_reasons": {
+      "TP": 51,
+      "SL": 38,
+      "EXPIRY": 29,
+      "7DTE_UNSTABLE": 17
+     },
+     "trades_over_1_1x_sl": 38
+    },
+    "delta=0.12": {
+     "params": {
+      "delta": 0.12
+     },
+     "trades": 127,
+     "train": {
+      "trades": 82,
+      "win_pct": 57.3,
+      "avg_inr": -1168.0,
+      "avg_r": -0.09,
+      "total_inr": -95784.0,
+      "max_dd_inr": 206647.0,
+      "worst_inr": -29546.0,
+      "worst_vs_sl": 2.27,
+      "costs_inr": 60479.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 73.3,
+      "avg_inr": 3390.0,
+      "avg_r": 0.261,
+      "total_inr": 152547.0,
+      "max_dd_inr": 104510.0,
+      "worst_inr": -77588.0,
+      "worst_vs_sl": 5.97,
+      "costs_inr": 33163.0
+     },
+     "walk_forward_total": 56764.0,
+     "years": {
+      "2019": -77345,
+      "2020": -82735,
+      "2021": 36108,
+      "2022": 9594,
+      "2023": 52062,
+      "2024": -8996,
+      "2025": 108546,
+      "2026": 935
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 30,
+       "total_inr": 1324,
+       "win_pct": 53.3
+      },
+      "vix_low": {
+       "trades": 62,
+       "total_inr": 171899,
+       "win_pct": 71.0
+      },
+      "vix_mid": {
+       "trades": 35,
+       "total_inr": -116460,
+       "win_pct": 57.1
+      },
+      "other_weeks": {
+       "trades": 127,
+       "total_inr": 56763,
+       "win_pct": 63.0
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 49,
+      "SL": 33,
+      "TP": 32,
+      "7DTE_UNSTABLE": 13
+     },
+     "trades_over_1_1x_sl": 32
+    },
+    "delta=0.24": {
+     "params": {
+      "delta": 0.24
+     },
+     "trades": 136,
+     "train": {
+      "trades": 91,
+      "win_pct": 51.6,
+      "avg_inr": -707.0,
+      "avg_r": -0.054,
+      "total_inr": -64352.0,
+      "max_dd_inr": 181973.0,
+      "worst_inr": -39570.0,
+      "worst_vs_sl": 3.04,
+      "costs_inr": 82768.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 53.3,
+      "avg_inr": -11.0,
+      "avg_r": -0.001,
+      "total_inr": -517.0,
+      "max_dd_inr": 97135.0,
+      "worst_inr": -36512.0,
+      "worst_vs_sl": 2.81,
+      "costs_inr": 47066.0
+     },
+     "walk_forward_total": -64869.0,
+     "years": {
+      "2019": 15822,
+      "2020": -76432,
+      "2021": -33823,
+      "2022": -17946,
+      "2023": -21457,
+      "2024": 17459,
+      "2025": 13163,
+      "2026": -9681
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 3,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 36,
+       "total_inr": -44334,
+       "win_pct": 52.8
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": -110060,
+       "win_pct": 48.4
+      },
+      "vix_mid": {
+       "trades": 36,
+       "total_inr": 89525,
+       "win_pct": 58.3
+      },
+      "other_weeks": {
+       "trades": 136,
+       "total_inr": -64869,
+       "win_pct": 52.2
+      }
+     },
+     "exit_reasons": {
+      "TP": 55,
+      "SL": 43,
+      "EXPIRY": 20,
+      "7DTE_UNSTABLE": 18
+     },
+     "trades_over_1_1x_sl": 43
+    },
+    "delta=0.3": {
+     "params": {
+      "delta": 0.3
+     },
+     "trades": 138,
+     "train": {
+      "trades": 92,
+      "win_pct": 53.3,
+      "avg_inr": 118.0,
+      "avg_r": 0.009,
+      "total_inr": 10830.0,
+      "max_dd_inr": 191991.0,
+      "worst_inr": -37664.0,
+      "worst_vs_sl": 2.9,
+      "costs_inr": 80466.0
+     },
+     "test": {
+      "trades": 46,
+      "win_pct": 56.5,
+      "avg_inr": 1384.0,
+      "avg_r": 0.106,
+      "total_inr": 63665.0,
+      "max_dd_inr": 89397.0,
+      "worst_inr": -32054.0,
+      "worst_vs_sl": 2.47,
+      "costs_inr": 51914.0
+     },
+     "walk_forward_total": 74494.0,
+     "years": {
+      "2019": -90517,
+      "2020": -18417,
+      "2021": -25814,
+      "2022": 23449,
+      "2023": 30322,
+      "2024": 15780,
+      "2025": 4354,
+      "2026": 13209
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 36,
+       "total_inr": -42024,
+       "win_pct": 52.8
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 55346,
+       "win_pct": 54.7
+      },
+      "vix_mid": {
+       "trades": 38,
+       "total_inr": 61174,
+       "win_pct": 55.3
+      },
+      "other_weeks": {
+       "trades": 138,
+       "total_inr": 74495,
+       "win_pct": 54.3
+      }
+     },
+     "exit_reasons": {
+      "TP": 71,
+      "SL": 44,
+      "7DTE_UNSTABLE": 16,
+      "EXPIRY": 7
+     },
+     "trades_over_1_1x_sl": 43
+    },
+    "sl=8000": {
+     "params": {
+      "sl": 8000
+     },
+     "trades": 135,
+     "train": {
+      "trades": 90,
+      "win_pct": 48.9,
+      "avg_inr": -359.0,
+      "avg_r": -0.045,
+      "total_inr": -32321.0,
+      "max_dd_inr": 111470.0,
+      "worst_inr": -28309.0,
+      "worst_vs_sl": 3.54,
+      "costs_inr": 63271.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 62.2,
+      "avg_inr": 3037.0,
+      "avg_r": 0.38,
+      "total_inr": 136645.0,
+      "max_dd_inr": 48863.0,
+      "worst_inr": -22795.0,
+      "worst_vs_sl": 2.85,
+      "costs_inr": 33108.0
+     },
+     "walk_forward_total": 104325.0,
+     "years": {
+      "2019": -29165,
+      "2020": -38113,
+      "2021": 14534,
+      "2022": -23466,
+      "2023": 5812,
+      "2024": 7718,
+      "2025": 75443,
+      "2026": 47672
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 34,
+       "total_inr": 20233,
+       "win_pct": 52.9
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 77503,
+       "win_pct": 54.7
+      },
+      "vix_mid": {
+       "trades": 37,
+       "total_inr": 6588,
+       "win_pct": 51.4
+      },
+      "other_weeks": {
+       "trades": 135,
+       "total_inr": 104325,
+       "win_pct": 53.3
+      }
+     },
+     "exit_reasons": {
+      "SL": 54,
+      "TP": 47,
+      "EXPIRY": 28,
+      "7DTE_UNSTABLE": 6
+     },
+     "trades_over_1_1x_sl": 54
+    },
+    "sl=18000": {
+     "params": {
+      "sl": 18000
+     },
+     "trades": 135,
+     "train": {
+      "trades": 90,
+      "win_pct": 52.2,
+      "avg_inr": -868.0,
+      "avg_r": -0.048,
+      "total_inr": -78104.0,
+      "max_dd_inr": 128693.0,
+      "worst_inr": -37152.0,
+      "worst_vs_sl": 2.06,
+      "costs_inr": 85469.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 71.1,
+      "avg_inr": 3647.0,
+      "avg_r": 0.203,
+      "total_inr": 164117.0,
+      "max_dd_inr": 59817.0,
+      "worst_inr": -34554.0,
+      "worst_vs_sl": 1.92,
+      "costs_inr": 41222.0
+     },
+     "walk_forward_total": 86015.0,
+     "years": {
+      "2019": -27475,
+      "2020": -18403,
+      "2021": 16983,
+      "2022": -44573,
+      "2023": 29635,
+      "2024": 15944,
+      "2025": 73031,
+      "2026": 45507
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 34,
+       "total_inr": 41846,
+       "win_pct": 58.8
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 43571,
+       "win_pct": 59.4
+      },
+      "vix_mid": {
+       "trades": 37,
+       "total_inr": 597,
+       "win_pct": 56.8
+      },
+      "other_weeks": {
+       "trades": 135,
+       "total_inr": 86013,
+       "win_pct": 58.5
+      }
+     },
+     "exit_reasons": {
+      "TP": 53,
+      "EXPIRY": 29,
+      "SL": 28,
+      "7DTE_UNSTABLE": 25
+     },
+     "trades_over_1_1x_sl": 25
+    },
+    "sl=26000": {
+     "params": {
+      "sl": 26000
+     },
+     "trades": 135,
+     "train": {
+      "trades": 90,
+      "win_pct": 52.2,
+      "avg_inr": -959.0,
+      "avg_r": -0.037,
+      "total_inr": -86350.0,
+      "max_dd_inr": 148349.0,
+      "worst_inr": -51030.0,
+      "worst_vs_sl": 1.96,
+      "costs_inr": 91420.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 77.8,
+      "avg_inr": 5102.0,
+      "avg_r": 0.196,
+      "total_inr": 229611.0,
+      "max_dd_inr": 62911.0,
+      "worst_inr": -36923.0,
+      "worst_vs_sl": 1.42,
+      "costs_inr": 47957.0
+     },
+     "walk_forward_total": 143262.0,
+     "years": {
+      "2019": -29599,
+      "2020": -14419,
+      "2021": -17561,
+      "2022": -11357,
+      "2023": 19026,
+      "2024": 36043,
+      "2025": 88453,
+      "2026": 86089
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 34,
+       "total_inr": 142599,
+       "win_pct": 64.7
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 49132,
+       "win_pct": 60.9
+      },
+      "vix_mid": {
+       "trades": 37,
+       "total_inr": -48470,
+       "win_pct": 56.8
+      },
+      "other_weeks": {
+       "trades": 135,
+       "total_inr": 143261,
+       "win_pct": 60.7
+      }
+     },
+     "exit_reasons": {
+      "TP": 56,
+      "7DTE_UNSTABLE": 35,
+      "EXPIRY": 29,
+      "SL": 15
+     },
+     "trades_over_1_1x_sl": 12
+    }
+   },
+   "oos": {
+    "table": {
+     "base": {
+      "fit": {
+       "trades": 78,
+       "net_inr": -53562,
+       "win_pct": 51.3
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 129355,
+       "win_pct": 64.9
+      }
+     },
+     "delta=0.12": {
+      "fit": {
+       "trades": 70,
+       "net_inr": -105378,
+       "win_pct": 58.6
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 162141,
+       "win_pct": 68.4
+      }
+     },
+     "delta=0.24": {
+      "fit": {
+       "trades": 79,
+       "net_inr": -46407,
+       "win_pct": 50.6
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": -18462,
+       "win_pct": 54.4
+      }
+     },
+     "delta=0.3": {
+      "fit": {
+       "trades": 80,
+       "net_inr": -12620,
+       "win_pct": 51.2
+      },
+      "oos": {
+       "trades": 58,
+       "net_inr": 87115,
+       "win_pct": 58.6
+      }
+     },
+     "sl=8000": {
+      "fit": {
+       "trades": 78,
+       "net_inr": -8855,
+       "win_pct": 50.0
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 113180,
+       "win_pct": 57.9
+      }
+     },
+     "sl=18000": {
+      "fit": {
+       "trades": 78,
+       "net_inr": -33530,
+       "win_pct": 53.8
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 119544,
+       "win_pct": 64.9
+      }
+     },
+     "sl=26000": {
+      "fit": {
+       "trades": 78,
+       "net_inr": -74993,
+       "win_pct": 53.8
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 218253,
+       "win_pct": 70.2
+      }
+     }
+    },
+    "chosen": {
+     "set": "sl=8000",
+     "fit": {
+      "trades": 78,
+      "net_inr": -8855,
+      "win_pct": 50.0
+     },
+     "oos": {
+      "trades": 57,
+      "net_inr": 113180,
+      "win_pct": 57.9
+     }
+    },
+    "base": {
+     "fit": {
+      "trades": 78,
+      "net_inr": -53562,
+      "win_pct": 51.3
+     },
+     "oos": {
+      "trades": 57,
+      "net_inr": 129355,
+      "win_pct": 64.9
+     }
+    },
+    "sets_positive_in_both": "0/7",
+    "sets_positive_oos": "6/7"
+   }
+  },
+  "BANKNIFTY/monthly/strangle_p100": {
+   "sets": {
+    "base": {
+     "params": {},
+     "trades": 140,
+     "train": {
+      "trades": 95,
+      "win_pct": 55.8,
+      "avg_inr": -958.0,
+      "avg_r": -0.074,
+      "total_inr": -90999.0,
+      "max_dd_inr": 175720.0,
+      "worst_inr": -32534.0,
+      "worst_vs_sl": 2.5,
+      "costs_inr": 68085.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 75.6,
+      "avg_inr": 1693.0,
+      "avg_r": 0.13,
+      "total_inr": 76192.0,
+      "max_dd_inr": 67045.0,
+      "worst_inr": -33435.0,
+      "worst_vs_sl": 2.57,
+      "costs_inr": 23934.0
+     },
+     "walk_forward_total": -14806.0,
+     "years": {
+      "2019": -90333,
+      "2020": -30336,
+      "2021": 9042,
+      "2022": -4514,
+      "2023": 29528,
+      "2024": 33703,
+      "2025": 25224,
+      "2026": -12262
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 37,
+       "total_inr": -26140,
+       "win_pct": 62.2
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": -6752,
+       "win_pct": 64.1
+      },
+      "vix_mid": {
+       "trades": 39,
+       "total_inr": 18086,
+       "win_pct": 59.0
+      },
+      "other_weeks": {
+       "trades": 140,
+       "total_inr": -14807,
+       "win_pct": 62.1
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 73,
+      "SL": 32,
+      "7DTE_UNSTABLE": 19,
+      "TP": 16
+     },
+     "trades_over_1_1x_sl": 29
+    },
+    "premium=70": {
+     "params": {
+      "premium": 70.0
+     },
+     "trades": 140,
+     "train": {
+      "trades": 95,
+      "win_pct": 56.8,
+      "avg_inr": -2061.0,
+      "avg_r": -0.159,
+      "total_inr": -195826.0,
+      "max_dd_inr": 234995.0,
+      "worst_inr": -32582.0,
+      "worst_vs_sl": 2.51,
+      "costs_inr": 63536.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 77.8,
+      "avg_inr": 946.0,
+      "avg_r": 0.073,
+      "total_inr": 42565.0,
+      "max_dd_inr": 59230.0,
+      "worst_inr": -22192.0,
+      "worst_vs_sl": 1.71,
+      "costs_inr": 24812.0
+     },
+     "walk_forward_total": -153261.0,
+     "years": {
+      "2019": -108356,
+      "2020": -26482,
+      "2021": 5736,
+      "2022": -10973,
+      "2023": 34391,
+      "2024": 11774,
+      "2025": 20899,
+      "2026": -24499
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 37,
+       "total_inr": -54292,
+       "win_pct": 56.8
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": -52812,
+       "win_pct": 68.8
+      },
+      "vix_mid": {
+       "trades": 39,
+       "total_inr": -46158,
+       "win_pct": 61.5
+      },
+      "other_weeks": {
+       "trades": 140,
+       "total_inr": -153261,
+       "win_pct": 63.6
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 75,
+      "SL": 33,
+      "7DTE_UNSTABLE": 17,
+      "TP": 15
+     },
+     "trades_over_1_1x_sl": 31
+    },
+    "premium=140": {
+     "params": {
+      "premium": 140.0
+     },
+     "trades": 140,
+     "train": {
+      "trades": 95,
+      "win_pct": 54.7,
+      "avg_inr": -450.0,
+      "avg_r": -0.035,
+      "total_inr": -42784.0,
+      "max_dd_inr": 146659.0,
+      "worst_inr": -28984.0,
+      "worst_vs_sl": 2.23,
+      "costs_inr": 75274.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 71.1,
+      "avg_inr": 1776.0,
+      "avg_r": 0.137,
+      "total_inr": 79902.0,
+      "max_dd_inr": 90632.0,
+      "worst_inr": -28802.0,
+      "worst_vs_sl": 2.22,
+      "costs_inr": 33451.0
+     },
+     "walk_forward_total": 37120.0,
+     "years": {
+      "2019": -91010,
+      "2020": 4649,
+      "2021": 26374,
+      "2022": -27484,
+      "2023": 48255,
+      "2024": -24172,
+      "2025": 57973,
+      "2026": -2153
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 37,
+       "total_inr": 52775,
+       "win_pct": 62.2
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 47956,
+       "win_pct": 62.5
+      },
+      "vix_mid": {
+       "trades": 39,
+       "total_inr": -63613,
+       "win_pct": 53.8
+      },
+      "other_weeks": {
+       "trades": 140,
+       "total_inr": 37118,
+       "win_pct": 60.0
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 52,
+      "SL": 40,
+      "TP": 36,
+      "7DTE_UNSTABLE": 12
+     },
+     "trades_over_1_1x_sl": 39
+    },
+    "premium=200": {
+     "params": {
+      "premium": 200.0
+     },
+     "trades": 140,
+     "train": {
+      "trades": 95,
+      "win_pct": 49.5,
+      "avg_inr": -1099.0,
+      "avg_r": -0.084,
+      "total_inr": -104369.0,
+      "max_dd_inr": 190255.0,
+      "worst_inr": -32725.0,
+      "worst_vs_sl": 2.52,
+      "costs_inr": 82526.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 60.0,
+      "avg_inr": 37.0,
+      "avg_r": 0.003,
+      "total_inr": 1677.0,
+      "max_dd_inr": 117312.0,
+      "worst_inr": -70288.0,
+      "worst_vs_sl": 5.41,
+      "costs_inr": 33438.0
+     },
+     "walk_forward_total": -102693.0,
+     "years": {
+      "2019": -104697,
+      "2020": -42736,
+      "2021": 62155,
+      "2022": -46811,
+      "2023": 64098,
+      "2024": -25810,
+      "2025": 34291,
+      "2026": -70903
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 3,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 37,
+       "total_inr": -127872,
+       "win_pct": 43.2
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 86154,
+       "win_pct": 57.8
+      },
+      "vix_mid": {
+       "trades": 39,
+       "total_inr": -60974,
+       "win_pct": 53.8
+      },
+      "other_weeks": {
+       "trades": 140,
+       "total_inr": -102692,
+       "win_pct": 52.9
+      }
+     },
+     "exit_reasons": {
+      "SL": 40,
+      "TP": 40,
+      "EXPIRY": 36,
+      "7DTE_UNSTABLE": 24
+     },
+     "trades_over_1_1x_sl": 38
+    },
+    "sl=8000": {
+     "params": {
+      "sl": 8000
+     },
+     "trades": 140,
+     "train": {
+      "trades": 95,
+      "win_pct": 53.7,
+      "avg_inr": -532.0,
+      "avg_r": -0.066,
+      "total_inr": -50512.0,
+      "max_dd_inr": 131589.0,
+      "worst_inr": -29546.0,
+      "worst_vs_sl": 3.69,
+      "costs_inr": 55783.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 71.1,
+      "avg_inr": 1558.0,
+      "avg_r": 0.195,
+      "total_inr": 70122.0,
+      "max_dd_inr": 53086.0,
+      "worst_inr": -21190.0,
+      "worst_vs_sl": 2.65,
+      "costs_inr": 20362.0
+     },
+     "walk_forward_total": 19609.0,
+     "years": {
+      "2019": -92274,
+      "2020": 3291,
+      "2021": 3855,
+      "2022": 2867,
+      "2023": -376,
+      "2024": 33703,
+      "2025": 55749,
+      "2026": -18954
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 37,
+       "total_inr": 20556,
+       "win_pct": 59.5
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": 37113,
+       "win_pct": 62.5
+      },
+      "vix_mid": {
+       "trades": 39,
+       "total_inr": -38059,
+       "win_pct": 53.8
+      },
+      "other_weeks": {
+       "trades": 140,
+       "total_inr": 19610,
+       "win_pct": 59.3
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 73,
+      "SL": 47,
+      "TP": 12,
+      "7DTE_UNSTABLE": 8
+     },
+     "trades_over_1_1x_sl": 45
+    },
+    "sl=18000": {
+     "params": {
+      "sl": 18000
+     },
+     "trades": 140,
+     "train": {
+      "trades": 95,
+      "win_pct": 57.9,
+      "avg_inr": -925.0,
+      "avg_r": -0.051,
+      "total_inr": -87878.0,
+      "max_dd_inr": 173537.0,
+      "worst_inr": -32534.0,
+      "worst_vs_sl": 1.81,
+      "costs_inr": 75065.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 80.0,
+      "avg_inr": 2849.0,
+      "avg_r": 0.158,
+      "total_inr": 128212.0,
+      "max_dd_inr": 65491.0,
+      "worst_inr": -33435.0,
+      "worst_vs_sl": 1.86,
+      "costs_inr": 26793.0
+     },
+     "walk_forward_total": 40334.0,
+     "years": {
+      "2019": -95901,
+      "2020": -42142,
+      "2021": 26658,
+      "2022": 31869,
+      "2023": 33065,
+      "2024": 60240,
+      "2025": 18231,
+      "2026": 16676
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 6,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 37,
+       "total_inr": 14299,
+       "win_pct": 67.6
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": -1369,
+       "win_pct": 65.6
+      },
+      "vix_mid": {
+       "trades": 39,
+       "total_inr": 27403,
+       "win_pct": 61.5
+      },
+      "other_weeks": {
+       "trades": 140,
+       "total_inr": 40333,
+       "win_pct": 65.0
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 73,
+      "7DTE_UNSTABLE": 25,
+      "SL": 22,
+      "TP": 20
+     },
+     "trades_over_1_1x_sl": 21
+    },
+    "sl=26000": {
+     "params": {
+      "sl": 26000
+     },
+     "trades": 140,
+     "train": {
+      "trades": 95,
+      "win_pct": 58.9,
+      "avg_inr": -663.0,
+      "avg_r": -0.025,
+      "total_inr": -62992.0,
+      "max_dd_inr": 188901.0,
+      "worst_inr": -53540.0,
+      "worst_vs_sl": 2.06,
+      "costs_inr": 78397.0
+     },
+     "test": {
+      "trades": 45,
+      "win_pct": 82.2,
+      "avg_inr": 2761.0,
+      "avg_r": 0.106,
+      "total_inr": 124252.0,
+      "max_dd_inr": 92288.0,
+      "worst_inr": -40434.0,
+      "worst_vs_sl": 1.56,
+      "costs_inr": 30051.0
+     },
+     "walk_forward_total": 61260.0,
+     "years": {
+      "2019": -58821,
+      "2020": -55839,
+      "2021": 26658,
+      "2022": 31869,
+      "2023": 34677,
+      "2024": 46695,
+      "2025": 53000,
+      "2026": -10120
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 37,
+       "total_inr": 42703,
+       "win_pct": 73.0
+      },
+      "vix_low": {
+       "trades": 64,
+       "total_inr": -41611,
+       "win_pct": 65.6
+      },
+      "vix_mid": {
+       "trades": 39,
+       "total_inr": 60168,
+       "win_pct": 61.5
+      },
+      "other_weeks": {
+       "trades": 140,
+       "total_inr": 61260,
+       "win_pct": 66.4
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 74,
+      "7DTE_UNSTABLE": 31,
+      "TP": 21,
+      "SL": 14
+     },
+     "trades_over_1_1x_sl": 13
+    }
+   },
+   "oos": {
+    "table": {
+     "base": {
+      "fit": {
+       "trades": 83,
+       "net_inr": -86485,
+       "win_pct": 54.2
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 71678,
+       "win_pct": 73.7
+      }
+     },
+     "premium=70": {
+      "fit": {
+       "trades": 83,
+       "net_inr": -184853,
+       "win_pct": 56.6
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 31592,
+       "win_pct": 73.7
+      }
+     },
+     "premium=140": {
+      "fit": {
+       "trades": 83,
+       "net_inr": -15300,
+       "win_pct": 56.6
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 52418,
+       "win_pct": 64.9
+      }
+     },
+     "premium=200": {
+      "fit": {
+       "trades": 83,
+       "net_inr": -57558,
+       "win_pct": 50.6
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": -45134,
+       "win_pct": 56.1
+      }
+     },
+     "sl=8000": {
+      "fit": {
+       "trades": 83,
+       "net_inr": -53379,
+       "win_pct": 53.0
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 72989,
+       "win_pct": 68.4
+      }
+     },
+     "sl=18000": {
+      "fit": {
+       "trades": 83,
+       "net_inr": -119747,
+       "win_pct": 55.4
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 160081,
+       "win_pct": 78.9
+      }
+     },
+     "sl=26000": {
+      "fit": {
+       "trades": 83,
+       "net_inr": -94861,
+       "win_pct": 56.6
+      },
+      "oos": {
+       "trades": 57,
+       "net_inr": 156121,
+       "win_pct": 80.7
+      }
+     }
+    },
+    "chosen": {
+     "set": "premium=140",
+     "fit": {
+      "trades": 83,
+      "net_inr": -15300,
+      "win_pct": 56.6
+     },
+     "oos": {
+      "trades": 57,
+      "net_inr": 52418,
+      "win_pct": 64.9
+     }
+    },
+    "base": {
+     "fit": {
+      "trades": 83,
+      "net_inr": -86485,
+      "win_pct": 54.2
+     },
+     "oos": {
+      "trades": 57,
+      "net_inr": 71678,
+      "win_pct": 73.7
+     }
+    },
+    "sets_positive_in_both": "0/7",
+    "sets_positive_oos": "6/7"
+   }
+  },
+  "BANKNIFTY/monthly/condor": {
+   "sets": {
+    "base": {
+     "params": {},
+     "trades": 94,
+     "train": {
+      "trades": 59,
+      "win_pct": 71.2,
+      "avg_inr": 1711.0,
+      "avg_r": 0.045,
+      "total_inr": 100960.0,
+      "max_dd_inr": 77976.0,
+      "worst_inr": -26429.0,
+      "worst_vs_sl": 1.46,
+      "costs_inr": 59984.0
+     },
+     "test": {
+      "trades": 35,
+      "win_pct": 65.7,
+      "avg_inr": 1144.0,
+      "avg_r": 0.019,
+      "total_inr": 40040.0,
+      "max_dd_inr": 55617.0,
+      "worst_inr": -30770.0,
+      "worst_vs_sl": 1.1,
+      "costs_inr": 37062.0
+     },
+     "walk_forward_total": 141000.0,
+     "years": {
+      "2019": 24171,
+      "2020": 29163,
+      "2021": 45415,
+      "2022": -5816,
+      "2023": 6979,
+      "2024": 52059,
+      "2025": -10671,
+      "2026": -8328
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 23,
+       "total_inr": 87690,
+       "win_pct": 78.3
+      },
+      "vix_low": {
+       "trades": 44,
+       "total_inr": 38389,
+       "win_pct": 61.4
+      },
+      "vix_mid": {
+       "trades": 27,
+       "total_inr": 14921,
+       "win_pct": 74.1
+      },
+      "other_weeks": {
+       "trades": 94,
+       "total_inr": 141000,
+       "win_pct": 69.1
+      }
+     },
+     "exit_reasons": {
+      "TP50": 48,
+      "15DTE": 32,
+      "SL100": 14
+     },
+     "trades_over_1_1x_sl": 13
+    },
+    "short_delta=0.2": {
+     "params": {
+      "short_delta": 0.2
+     },
+     "trades": 25,
+     "train": {
+      "trades": 13,
+      "win_pct": 76.9,
+      "avg_inr": 5248.0,
+      "avg_r": 0.318,
+      "total_inr": 68222.0,
+      "max_dd_inr": 11844.0,
+      "worst_inr": -6673.0,
+      "worst_vs_sl": 1.24,
+      "costs_inr": 12924.0
+     },
+     "test": {
+      "trades": 12,
+      "win_pct": 91.7,
+      "avg_inr": 5045.0,
+      "avg_r": 0.574,
+      "total_inr": 60539.0,
+      "max_dd_inr": 6719.0,
+      "worst_inr": -719.0,
+      "worst_vs_sl": 0.14,
+      "costs_inr": 12477.0
+     },
+     "walk_forward_total": 128761.0,
+     "years": {
+      "2019": -6673,
+      "2020": 9033,
+      "2021": 22016,
+      "2022": 43235,
+      "2023": 0,
+      "2024": 26260,
+      "2025": 28719,
+      "2026": 5560
+     },
+     "verdict": "not enough data",
+     "preset_rule": false,
+     "positive_years_2019_26": 6,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 8,
+       "total_inr": 61468,
+       "win_pct": 100.0
+      },
+      "vix_low": {
+       "trades": 11,
+       "total_inr": 46536,
+       "win_pct": 72.7
+      },
+      "vix_mid": {
+       "trades": 6,
+       "total_inr": 20757,
+       "win_pct": 83.3
+      },
+      "other_weeks": {
+       "trades": 25,
+       "total_inr": 128761,
+       "win_pct": 84.0
+      }
+     },
+     "exit_reasons": {
+      "TP50": 21,
+      "SL100": 2,
+      "15DTE": 2
+     },
+     "trades_over_1_1x_sl": 2
+    },
+    "short_delta=0.25": {
+     "params": {
+      "short_delta": 0.25
+     },
+     "trades": 74,
+     "train": {
+      "trades": 47,
+      "win_pct": 66.0,
+      "avg_inr": 1820.0,
+      "avg_r": 0.11,
+      "total_inr": 85537.0,
+      "max_dd_inr": 28544.0,
+      "worst_inr": -17434.0,
+      "worst_vs_sl": 1.36,
+      "costs_inr": 47656.0
+     },
+     "test": {
+      "trades": 27,
+      "win_pct": 81.5,
+      "avg_inr": 4210.0,
+      "avg_r": 0.241,
+      "total_inr": 113681.0,
+      "max_dd_inr": 22338.0,
+      "worst_inr": -13578.0,
+      "worst_vs_sl": 1.15,
+      "costs_inr": 27768.0
+     },
+     "walk_forward_total": 199217.0,
+     "years": {
+      "2019": 27620,
+      "2020": -14680,
+      "2021": 48396,
+      "2022": 22289,
+      "2023": 26088,
+      "2024": 40920,
+      "2025": 10166,
+      "2026": 36508
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 18,
+       "total_inr": 55709,
+       "win_pct": 77.8
+      },
+      "vix_low": {
+       "trades": 37,
+       "total_inr": 60532,
+       "win_pct": 62.2
+      },
+      "vix_mid": {
+       "trades": 19,
+       "total_inr": 82977,
+       "win_pct": 84.2
+      },
+      "other_weeks": {
+       "trades": 74,
+       "total_inr": 199218,
+       "win_pct": 71.6
+      }
+     },
+     "exit_reasons": {
+      "TP50": 48,
+      "15DTE": 18,
+      "SL100": 8
+     },
+     "trades_over_1_1x_sl": 8
+    },
+    "short_delta=0.35": {
+     "params": {
+      "short_delta": 0.35
+     },
+     "trades": 101,
+     "train": {
+      "trades": 63,
+      "win_pct": 66.7,
+      "avg_inr": 1913.0,
+      "avg_r": 0.069,
+      "total_inr": 120493.0,
+      "max_dd_inr": 107693.0,
+      "worst_inr": -40564.0,
+      "worst_vs_sl": 1.07,
+      "costs_inr": 65741.0
+     },
+     "test": {
+      "trades": 38,
+      "win_pct": 60.5,
+      "avg_inr": 2082.0,
+      "avg_r": 0.052,
+      "total_inr": 79098.0,
+      "max_dd_inr": 50745.0,
+      "worst_inr": -31220.0,
+      "worst_vs_sl": 1.3,
+      "costs_inr": 40989.0
+     },
+     "walk_forward_total": 199592.0,
+     "years": {
+      "2019": 13226,
+      "2020": 39507,
+      "2021": -65398,
+      "2022": 48356,
+      "2023": 36873,
+      "2024": 19841,
+      "2025": -1504,
+      "2026": 23888
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 6,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 26,
+       "total_inr": 76953,
+       "win_pct": 69.2
+      },
+      "vix_low": {
+       "trades": 47,
+       "total_inr": 14487,
+       "win_pct": 57.4
+      },
+      "vix_mid": {
+       "trades": 28,
+       "total_inr": 108151,
+       "win_pct": 71.4
+      },
+      "other_weeks": {
+       "trades": 101,
+       "total_inr": 199591,
+       "win_pct": 64.4
+      }
+     },
+     "exit_reasons": {
+      "15DTE": 56,
+      "TP50": 36,
+      "SL100": 9
+     },
+     "trades_over_1_1x_sl": 6
+    },
+    "sl_mult=0.5": {
+     "params": {
+      "sl_mult": 0.5
+     },
+     "trades": 93,
+     "train": {
+      "trades": 58,
+      "win_pct": 69.0,
+      "avg_inr": 1753.0,
+      "avg_r": 0.07,
+      "total_inr": 101676.0,
+      "max_dd_inr": 55847.0,
+      "worst_inr": -25536.0,
+      "worst_vs_sl": 2.06,
+      "costs_inr": 58560.0
+     },
+     "test": {
+      "trades": 35,
+      "win_pct": 60.0,
+      "avg_inr": 1080.0,
+      "avg_r": 0.014,
+      "total_inr": 37788.0,
+      "max_dd_inr": 35766.0,
+      "worst_inr": -24723.0,
+      "worst_vs_sl": 1.77,
+      "costs_inr": 36988.0
+     },
+     "walk_forward_total": 139465.0,
+     "years": {
+      "2019": 24171,
+      "2020": 19808,
+      "2021": 20869,
+      "2022": 31730,
+      "2023": 8638,
+      "2024": 26968,
+      "2025": -6645,
+      "2026": 8828
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 25,
+       "total_inr": 89153,
+       "win_pct": 72.0
+      },
+      "vix_low": {
+       "trades": 44,
+       "total_inr": 22424,
+       "win_pct": 61.4
+      },
+      "vix_mid": {
+       "trades": 24,
+       "total_inr": 27888,
+       "win_pct": 66.7
+      },
+      "other_weeks": {
+       "trades": 93,
+       "total_inr": 139464,
+       "win_pct": 65.6
+      }
+     },
+     "exit_reasons": {
+      "TP50": 47,
+      "SL100": 29,
+      "15DTE": 17
+     },
+     "trades_over_1_1x_sl": 29
+    },
+    "sl_mult=1.5": {
+     "params": {
+      "sl_mult": 1.5
+     },
+     "trades": 95,
+     "train": {
+      "trades": 58,
+      "win_pct": 75.9,
+      "avg_inr": 2819.0,
+      "avg_r": 0.067,
+      "total_inr": 163498.0,
+      "max_dd_inr": 46147.0,
+      "worst_inr": -33102.0,
+      "worst_vs_sl": 1.46,
+      "costs_inr": 58514.0
+     },
+     "test": {
+      "trades": 37,
+      "win_pct": 67.6,
+      "avg_inr": 2956.0,
+      "avg_r": 0.085,
+      "total_inr": 109382.0,
+      "max_dd_inr": 49487.0,
+      "worst_inr": -23439.0,
+      "worst_vs_sl": 1.18,
+      "costs_inr": 38661.0
+     },
+     "walk_forward_total": 272880.0,
+     "years": {
+      "2019": 24171,
+      "2020": 24874,
+      "2021": 63603,
+      "2022": 46063,
+      "2023": 33808,
+      "2024": 52059,
+      "2025": 12790,
+      "2026": 10724
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 8,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 23,
+       "total_inr": 144893,
+       "win_pct": 82.6
+      },
+      "vix_low": {
+       "trades": 46,
+       "total_inr": 65800,
+       "win_pct": 63.0
+      },
+      "vix_mid": {
+       "trades": 26,
+       "total_inr": 62187,
+       "win_pct": 80.8
+      },
+      "other_weeks": {
+       "trades": 95,
+       "total_inr": 272880,
+       "win_pct": 72.6
+      }
+     },
+     "exit_reasons": {
+      "TP50": 51,
+      "15DTE": 42,
+      "SL100": 2
+     },
+     "trades_over_1_1x_sl": 2
+    },
+    "sl_mult=2": {
+     "params": {
+      "sl_mult": 2.0
+     },
+     "trades": 95,
+     "train": {
+      "trades": 58,
+      "win_pct": 75.9,
+      "avg_inr": 2819.0,
+      "avg_r": 0.05,
+      "total_inr": 163498.0,
+      "max_dd_inr": 46147.0,
+      "worst_inr": -33102.0,
+      "worst_vs_sl": 1.1,
+      "costs_inr": 58514.0
+     },
+     "test": {
+      "trades": 37,
+      "win_pct": 67.6,
+      "avg_inr": 2968.0,
+      "avg_r": 0.061,
+      "total_inr": 109813.0,
+      "max_dd_inr": 40177.0,
+      "worst_inr": -29004.0,
+      "worst_vs_sl": 1.1,
+      "costs_inr": 38921.0
+     },
+     "walk_forward_total": 273312.0,
+     "years": {
+      "2019": 24171,
+      "2020": 24874,
+      "2021": 63603,
+      "2022": 46063,
+      "2023": 33808,
+      "2024": 52059,
+      "2025": 12790,
+      "2026": 11156
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 8,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 23,
+       "total_inr": 150890,
+       "win_pct": 82.6
+      },
+      "vix_low": {
+       "trades": 46,
+       "total_inr": 60235,
+       "win_pct": 63.0
+      },
+      "vix_mid": {
+       "trades": 26,
+       "total_inr": 62187,
+       "win_pct": 80.8
+      },
+      "other_weeks": {
+       "trades": 95,
+       "total_inr": 273311,
+       "win_pct": 72.6
+      }
+     },
+     "exit_reasons": {
+      "TP50": 51,
+      "15DTE": 42,
+      "SL100": 2
+     },
+     "trades_over_1_1x_sl": 0
+    }
+   },
+   "oos": {
+    "table": {
+     "base": {
+      "fit": {
+       "trades": 50,
+       "net_inr": 106777,
+       "win_pct": 74.0
+      },
+      "oos": {
+       "trades": 44,
+       "net_inr": 34224,
+       "win_pct": 63.6
+      }
+     },
+     "short_delta=0.2": {
+      "fit": {
+       "trades": 9,
+       "net_inr": 24987,
+       "win_pct": 66.7
+      },
+      "oos": {
+       "trades": 16,
+       "net_inr": 103774,
+       "win_pct": 93.8
+      }
+     },
+     "short_delta=0.25": {
+      "fit": {
+       "trades": 41,
+       "net_inr": 63248,
+       "win_pct": 65.9
+      },
+      "oos": {
+       "trades": 33,
+       "net_inr": 135970,
+       "win_pct": 78.8
+      }
+     },
+     "short_delta=0.35": {
+      "fit": {
+       "trades": 54,
+       "net_inr": 72138,
+       "win_pct": 68.5
+      },
+      "oos": {
+       "trades": 47,
+       "net_inr": 127454,
+       "win_pct": 59.6
+      }
+     },
+     "sl_mult=0.5": {
+      "fit": {
+       "trades": 49,
+       "net_inr": 69947,
+       "win_pct": 69.4
+      },
+      "oos": {
+       "trades": 44,
+       "net_inr": 69518,
+       "win_pct": 61.4
+      }
+     },
+     "sl_mult=1.5": {
+      "fit": {
+       "trades": 50,
+       "net_inr": 117435,
+       "win_pct": 76.0
+      },
+      "oos": {
+       "trades": 45,
+       "net_inr": 155445,
+       "win_pct": 68.9
+      }
+     },
+     "sl_mult=2": {
+      "fit": {
+       "trades": 50,
+       "net_inr": 117435,
+       "win_pct": 76.0
+      },
+      "oos": {
+       "trades": 45,
+       "net_inr": 155876,
+       "win_pct": 68.9
+      }
+     }
+    },
+    "chosen": {
+     "set": "sl_mult=1.5",
+     "fit": {
+      "trades": 50,
+      "net_inr": 117435,
+      "win_pct": 76.0
+     },
+     "oos": {
+      "trades": 45,
+      "net_inr": 155445,
+      "win_pct": 68.9
+     }
+    },
+    "base": {
+     "fit": {
+      "trades": 50,
+      "net_inr": 106777,
+      "win_pct": 74.0
+     },
+     "oos": {
+      "trades": 44,
+      "net_inr": 34224,
+      "win_pct": 63.6
+     }
+    },
+    "sets_positive_in_both": "6/6",
+    "sets_positive_oos": "6/6"
+   }
+  },
+  "NIFTY/weekly0/strangle_d18": {
+   "sets": {
+    "base": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1
+     },
+     "trades": 451,
+     "train": {
+      "trades": 252,
+      "win_pct": 73.8,
+      "avg_inr": -174.0,
+      "avg_r": -0.013,
+      "total_inr": -43889.0,
+      "max_dd_inr": 79615.0,
+      "worst_inr": -30203.0,
+      "worst_vs_sl": 2.32,
+      "costs_inr": 116650.0
+     },
+     "test": {
+      "trades": 199,
+      "win_pct": 78.9,
+      "avg_inr": 468.0,
+      "avg_r": 0.036,
+      "total_inr": 93041.0,
+      "max_dd_inr": 51788.0,
+      "worst_inr": -22153.0,
+      "worst_vs_sl": 1.7,
+      "costs_inr": 91762.0
+     },
+     "walk_forward_total": 49153.0,
+     "years": {
+      "2019": -11202,
+      "2020": -30789,
+      "2021": 27164,
+      "2022": -540,
+      "2023": 15034,
+      "2024": -5071,
+      "2025": 26548,
+      "2026": 56531
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 135,
+       "total_inr": 22381,
+       "win_pct": 80.0
+      },
+      "vix_low": {
+       "trades": 205,
+       "total_inr": 34043,
+       "win_pct": 74.6
+      },
+      "vix_mid": {
+       "trades": 111,
+       "total_inr": -7271,
+       "win_pct": 73.9
+      },
+      "monthly_expiry_week": {
+       "trades": 141,
+       "total_inr": -43961,
+       "win_pct": 70.2
+      },
+      "other_weeks": {
+       "trades": 310,
+       "total_inr": 93113,
+       "win_pct": 78.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 451
+     },
+     "trades_over_1_1x_sl": 6
+    },
+    "delta=0.12": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "delta": 0.12
+     },
+     "trades": 451,
+     "train": {
+      "trades": 252,
+      "win_pct": 68.3,
+      "avg_inr": -317.0,
+      "avg_r": -0.024,
+      "total_inr": -79969.0,
+      "max_dd_inr": 99596.0,
+      "worst_inr": -38349.0,
+      "worst_vs_sl": 2.95,
+      "costs_inr": 108919.0
+     },
+     "test": {
+      "trades": 199,
+      "win_pct": 86.9,
+      "avg_inr": 248.0,
+      "avg_r": 0.019,
+      "total_inr": 49314.0,
+      "max_dd_inr": 38542.0,
+      "worst_inr": -17085.0,
+      "worst_vs_sl": 1.31,
+      "costs_inr": 85532.0
+     },
+     "walk_forward_total": -30653.0,
+     "years": {
+      "2019": -11132,
+      "2020": -52710,
+      "2021": 21103,
+      "2022": -6622,
+      "2023": 6827,
+      "2024": -8755,
+      "2025": 20720,
+      "2026": 30523
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 135,
+       "total_inr": -22384,
+       "win_pct": 82.2
+      },
+      "vix_low": {
+       "trades": 205,
+       "total_inr": 24551,
+       "win_pct": 76.6
+      },
+      "vix_mid": {
+       "trades": 111,
+       "total_inr": -32821,
+       "win_pct": 69.4
+      },
+      "monthly_expiry_week": {
+       "trades": 141,
+       "total_inr": -64656,
+       "win_pct": 64.5
+      },
+      "other_weeks": {
+       "trades": 310,
+       "total_inr": 34001,
+       "win_pct": 81.9
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 451
+     },
+     "trades_over_1_1x_sl": 4
+    },
+    "delta=0.24": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "delta": 0.24
+     },
+     "trades": 443,
+     "train": {
+      "trades": 244,
+      "win_pct": 69.7,
+      "avg_inr": -148.0,
+      "avg_r": -0.011,
+      "total_inr": -36134.0,
+      "max_dd_inr": 93034.0,
+      "worst_inr": -38418.0,
+      "worst_vs_sl": 2.96,
+      "costs_inr": 120370.0
+     },
+     "test": {
+      "trades": 199,
+      "win_pct": 73.4,
+      "avg_inr": 497.0,
+      "avg_r": 0.038,
+      "total_inr": 98884.0,
+      "max_dd_inr": 59044.0,
+      "worst_inr": -21933.0,
+      "worst_vs_sl": 1.69,
+      "costs_inr": 96397.0
+     },
+     "walk_forward_total": 62752.0,
+     "years": {
+      "2019": -10193,
+      "2020": -49906,
+      "2021": 32718,
+      "2022": 7656,
+      "2023": 18636,
+      "2024": 3179,
+      "2025": 40952,
+      "2026": 36118
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 6,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 135,
+       "total_inr": 29882,
+       "win_pct": 72.6
+      },
+      "vix_low": {
+       "trades": 199,
+       "total_inr": 19623,
+       "win_pct": 69.3
+      },
+      "vix_mid": {
+       "trades": 109,
+       "total_inr": 13245,
+       "win_pct": 73.4
+      },
+      "monthly_expiry_week": {
+       "trades": 135,
+       "total_inr": -36899,
+       "win_pct": 68.1
+      },
+      "other_weeks": {
+       "trades": 308,
+       "total_inr": 99649,
+       "win_pct": 72.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 443
+     },
+     "trades_over_1_1x_sl": 10
+    },
+    "delta=0.3": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "delta": 0.3
+     },
+     "trades": 425,
+     "train": {
+      "trades": 226,
+      "win_pct": 65.0,
+      "avg_inr": -216.0,
+      "avg_r": -0.017,
+      "total_inr": -48924.0,
+      "max_dd_inr": 98691.0,
+      "worst_inr": -35290.0,
+      "worst_vs_sl": 2.71,
+      "costs_inr": 119690.0
+     },
+     "test": {
+      "trades": 199,
+      "win_pct": 67.3,
+      "avg_inr": 531.0,
+      "avg_r": 0.041,
+      "total_inr": 105751.0,
+      "max_dd_inr": 67050.0,
+      "worst_inr": -24267.0,
+      "worst_vs_sl": 1.87,
+      "costs_inr": 104485.0
+     },
+     "walk_forward_total": 56827.0,
+     "years": {
+      "2019": -20163,
+      "2020": -44741,
+      "2021": 40598,
+      "2022": -10534,
+      "2023": 12734,
+      "2024": 5513,
+      "2025": 41465,
+      "2026": 46040
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 5,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 133,
+       "total_inr": 18470,
+       "win_pct": 66.9
+      },
+      "vix_low": {
+       "trades": 192,
+       "total_inr": 19965,
+       "win_pct": 65.1
+      },
+      "vix_mid": {
+       "trades": 100,
+       "total_inr": 18392,
+       "win_pct": 67.0
+      },
+      "monthly_expiry_week": {
+       "trades": 122,
+       "total_inr": -44303,
+       "win_pct": 64.8
+      },
+      "other_weeks": {
+       "trades": 303,
+       "total_inr": 101130,
+       "win_pct": 66.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 425
+     },
+     "trades_over_1_1x_sl": 15
+    },
+    "sl=8000": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl": 8000
+     },
+     "trades": 451,
+     "train": {
+      "trades": 252,
+      "win_pct": 73.8,
+      "avg_inr": -174.0,
+      "avg_r": -0.022,
+      "total_inr": -43889.0,
+      "max_dd_inr": 79615.0,
+      "worst_inr": -30203.0,
+      "worst_vs_sl": 3.78,
+      "costs_inr": 116650.0
+     },
+     "test": {
+      "trades": 199,
+      "win_pct": 78.9,
+      "avg_inr": 468.0,
+      "avg_r": 0.058,
+      "total_inr": 93041.0,
+      "max_dd_inr": 51788.0,
+      "worst_inr": -22153.0,
+      "worst_vs_sl": 2.77,
+      "costs_inr": 91762.0
+     },
+     "walk_forward_total": 49153.0,
+     "years": {
+      "2019": -11202,
+      "2020": -30789,
+      "2021": 27164,
+      "2022": -540,
+      "2023": 15034,
+      "2024": -5071,
+      "2025": 26548,
+      "2026": 56531
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 135,
+       "total_inr": 22381,
+       "win_pct": 80.0
+      },
+      "vix_low": {
+       "trades": 205,
+       "total_inr": 34043,
+       "win_pct": 74.6
+      },
+      "vix_mid": {
+       "trades": 111,
+       "total_inr": -7271,
+       "win_pct": 73.9
+      },
+      "monthly_expiry_week": {
+       "trades": 141,
+       "total_inr": -43961,
+       "win_pct": 70.2
+      },
+      "other_weeks": {
+       "trades": 310,
+       "total_inr": 93113,
+       "win_pct": 78.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 451
+     },
+     "trades_over_1_1x_sl": 17
+    },
+    "sl=18000": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl": 18000
+     },
+     "trades": 451,
+     "train": {
+      "trades": 252,
+      "win_pct": 73.8,
+      "avg_inr": -174.0,
+      "avg_r": -0.01,
+      "total_inr": -43889.0,
+      "max_dd_inr": 79615.0,
+      "worst_inr": -30203.0,
+      "worst_vs_sl": 1.68,
+      "costs_inr": 116650.0
+     },
+     "test": {
+      "trades": 199,
+      "win_pct": 78.9,
+      "avg_inr": 468.0,
+      "avg_r": 0.026,
+      "total_inr": 93041.0,
+      "max_dd_inr": 51788.0,
+      "worst_inr": -22153.0,
+      "worst_vs_sl": 1.23,
+      "costs_inr": 91762.0
+     },
+     "walk_forward_total": 49153.0,
+     "years": {
+      "2019": -11202,
+      "2020": -30789,
+      "2021": 27164,
+      "2022": -540,
+      "2023": 15034,
+      "2024": -5071,
+      "2025": 26548,
+      "2026": 56531
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 135,
+       "total_inr": 22381,
+       "win_pct": 80.0
+      },
+      "vix_low": {
+       "trades": 205,
+       "total_inr": 34043,
+       "win_pct": 74.6
+      },
+      "vix_mid": {
+       "trades": 111,
+       "total_inr": -7271,
+       "win_pct": 73.9
+      },
+      "monthly_expiry_week": {
+       "trades": 141,
+       "total_inr": -43961,
+       "win_pct": 70.2
+      },
+      "other_weeks": {
+       "trades": 310,
+       "total_inr": 93113,
+       "win_pct": 78.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 451
+     },
+     "trades_over_1_1x_sl": 3
+    },
+    "sl=26000": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl": 26000
+     },
+     "trades": 451,
+     "train": {
+      "trades": 252,
+      "win_pct": 73.8,
+      "avg_inr": -174.0,
+      "avg_r": -0.007,
+      "total_inr": -43889.0,
+      "max_dd_inr": 79615.0,
+      "worst_inr": -30203.0,
+      "worst_vs_sl": 1.16,
+      "costs_inr": 116650.0
+     },
+     "test": {
+      "trades": 199,
+      "win_pct": 78.9,
+      "avg_inr": 468.0,
+      "avg_r": 0.018,
+      "total_inr": 93041.0,
+      "max_dd_inr": 51788.0,
+      "worst_inr": -22153.0,
+      "worst_vs_sl": 0.85,
+      "costs_inr": 91762.0
+     },
+     "walk_forward_total": 49153.0,
+     "years": {
+      "2019": -11202,
+      "2020": -30789,
+      "2021": 27164,
+      "2022": -540,
+      "2023": 15034,
+      "2024": -5071,
+      "2025": 26548,
+      "2026": 56531
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 4,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 135,
+       "total_inr": 22381,
+       "win_pct": 80.0
+      },
+      "vix_low": {
+       "trades": 205,
+       "total_inr": 34043,
+       "win_pct": 74.6
+      },
+      "vix_mid": {
+       "trades": 111,
+       "total_inr": -7271,
+       "win_pct": 73.9
+      },
+      "monthly_expiry_week": {
+       "trades": 141,
+       "total_inr": -43961,
+       "win_pct": 70.2
+      },
+      "other_weeks": {
+       "trades": 310,
+       "total_inr": 93113,
+       "win_pct": 78.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 451
+     },
+     "trades_over_1_1x_sl": 1
+    }
+   },
+   "oos": {
+    "table": {
+     "base": {
+      "fit": {
+       "trades": 200,
+       "net_inr": -43349,
+       "win_pct": 72.5
+      },
+      "oos": {
+       "trades": 251,
+       "net_inr": 92502,
+       "win_pct": 78.9
+      }
+     },
+     "delta=0.12": {
+      "fit": {
+       "trades": 200,
+       "net_inr": -73347,
+       "win_pct": 64.0
+      },
+      "oos": {
+       "trades": 251,
+       "net_inr": 42692,
+       "win_pct": 86.5
+      }
+     },
+     "delta=0.24": {
+      "fit": {
+       "trades": 192,
+       "net_inr": -43789,
+       "win_pct": 69.3
+      },
+      "oos": {
+       "trades": 251,
+       "net_inr": 106540,
+       "win_pct": 72.9
+      }
+     },
+     "delta=0.3": {
+      "fit": {
+       "trades": 174,
+       "net_inr": -38390,
+       "win_pct": 64.9
+      },
+      "oos": {
+       "trades": 251,
+       "net_inr": 95217,
+       "win_pct": 66.9
+      }
+     },
+     "sl=8000": {
+      "fit": {
+       "trades": 200,
+       "net_inr": -43349,
+       "win_pct": 72.5
+      },
+      "oos": {
+       "trades": 251,
+       "net_inr": 92502,
+       "win_pct": 78.9
+      }
+     },
+     "sl=18000": {
+      "fit": {
+       "trades": 200,
+       "net_inr": -43349,
+       "win_pct": 72.5
+      },
+      "oos": {
+       "trades": 251,
+       "net_inr": 92502,
+       "win_pct": 78.9
+      }
+     },
+     "sl=26000": {
+      "fit": {
+       "trades": 200,
+       "net_inr": -43349,
+       "win_pct": 72.5
+      },
+      "oos": {
+       "trades": 251,
+       "net_inr": 92502,
+       "win_pct": 78.9
+      }
+     }
+    },
+    "chosen": {
+     "set": "delta=0.3",
+     "fit": {
+      "trades": 174,
+      "net_inr": -38390,
+      "win_pct": 64.9
+     },
+     "oos": {
+      "trades": 251,
+      "net_inr": 95217,
+      "win_pct": 66.9
+     }
+    },
+    "base": {
+     "fit": {
+      "trades": 200,
+      "net_inr": -43349,
+      "win_pct": 72.5
+     },
+     "oos": {
+      "trades": 251,
+      "net_inr": 92502,
+      "win_pct": 78.9
+     }
+    },
+    "sets_positive_in_both": "0/7",
+    "sets_positive_oos": "7/7"
+   }
+  },
+  "NIFTY/weekly0/condor": {
+   "sets": {
+    "base": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1
+     },
+     "trades": 228,
+     "train": {
+      "trades": 109,
+      "win_pct": 45.9,
+      "avg_inr": -941.0,
+      "avg_r": -0.422,
+      "total_inr": -102529.0,
+      "max_dd_inr": 107969.0,
+      "worst_inr": -8122.0,
+      "worst_vs_sl": 1.86,
+      "costs_inr": 108356.0
+     },
+     "test": {
+      "trades": 119,
+      "win_pct": 52.9,
+      "avg_inr": -641.0,
+      "avg_r": -0.298,
+      "total_inr": -76238.0,
+      "max_dd_inr": 81055.0,
+      "worst_inr": -9768.0,
+      "worst_vs_sl": 1.27,
+      "costs_inr": 118261.0
+     },
+     "walk_forward_total": -178766.0,
+     "years": {
+      "2019": -18835,
+      "2020": -20647,
+      "2021": -3187,
+      "2022": -53269,
+      "2023": -21608,
+      "2024": -34405,
+      "2025": 8771,
+      "2026": -28996
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 67,
+       "total_inr": -96446,
+       "win_pct": 40.3
+      },
+      "vix_low": {
+       "trades": 112,
+       "total_inr": -69324,
+       "win_pct": 53.6
+      },
+      "vix_mid": {
+       "trades": 49,
+       "total_inr": -12998,
+       "win_pct": 53.1
+      },
+      "monthly_expiry_week": {
+       "trades": 59,
+       "total_inr": -30988,
+       "win_pct": 54.2
+      },
+      "other_weeks": {
+       "trades": 169,
+       "total_inr": -147780,
+       "win_pct": 47.9
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 228
+     },
+     "trades_over_1_1x_sl": 65
+    },
+    "short_delta=0.2": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "short_delta": 0.2
+     },
+     "trades": 81,
+     "train": {
+      "trades": 38,
+      "win_pct": 71.1,
+      "avg_inr": 47.0,
+      "avg_r": -0.138,
+      "total_inr": 1792.0,
+      "max_dd_inr": 9434.0,
+      "worst_inr": -3594.0,
+      "worst_vs_sl": 2.59,
+      "costs_inr": 35986.0
+     },
+     "test": {
+      "trades": 43,
+      "win_pct": 58.1,
+      "avg_inr": -682.0,
+      "avg_r": -0.475,
+      "total_inr": -29320.0,
+      "max_dd_inr": 37440.0,
+      "worst_inr": -3666.0,
+      "worst_vs_sl": 2.65,
+      "costs_inr": 41497.0
+     },
+     "walk_forward_total": -27528.0,
+     "years": {
+      "2019": -4904,
+      "2020": 9378,
+      "2021": -777,
+      "2022": -552,
+      "2023": 1829,
+      "2024": -19478,
+      "2025": -12241,
+      "2026": 570
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 3,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 29,
+       "total_inr": 3430,
+       "win_pct": 72.4
+      },
+      "vix_low": {
+       "trades": 35,
+       "total_inr": -18916,
+       "win_pct": 60.0
+      },
+      "vix_mid": {
+       "trades": 17,
+       "total_inr": -12042,
+       "win_pct": 58.8
+      },
+      "monthly_expiry_week": {
+       "trades": 22,
+       "total_inr": -14037,
+       "win_pct": 59.1
+      },
+      "other_weeks": {
+       "trades": 59,
+       "total_inr": -13492,
+       "win_pct": 66.1
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 81
+     },
+     "trades_over_1_1x_sl": 23
+    },
+    "short_delta=0.25": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "short_delta": 0.25
+     },
+     "trades": 174,
+     "train": {
+      "trades": 94,
+      "win_pct": 53.2,
+      "avg_inr": -496.0,
+      "avg_r": -0.349,
+      "total_inr": -46580.0,
+      "max_dd_inr": 47601.0,
+      "worst_inr": -6114.0,
+      "worst_vs_sl": 2.33,
+      "costs_inr": 91460.0
+     },
+     "test": {
+      "trades": 80,
+      "win_pct": 47.5,
+      "avg_inr": -930.0,
+      "avg_r": -0.568,
+      "total_inr": -74407.0,
+      "max_dd_inr": 76541.0,
+      "worst_inr": -5977.0,
+      "worst_vs_sl": 2.15,
+      "costs_inr": 79774.0
+     },
+     "walk_forward_total": -120987.0,
+     "years": {
+      "2019": -11865,
+      "2020": -5338,
+      "2021": -12782,
+      "2022": -17616,
+      "2023": -11431,
+      "2024": -40625,
+      "2025": -13951,
+      "2026": -8401
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 0,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 54,
+       "total_inr": 854,
+       "win_pct": 63.0
+      },
+      "vix_low": {
+       "trades": 84,
+       "total_inr": -77037,
+       "win_pct": 50.0
+      },
+      "vix_mid": {
+       "trades": 36,
+       "total_inr": -44804,
+       "win_pct": 33.3
+      },
+      "monthly_expiry_week": {
+       "trades": 41,
+       "total_inr": -28373,
+       "win_pct": 58.5
+      },
+      "other_weeks": {
+       "trades": 133,
+       "total_inr": -92614,
+       "win_pct": 48.1
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 174
+     },
+     "trades_over_1_1x_sl": 52
+    },
+    "short_delta=0.35": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "short_delta": 0.35
+     },
+     "trades": 296,
+     "train": {
+      "trades": 149,
+      "win_pct": 40.9,
+      "avg_inr": -953.0,
+      "avg_r": -0.381,
+      "total_inr": -141931.0,
+      "max_dd_inr": 149134.0,
+      "worst_inr": -10382.0,
+      "worst_vs_sl": 1.77,
+      "costs_inr": 153604.0
+     },
+     "test": {
+      "trades": 147,
+      "win_pct": 53.1,
+      "avg_inr": -544.0,
+      "avg_r": -0.194,
+      "total_inr": -79959.0,
+      "max_dd_inr": 100468.0,
+      "worst_inr": -12241.0,
+      "worst_vs_sl": 1.37,
+      "costs_inr": 149484.0
+     },
+     "walk_forward_total": -221890.0,
+     "years": {
+      "2019": -18807,
+      "2020": -22347,
+      "2021": -27515,
+      "2022": -42965,
+      "2023": -2658,
+      "2024": -47195,
+      "2025": -15752,
+      "2026": -14353
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 0,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 91,
+       "total_inr": -77167,
+       "win_pct": 44.0
+      },
+      "vix_low": {
+       "trades": 137,
+       "total_inr": -100143,
+       "win_pct": 49.6
+      },
+      "vix_mid": {
+       "trades": 68,
+       "total_inr": -44579,
+       "win_pct": 45.6
+      },
+      "monthly_expiry_week": {
+       "trades": 85,
+       "total_inr": -88771,
+       "win_pct": 41.2
+      },
+      "other_weeks": {
+       "trades": 211,
+       "total_inr": -133119,
+       "win_pct": 49.3
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 296
+     },
+     "trades_over_1_1x_sl": 69
+    },
+    "sl_mult=0.5": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl_mult": 0.5
+     },
+     "trades": 228,
+     "train": {
+      "trades": 109,
+      "win_pct": 45.9,
+      "avg_inr": -941.0,
+      "avg_r": -0.843,
+      "total_inr": -102529.0,
+      "max_dd_inr": 107969.0,
+      "worst_inr": -8122.0,
+      "worst_vs_sl": 3.73,
+      "costs_inr": 108356.0
+     },
+     "test": {
+      "trades": 119,
+      "win_pct": 52.9,
+      "avg_inr": -641.0,
+      "avg_r": -0.595,
+      "total_inr": -76238.0,
+      "max_dd_inr": 81055.0,
+      "worst_inr": -9768.0,
+      "worst_vs_sl": 2.55,
+      "costs_inr": 118261.0
+     },
+     "walk_forward_total": -178766.0,
+     "years": {
+      "2019": -18835,
+      "2020": -20647,
+      "2021": -3187,
+      "2022": -53269,
+      "2023": -21608,
+      "2024": -34405,
+      "2025": 8771,
+      "2026": -28996
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 67,
+       "total_inr": -96446,
+       "win_pct": 40.3
+      },
+      "vix_low": {
+       "trades": 112,
+       "total_inr": -69324,
+       "win_pct": 53.6
+      },
+      "vix_mid": {
+       "trades": 49,
+       "total_inr": -12998,
+       "win_pct": 53.1
+      },
+      "monthly_expiry_week": {
+       "trades": 59,
+       "total_inr": -30988,
+       "win_pct": 54.2
+      },
+      "other_weeks": {
+       "trades": 169,
+       "total_inr": -147780,
+       "win_pct": 47.9
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 228
+     },
+     "trades_over_1_1x_sl": 91
+    },
+    "sl_mult=1.5": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl_mult": 1.5
+     },
+     "trades": 228,
+     "train": {
+      "trades": 109,
+      "win_pct": 45.9,
+      "avg_inr": -941.0,
+      "avg_r": -0.281,
+      "total_inr": -102529.0,
+      "max_dd_inr": 107969.0,
+      "worst_inr": -8122.0,
+      "worst_vs_sl": 1.24,
+      "costs_inr": 108356.0
+     },
+     "test": {
+      "trades": 119,
+      "win_pct": 52.9,
+      "avg_inr": -641.0,
+      "avg_r": -0.198,
+      "total_inr": -76238.0,
+      "max_dd_inr": 81055.0,
+      "worst_inr": -9768.0,
+      "worst_vs_sl": 0.85,
+      "costs_inr": 118261.0
+     },
+     "walk_forward_total": -178766.0,
+     "years": {
+      "2019": -18835,
+      "2020": -20647,
+      "2021": -3187,
+      "2022": -53269,
+      "2023": -21608,
+      "2024": -34405,
+      "2025": 8771,
+      "2026": -28996
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 67,
+       "total_inr": -96446,
+       "win_pct": 40.3
+      },
+      "vix_low": {
+       "trades": 112,
+       "total_inr": -69324,
+       "win_pct": 53.6
+      },
+      "vix_mid": {
+       "trades": 49,
+       "total_inr": -12998,
+       "win_pct": 53.1
+      },
+      "monthly_expiry_week": {
+       "trades": 59,
+       "total_inr": -30988,
+       "win_pct": 54.2
+      },
+      "other_weeks": {
+       "trades": 169,
+       "total_inr": -147780,
+       "win_pct": 47.9
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 228
+     },
+     "trades_over_1_1x_sl": 42
+    },
+    "sl_mult=2": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 0,
+      "entry_hi": 0,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl_mult": 2.0
+     },
+     "trades": 228,
+     "train": {
+      "trades": 109,
+      "win_pct": 45.9,
+      "avg_inr": -941.0,
+      "avg_r": -0.211,
+      "total_inr": -102529.0,
+      "max_dd_inr": 107969.0,
+      "worst_inr": -8122.0,
+      "worst_vs_sl": 0.93,
+      "costs_inr": 108356.0
+     },
+     "test": {
+      "trades": 119,
+      "win_pct": 52.9,
+      "avg_inr": -641.0,
+      "avg_r": -0.149,
+      "total_inr": -76238.0,
+      "max_dd_inr": 81055.0,
+      "worst_inr": -9768.0,
+      "worst_vs_sl": 0.64,
+      "costs_inr": 118261.0
+     },
+     "walk_forward_total": -178766.0,
+     "years": {
+      "2019": -18835,
+      "2020": -20647,
+      "2021": -3187,
+      "2022": -53269,
+      "2023": -21608,
+      "2024": -34405,
+      "2025": 8771,
+      "2026": -28996
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 67,
+       "total_inr": -96446,
+       "win_pct": 40.3
+      },
+      "vix_low": {
+       "trades": 112,
+       "total_inr": -69324,
+       "win_pct": 53.6
+      },
+      "vix_mid": {
+       "trades": 49,
+       "total_inr": -12998,
+       "win_pct": 53.1
+      },
+      "monthly_expiry_week": {
+       "trades": 59,
+       "total_inr": -30988,
+       "win_pct": 54.2
+      },
+      "other_weeks": {
+       "trades": 169,
+       "total_inr": -147780,
+       "win_pct": 47.9
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY0": 228
+     },
+     "trades_over_1_1x_sl": 16
+    }
+   },
+   "oos": {
+    "table": {
+     "base": {
+      "fit": {
+       "trades": 84,
+       "net_inr": -49259,
+       "win_pct": 48.8
+      },
+      "oos": {
+       "trades": 144,
+       "net_inr": -129508,
+       "win_pct": 50.0
+      }
+     },
+     "short_delta=0.2": {
+      "fit": {
+       "trades": 26,
+       "net_inr": 2344,
+       "win_pct": 69.2
+      },
+      "oos": {
+       "trades": 55,
+       "net_inr": -29872,
+       "win_pct": 61.8
+      }
+     },
+     "short_delta=0.25": {
+      "fit": {
+       "trades": 66,
+       "net_inr": -28964,
+       "win_pct": 53.0
+      },
+      "oos": {
+       "trades": 108,
+       "net_inr": -92023,
+       "win_pct": 49.1
+      }
+     },
+     "short_delta=0.35": {
+      "fit": {
+       "trades": 106,
+       "net_inr": -98966,
+       "win_pct": 38.7
+      },
+      "oos": {
+       "trades": 190,
+       "net_inr": -122923,
+       "win_pct": 51.6
+      }
+     },
+     "sl_mult=0.5": {
+      "fit": {
+       "trades": 84,
+       "net_inr": -49259,
+       "win_pct": 48.8
+      },
+      "oos": {
+       "trades": 144,
+       "net_inr": -129508,
+       "win_pct": 50.0
+      }
+     },
+     "sl_mult=1.5": {
+      "fit": {
+       "trades": 84,
+       "net_inr": -49259,
+       "win_pct": 48.8
+      },
+      "oos": {
+       "trades": 144,
+       "net_inr": -129508,
+       "win_pct": 50.0
+      }
+     },
+     "sl_mult=2": {
+      "fit": {
+       "trades": 84,
+       "net_inr": -49259,
+       "win_pct": 48.8
+      },
+      "oos": {
+       "trades": 144,
+       "net_inr": -129508,
+       "win_pct": 50.0
+      }
+     }
+    },
+    "chosen": {
+     "set": "short_delta=0.2",
+     "fit": {
+      "trades": 26,
+      "net_inr": 2344,
+      "win_pct": 69.2
+     },
+     "oos": {
+      "trades": 55,
+      "net_inr": -29872,
+      "win_pct": 61.8
+     }
+    },
+    "base": {
+     "fit": {
+      "trades": 84,
+      "net_inr": -49259,
+      "win_pct": 48.8
+     },
+     "oos": {
+      "trades": 144,
+      "net_inr": -129508,
+      "win_pct": 50.0
+     }
+    },
+    "sets_positive_in_both": "0/7",
+    "sets_positive_oos": "0/7"
+   }
+  },
+  "NIFTY/weekly2/strangle_d18": {
+   "sets": {
+    "base": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1
+     },
+     "trades": 371,
+     "train": {
+      "trades": 238,
+      "win_pct": 71.4,
+      "avg_inr": 388.0,
+      "avg_r": 0.03,
+      "total_inr": 92243.0,
+      "max_dd_inr": 86598.0,
+      "worst_inr": -36186.0,
+      "worst_vs_sl": 2.78,
+      "costs_inr": 128906.0
+     },
+     "test": {
+      "trades": 133,
+      "win_pct": 77.4,
+      "avg_inr": 1350.0,
+      "avg_r": 0.104,
+      "total_inr": 179523.0,
+      "max_dd_inr": 77204.0,
+      "worst_inr": -21066.0,
+      "worst_vs_sl": 1.62,
+      "costs_inr": 71169.0
+     },
+     "walk_forward_total": 271764.0,
+     "years": {
+      "2019": 29430,
+      "2020": 48051,
+      "2021": 19970,
+      "2022": 10260,
+      "2023": 53758,
+      "2024": 46357,
+      "2025": 79407,
+      "2026": 0
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 116,
+       "total_inr": 87224,
+       "win_pct": 72.4
+      },
+      "vix_low": {
+       "trades": 154,
+       "total_inr": 39152,
+       "win_pct": 70.8
+      },
+      "vix_mid": {
+       "trades": 101,
+       "total_inr": 145389,
+       "win_pct": 79.2
+      },
+      "monthly_expiry_week": {
+       "trades": 124,
+       "total_inr": 33462,
+       "win_pct": 73.4
+      },
+      "other_weeks": {
+       "trades": 247,
+       "total_inr": 238303,
+       "win_pct": 73.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 355,
+      "SL": 12,
+      "TP": 4
+     },
+     "trades_over_1_1x_sl": 12
+    },
+    "delta=0.12": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "delta": 0.12
+     },
+     "trades": 371,
+     "train": {
+      "trades": 238,
+      "win_pct": 80.7,
+      "avg_inr": 406.0,
+      "avg_r": 0.031,
+      "total_inr": 96617.0,
+      "max_dd_inr": 37478.0,
+      "worst_inr": -24570.0,
+      "worst_vs_sl": 1.89,
+      "costs_inr": 116545.0
+     },
+     "test": {
+      "trades": 133,
+      "win_pct": 81.2,
+      "avg_inr": 921.0,
+      "avg_r": 0.071,
+      "total_inr": 122555.0,
+      "max_dd_inr": 43146.0,
+      "worst_inr": -17186.0,
+      "worst_vs_sl": 1.32,
+      "costs_inr": 66550.0
+     },
+     "walk_forward_total": 219171.0,
+     "years": {
+      "2019": 20658,
+      "2020": 32667,
+      "2021": 26180,
+      "2022": 23224,
+      "2023": 34846,
+      "2024": 23870,
+      "2025": 63839,
+      "2026": 0
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 116,
+       "total_inr": 86036,
+       "win_pct": 82.8
+      },
+      "vix_low": {
+       "trades": 154,
+       "total_inr": 26159,
+       "win_pct": 75.3
+      },
+      "vix_mid": {
+       "trades": 101,
+       "total_inr": 106976,
+       "win_pct": 87.1
+      },
+      "monthly_expiry_week": {
+       "trades": 124,
+       "total_inr": 37621,
+       "win_pct": 82.3
+      },
+      "other_weeks": {
+       "trades": 247,
+       "total_inr": 181550,
+       "win_pct": 80.2
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 363,
+      "SL": 7,
+      "TP": 1
+     },
+     "trades_over_1_1x_sl": 5
+    },
+    "delta=0.24": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "delta": 0.24
+     },
+     "trades": 371,
+     "train": {
+      "trades": 238,
+      "win_pct": 65.5,
+      "avg_inr": 405.0,
+      "avg_r": 0.031,
+      "total_inr": 96284.0,
+      "max_dd_inr": 98627.0,
+      "worst_inr": -34354.0,
+      "worst_vs_sl": 2.64,
+      "costs_inr": 139609.0
+     },
+     "test": {
+      "trades": 133,
+      "win_pct": 73.7,
+      "avg_inr": 1604.0,
+      "avg_r": 0.123,
+      "total_inr": 213316.0,
+      "max_dd_inr": 104138.0,
+      "worst_inr": -27263.0,
+      "worst_vs_sl": 2.1,
+      "costs_inr": 79087.0
+     },
+     "walk_forward_total": 309600.0,
+     "years": {
+      "2019": 17185,
+      "2020": 57705,
+      "2021": 8761,
+      "2022": 23553,
+      "2023": 59533,
+      "2024": 45359,
+      "2025": 108424,
+      "2026": 0
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 116,
+       "total_inr": 93599,
+       "win_pct": 68.1
+      },
+      "vix_low": {
+       "trades": 154,
+       "total_inr": 34382,
+       "win_pct": 66.2
+      },
+      "vix_mid": {
+       "trades": 101,
+       "total_inr": 181619,
+       "win_pct": 72.3
+      },
+      "monthly_expiry_week": {
+       "trades": 124,
+       "total_inr": 60247,
+       "win_pct": 71.0
+      },
+      "other_weeks": {
+       "trades": 247,
+       "total_inr": 249353,
+       "win_pct": 67.2
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 350,
+      "SL": 17,
+      "TP": 4
+     },
+     "trades_over_1_1x_sl": 14
+    },
+    "delta=0.3": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "delta": 0.3
+     },
+     "trades": 371,
+     "train": {
+      "trades": 238,
+      "win_pct": 59.7,
+      "avg_inr": 400.0,
+      "avg_r": 0.031,
+      "total_inr": 95291.0,
+      "max_dd_inr": 122929.0,
+      "worst_inr": -46203.0,
+      "worst_vs_sl": 3.55,
+      "costs_inr": 154519.0
+     },
+     "test": {
+      "trades": 133,
+      "win_pct": 62.4,
+      "avg_inr": 1611.0,
+      "avg_r": 0.124,
+      "total_inr": 214208.0,
+      "max_dd_inr": 116632.0,
+      "worst_inr": -28814.0,
+      "worst_vs_sl": 2.22,
+      "costs_inr": 86894.0
+     },
+     "walk_forward_total": 309500.0,
+     "years": {
+      "2019": 24853,
+      "2020": 49838,
+      "2021": 13284,
+      "2022": 7870,
+      "2023": 53392,
+      "2024": 32896,
+      "2025": 127921,
+      "2026": 0
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 116,
+       "total_inr": 103405,
+       "win_pct": 61.2
+      },
+      "vix_low": {
+       "trades": 154,
+       "total_inr": 22162,
+       "win_pct": 57.8
+      },
+      "vix_mid": {
+       "trades": 101,
+       "total_inr": 183932,
+       "win_pct": 64.4
+      },
+      "monthly_expiry_week": {
+       "trades": 124,
+       "total_inr": 52582,
+       "win_pct": 61.3
+      },
+      "other_weeks": {
+       "trades": 247,
+       "total_inr": 256917,
+       "win_pct": 60.3
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 338,
+      "SL": 21,
+      "TP": 12
+     },
+     "trades_over_1_1x_sl": 18
+    },
+    "sl=8000": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl": 8000
+     },
+     "trades": 371,
+     "train": {
+      "trades": 238,
+      "win_pct": 71.4,
+      "avg_inr": 415.0,
+      "avg_r": 0.052,
+      "total_inr": 98753.0,
+      "max_dd_inr": 86598.0,
+      "worst_inr": -36186.0,
+      "worst_vs_sl": 4.52,
+      "costs_inr": 128179.0
+     },
+     "test": {
+      "trades": 133,
+      "win_pct": 77.4,
+      "avg_inr": 1364.0,
+      "avg_r": 0.17,
+      "total_inr": 181408.0,
+      "max_dd_inr": 77204.0,
+      "worst_inr": -21066.0,
+      "worst_vs_sl": 2.63,
+      "costs_inr": 70472.0
+     },
+     "walk_forward_total": 280160.0,
+     "years": {
+      "2019": 29430,
+      "2020": 54502,
+      "2021": 19970,
+      "2022": 10260,
+      "2023": 52768,
+      "2024": 46357,
+      "2025": 82283,
+      "2026": 0
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 116,
+       "total_inr": 93734,
+       "win_pct": 72.4
+      },
+      "vix_low": {
+       "trades": 154,
+       "total_inr": 41037,
+       "win_pct": 70.8
+      },
+      "vix_mid": {
+       "trades": 101,
+       "total_inr": 145389,
+       "win_pct": 79.2
+      },
+      "monthly_expiry_week": {
+       "trades": 124,
+       "total_inr": 32531,
+       "win_pct": 73.4
+      },
+      "other_weeks": {
+       "trades": 247,
+       "total_inr": 247629,
+       "win_pct": 73.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 340,
+      "SL": 27,
+      "TP": 4
+     },
+     "trades_over_1_1x_sl": 27
+    },
+    "sl=18000": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl": 18000
+     },
+     "trades": 371,
+     "train": {
+      "trades": 238,
+      "win_pct": 71.4,
+      "avg_inr": 387.0,
+      "avg_r": 0.021,
+      "total_inr": 92082.0,
+      "max_dd_inr": 86297.0,
+      "worst_inr": -36186.0,
+      "worst_vs_sl": 2.01,
+      "costs_inr": 130334.0
+     },
+     "test": {
+      "trades": 133,
+      "win_pct": 77.4,
+      "avg_inr": 1371.0,
+      "avg_r": 0.076,
+      "total_inr": 182355.0,
+      "max_dd_inr": 77204.0,
+      "worst_inr": -21066.0,
+      "worst_vs_sl": 1.17,
+      "costs_inr": 72124.0
+     },
+     "walk_forward_total": 274436.0,
+     "years": {
+      "2019": 29430,
+      "2020": 47590,
+      "2021": 20271,
+      "2022": 10260,
+      "2023": 53758,
+      "2024": 49189,
+      "2025": 79407,
+      "2026": 0
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 116,
+       "total_inr": 87478,
+       "win_pct": 72.4
+      },
+      "vix_low": {
+       "trades": 154,
+       "total_inr": 42032,
+       "win_pct": 70.8
+      },
+      "vix_mid": {
+       "trades": 101,
+       "total_inr": 144927,
+       "win_pct": 79.2
+      },
+      "monthly_expiry_week": {
+       "trades": 124,
+       "total_inr": 33462,
+       "win_pct": 73.4
+      },
+      "other_weeks": {
+       "trades": 247,
+       "total_inr": 240975,
+       "win_pct": 73.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 361,
+      "SL": 6,
+      "TP": 4
+     },
+     "trades_over_1_1x_sl": 4
+    },
+    "sl=26000": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl": 26000
+     },
+     "trades": 371,
+     "train": {
+      "trades": 238,
+      "win_pct": 71.4,
+      "avg_inr": 387.0,
+      "avg_r": 0.015,
+      "total_inr": 92082.0,
+      "max_dd_inr": 86297.0,
+      "worst_inr": -36186.0,
+      "worst_vs_sl": 1.39,
+      "costs_inr": 130334.0
+     },
+     "test": {
+      "trades": 133,
+      "win_pct": 77.4,
+      "avg_inr": 1371.0,
+      "avg_r": 0.053,
+      "total_inr": 182355.0,
+      "max_dd_inr": 77204.0,
+      "worst_inr": -21066.0,
+      "worst_vs_sl": 0.81,
+      "costs_inr": 72124.0
+     },
+     "walk_forward_total": 274436.0,
+     "years": {
+      "2019": 29430,
+      "2020": 47590,
+      "2021": 20271,
+      "2022": 10260,
+      "2023": 53758,
+      "2024": 49189,
+      "2025": 79407,
+      "2026": 0
+     },
+     "verdict": "survives",
+     "preset_rule": true,
+     "positive_years_2019_26": 7,
+     "n_years": 8,
+     "passes": true,
+     "regimes": {
+      "vix_high": {
+       "trades": 116,
+       "total_inr": 87478,
+       "win_pct": 72.4
+      },
+      "vix_low": {
+       "trades": 154,
+       "total_inr": 42032,
+       "win_pct": 70.8
+      },
+      "vix_mid": {
+       "trades": 101,
+       "total_inr": 144927,
+       "win_pct": 79.2
+      },
+      "monthly_expiry_week": {
+       "trades": 124,
+       "total_inr": 33462,
+       "win_pct": 73.4
+      },
+      "other_weeks": {
+       "trades": 247,
+       "total_inr": 240975,
+       "win_pct": 73.7
+      }
+     },
+     "exit_reasons": {
+      "EXPIRY": 366,
+      "TP": 4,
+      "SL": 1
+     },
+     "trades_over_1_1x_sl": 1
+    }
+   },
+   "oos": {
+    "table": {
+     "base": {
+      "fit": {
+       "trades": 190,
+       "net_inr": 81983,
+       "win_pct": 71.6
+      },
+      "oos": {
+       "trades": 181,
+       "net_inr": 189783,
+       "win_pct": 75.7
+      }
+     },
+     "delta=0.12": {
+      "fit": {
+       "trades": 190,
+       "net_inr": 73392,
+       "win_pct": 80.5
+      },
+      "oos": {
+       "trades": 181,
+       "net_inr": 145779,
+       "win_pct": 81.2
+      }
+     },
+     "delta=0.24": {
+      "fit": {
+       "trades": 190,
+       "net_inr": 72732,
+       "win_pct": 65.8
+      },
+      "oos": {
+       "trades": 181,
+       "net_inr": 236869,
+       "win_pct": 71.3
+      }
+     },
+     "delta=0.3": {
+      "fit": {
+       "trades": 190,
+       "net_inr": 87421,
+       "win_pct": 59.5
+      },
+      "oos": {
+       "trades": 181,
+       "net_inr": 222078,
+       "win_pct": 61.9
+      }
+     },
+     "sl=8000": {
+      "fit": {
+       "trades": 190,
+       "net_inr": 88492,
+       "win_pct": 71.6
+      },
+      "oos": {
+       "trades": 181,
+       "net_inr": 191668,
+       "win_pct": 75.7
+      }
+     },
+     "sl=18000": {
+      "fit": {
+       "trades": 190,
+       "net_inr": 81822,
+       "win_pct": 71.6
+      },
+      "oos": {
+       "trades": 181,
+       "net_inr": 192615,
+       "win_pct": 75.7
+      }
+     },
+     "sl=26000": {
+      "fit": {
+       "trades": 190,
+       "net_inr": 81822,
+       "win_pct": 71.6
+      },
+      "oos": {
+       "trades": 181,
+       "net_inr": 192615,
+       "win_pct": 75.7
+      }
+     }
+    },
+    "chosen": {
+     "set": "sl=8000",
+     "fit": {
+      "trades": 190,
+      "net_inr": 88492,
+      "win_pct": 71.6
+     },
+     "oos": {
+      "trades": 181,
+      "net_inr": 191668,
+      "win_pct": 75.7
+     }
+    },
+    "base": {
+     "fit": {
+      "trades": 190,
+      "net_inr": 81983,
+      "win_pct": 71.6
+     },
+     "oos": {
+      "trades": 181,
+      "net_inr": 189783,
+      "win_pct": 75.7
+     }
+    },
+    "sets_positive_in_both": "7/7",
+    "sets_positive_oos": "7/7"
+   }
+  },
+  "NIFTY/weekly2/condor": {
+   "sets": {
+    "base": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1
+     },
+     "trades": 256,
+     "train": {
+      "trades": 157,
+      "win_pct": 52.2,
+      "avg_inr": -928.0,
+      "avg_r": -0.285,
+      "total_inr": -145764.0,
+      "max_dd_inr": 163727.0,
+      "worst_inr": -15893.0,
+      "worst_vs_sl": 0.88,
+      "costs_inr": 185386.0
+     },
+     "test": {
+      "trades": 99,
+      "win_pct": 64.6,
+      "avg_inr": -19.0,
+      "avg_r": -0.09,
+      "total_inr": -1855.0,
+      "max_dd_inr": 62128.0,
+      "worst_inr": -9921.0,
+      "worst_vs_sl": 1.63,
+      "costs_inr": 113324.0
+     },
+     "walk_forward_total": -147619.0,
+     "years": {
+      "2019": -5244,
+      "2020": -10555,
+      "2021": -62382,
+      "2022": -51449,
+      "2023": -4483,
+      "2024": 13622,
+      "2025": -10994,
+      "2026": 0
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 77,
+       "total_inr": -35313,
+       "win_pct": 58.4
+      },
+      "vix_low": {
+       "trades": 103,
+       "total_inr": -84297,
+       "win_pct": 54.4
+      },
+      "vix_mid": {
+       "trades": 76,
+       "total_inr": -28009,
+       "win_pct": 59.2
+      },
+      "monthly_expiry_week": {
+       "trades": 81,
+       "total_inr": -8472,
+       "win_pct": 63.0
+      },
+      "other_weeks": {
+       "trades": 175,
+       "total_inr": -139147,
+       "win_pct": 54.3
+      }
+     },
+     "exit_reasons": {
+      "TP50": 146,
+      "SL100": 58,
+      "EXPIRY": 51,
+      "15DTE": 1
+     },
+     "trades_over_1_1x_sl": 64
+    },
+    "short_delta=0.2": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "short_delta": 0.2
+     },
+     "trades": 127,
+     "train": {
+      "trades": 75,
+      "win_pct": 38.7,
+      "avg_inr": -777.0,
+      "avg_r": -0.566,
+      "total_inr": -58256.0,
+      "max_dd_inr": 58279.0,
+      "worst_inr": -3713.0,
+      "worst_vs_sl": 2.93,
+      "costs_inr": 96990.0
+     },
+     "test": {
+      "trades": 52,
+      "win_pct": 42.3,
+      "avg_inr": -709.0,
+      "avg_r": -0.423,
+      "total_inr": -36842.0,
+      "max_dd_inr": 37292.0,
+      "worst_inr": -4197.0,
+      "worst_vs_sl": 0.9,
+      "costs_inr": 67922.0
+     },
+     "walk_forward_total": -95099.0,
+     "years": {
+      "2019": -17573,
+      "2020": 1081,
+      "2021": -15985,
+      "2022": -17489,
+      "2023": -11897,
+      "2024": -13440,
+      "2025": -11505,
+      "2026": 0
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 45,
+       "total_inr": -25613,
+       "win_pct": 40.0
+      },
+      "vix_low": {
+       "trades": 44,
+       "total_inr": -43787,
+       "win_pct": 36.4
+      },
+      "vix_mid": {
+       "trades": 38,
+       "total_inr": -25698,
+       "win_pct": 44.7
+      },
+      "monthly_expiry_week": {
+       "trades": 36,
+       "total_inr": -28334,
+       "win_pct": 30.6
+      },
+      "other_weeks": {
+       "trades": 91,
+       "total_inr": -66764,
+       "win_pct": 44.0
+      }
+     },
+     "exit_reasons": {
+      "TP50": 89,
+      "SL100": 23,
+      "EXPIRY": 14,
+      "15DTE": 1
+     },
+     "trades_over_1_1x_sl": 30
+    },
+    "short_delta=0.25": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "short_delta": 0.25
+     },
+     "trades": 208,
+     "train": {
+      "trades": 137,
+      "win_pct": 46.0,
+      "avg_inr": -1036.0,
+      "avg_r": -0.548,
+      "total_inr": -141915.0,
+      "max_dd_inr": 147138.0,
+      "worst_inr": -7146.0,
+      "worst_vs_sl": 1.65,
+      "costs_inr": 168138.0
+     },
+     "test": {
+      "trades": 71,
+      "win_pct": 57.7,
+      "avg_inr": -641.0,
+      "avg_r": -0.261,
+      "total_inr": -45542.0,
+      "max_dd_inr": 53662.0,
+      "worst_inr": -7998.0,
+      "worst_vs_sl": 1.88,
+      "costs_inr": 84509.0
+     },
+     "walk_forward_total": -187456.0,
+     "years": {
+      "2019": -27123,
+      "2020": 3491,
+      "2021": -56966,
+      "2022": -32562,
+      "2023": -10446,
+      "2024": -19009,
+      "2025": -16087,
+      "2026": 0
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 64,
+       "total_inr": -41387,
+       "win_pct": 51.6
+      },
+      "vix_low": {
+       "trades": 83,
+       "total_inr": -87684,
+       "win_pct": 47.0
+      },
+      "vix_mid": {
+       "trades": 61,
+       "total_inr": -58386,
+       "win_pct": 52.5
+      },
+      "monthly_expiry_week": {
+       "trades": 66,
+       "total_inr": -60735,
+       "win_pct": 50.0
+      },
+      "other_weeks": {
+       "trades": 142,
+       "total_inr": -126722,
+       "win_pct": 50.0
+      }
+     },
+     "exit_reasons": {
+      "TP50": 122,
+      "SL100": 49,
+      "EXPIRY": 36,
+      "15DTE": 1
+     },
+     "trades_over_1_1x_sl": 56
+    },
+    "short_delta=0.35": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "short_delta": 0.35
+     },
+     "trades": 306,
+     "train": {
+      "trades": 186,
+      "win_pct": 48.4,
+      "avg_inr": -1117.0,
+      "avg_r": -0.248,
+      "total_inr": -207736.0,
+      "max_dd_inr": 237392.0,
+      "worst_inr": -19494.0,
+      "worst_vs_sl": 0.76,
+      "costs_inr": 213679.0
+     },
+     "test": {
+      "trades": 120,
+      "win_pct": 57.5,
+      "avg_inr": -38.0,
+      "avg_r": -0.061,
+      "total_inr": -4566.0,
+      "max_dd_inr": 60095.0,
+      "worst_inr": -11623.0,
+      "worst_vs_sl": 1.43,
+      "costs_inr": 135790.0
+     },
+     "walk_forward_total": -212302.0,
+     "years": {
+      "2019": -28550,
+      "2020": -50063,
+      "2021": -85895,
+      "2022": -24104,
+      "2023": -13142,
+      "2024": -3435,
+      "2025": 12011,
+      "2026": 0
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 94,
+       "total_inr": -56578,
+       "win_pct": 54.3
+      },
+      "vix_low": {
+       "trades": 123,
+       "total_inr": -144928,
+       "win_pct": 48.0
+      },
+      "vix_mid": {
+       "trades": 89,
+       "total_inr": -10796,
+       "win_pct": 55.1
+      },
+      "monthly_expiry_week": {
+       "trades": 93,
+       "total_inr": -30706,
+       "win_pct": 53.8
+      },
+      "other_weeks": {
+       "trades": 213,
+       "total_inr": -181596,
+       "win_pct": 51.2
+      }
+     },
+     "exit_reasons": {
+      "TP50": 149,
+      "EXPIRY": 95,
+      "SL100": 61,
+      "15DTE": 1
+     },
+     "trades_over_1_1x_sl": 69
+    },
+    "sl_mult=0.5": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl_mult": 0.5
+     },
+     "trades": 256,
+     "train": {
+      "trades": 157,
+      "win_pct": 51.0,
+      "avg_inr": -953.0,
+      "avg_r": -0.597,
+      "total_inr": -149641.0,
+      "max_dd_inr": 167604.0,
+      "worst_inr": -15893.0,
+      "worst_vs_sl": 1.77,
+      "costs_inr": 194423.0
+     },
+     "test": {
+      "trades": 99,
+      "win_pct": 63.6,
+      "avg_inr": -18.0,
+      "avg_r": -0.171,
+      "total_inr": -1740.0,
+      "max_dd_inr": 58676.0,
+      "worst_inr": -9921.0,
+      "worst_vs_sl": 3.26,
+      "costs_inr": 117090.0
+     },
+     "walk_forward_total": -151382.0,
+     "years": {
+      "2019": -7927,
+      "2020": -7550,
+      "2021": -63747,
+      "2022": -56223,
+      "2023": -2256,
+      "2024": 11845,
+      "2025": -11329,
+      "2026": 0
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 77,
+       "total_inr": -27717,
+       "win_pct": 58.4
+      },
+      "vix_low": {
+       "trades": 103,
+       "total_inr": -88442,
+       "win_pct": 52.4
+      },
+      "vix_mid": {
+       "trades": 76,
+       "total_inr": -35221,
+       "win_pct": 57.9
+      },
+      "monthly_expiry_week": {
+       "trades": 81,
+       "total_inr": -9747,
+       "win_pct": 63.0
+      },
+      "other_weeks": {
+       "trades": 175,
+       "total_inr": -141633,
+       "win_pct": 52.6
+      }
+     },
+     "exit_reasons": {
+      "TP50": 144,
+      "SL100": 85,
+      "EXPIRY": 26,
+      "15DTE": 1
+     },
+     "trades_over_1_1x_sl": 91
+    },
+    "sl_mult=1.5": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl_mult": 1.5
+     },
+     "trades": 256,
+     "train": {
+      "trades": 157,
+      "win_pct": 52.2,
+      "avg_inr": -949.0,
+      "avg_r": -0.196,
+      "total_inr": -149041.0,
+      "max_dd_inr": 167004.0,
+      "worst_inr": -15893.0,
+      "worst_vs_sl": 0.59,
+      "costs_inr": 184227.0
+     },
+     "test": {
+      "trades": 99,
+      "win_pct": 64.6,
+      "avg_inr": -66.0,
+      "avg_r": -0.07,
+      "total_inr": -6522.0,
+      "max_dd_inr": 63370.0,
+      "worst_inr": -10660.0,
+      "worst_vs_sl": 1.25,
+      "costs_inr": 111803.0
+     },
+     "walk_forward_total": -155563.0,
+     "years": {
+      "2019": -7145,
+      "2020": -10555,
+      "2021": -61954,
+      "2022": -53253,
+      "2023": -7908,
+      "2024": 12380,
+      "2025": -10994,
+      "2026": 0
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 77,
+       "total_inr": -35313,
+       "win_pct": 58.4
+      },
+      "vix_low": {
+       "trades": 103,
+       "total_inr": -88535,
+       "win_pct": 54.4
+      },
+      "vix_mid": {
+       "trades": 76,
+       "total_inr": -31714,
+       "win_pct": 59.2
+      },
+      "monthly_expiry_week": {
+       "trades": 81,
+       "total_inr": -8494,
+       "win_pct": 63.0
+      },
+      "other_weeks": {
+       "trades": 175,
+       "total_inr": -147069,
+       "win_pct": 54.3
+      }
+     },
+     "exit_reasons": {
+      "TP50": 146,
+      "EXPIRY": 84,
+      "SL100": 25,
+      "15DTE": 1
+     },
+     "trades_over_1_1x_sl": 33
+    },
+    "sl_mult=2": {
+     "params": {
+      "weekly": true,
+      "entry_lo": 2,
+      "entry_hi": 2,
+      "exit_dte": -1,
+      "unstable_dte": -1,
+      "sl_mult": 2.0
+     },
+     "trades": 256,
+     "train": {
+      "trades": 157,
+      "win_pct": 52.2,
+      "avg_inr": -955.0,
+      "avg_r": -0.147,
+      "total_inr": -149868.0,
+      "max_dd_inr": 167831.0,
+      "worst_inr": -15893.0,
+      "worst_vs_sl": 0.44,
+      "costs_inr": 183892.0
+     },
+     "test": {
+      "trades": 99,
+      "win_pct": 64.6,
+      "avg_inr": -65.0,
+      "avg_r": -0.053,
+      "total_inr": -6458.0,
+      "max_dd_inr": 63370.0,
+      "worst_inr": -10660.0,
+      "worst_vs_sl": 0.94,
+      "costs_inr": 111440.0
+     },
+     "walk_forward_total": -156327.0,
+     "years": {
+      "2019": -7145,
+      "2020": -10555,
+      "2021": -61954,
+      "2022": -54080,
+      "2023": -7908,
+      "2024": 12443,
+      "2025": -10994,
+      "2026": 0
+     },
+     "verdict": "dies",
+     "preset_rule": false,
+     "positive_years_2019_26": 1,
+     "n_years": 8,
+     "passes": false,
+     "regimes": {
+      "vix_high": {
+       "trades": 77,
+       "total_inr": -35313,
+       "win_pct": 58.4
+      },
+      "vix_low": {
+       "trades": 103,
+       "total_inr": -88472,
+       "win_pct": 54.4
+      },
+      "vix_mid": {
+       "trades": 76,
+       "total_inr": -32541,
+       "win_pct": 59.2
+      },
+      "monthly_expiry_week": {
+       "trades": 81,
+       "total_inr": -8494,
+       "win_pct": 63.0
+      },
+      "other_weeks": {
+       "trades": 175,
+       "total_inr": -147832,
+       "win_pct": 54.3
+      }
+     },
+     "exit_reasons": {
+      "TP50": 146,
+      "EXPIRY": 109,
+      "15DTE": 1
+     },
+     "trades_over_1_1x_sl": 13
+    }
+   },
+   "oos": {
+    "table": {
+     "base": {
+      "fit": {
+       "trades": 119,
+       "net_inr": -94315,
+       "win_pct": 53.8
+      },
+      "oos": {
+       "trades": 137,
+       "net_inr": -53304,
+       "win_pct": 59.9
+      }
+     },
+     "short_delta=0.2": {
+      "fit": {
+       "trades": 55,
+       "net_inr": -40767,
+       "win_pct": 40.0
+      },
+      "oos": {
+       "trades": 72,
+       "net_inr": -54331,
+       "win_pct": 40.3
+      }
+     },
+     "short_delta=0.25": {
+      "fit": {
+       "trades": 106,
+       "net_inr": -109352,
+       "win_pct": 44.3
+      },
+      "oos": {
+       "trades": 102,
+       "net_inr": -78105,
+       "win_pct": 55.9
+      }
+     },
+     "short_delta=0.35": {
+      "fit": {
+       "trades": 140,
+       "net_inr": -183631,
+       "win_pct": 47.1
+      },
+      "oos": {
+       "trades": 166,
+       "net_inr": -28670,
+       "win_pct": 56.0
+      }
+     },
+     "sl_mult=0.5": {
+      "fit": {
+       "trades": 119,
+       "net_inr": -93418,
+       "win_pct": 52.9
+      },
+      "oos": {
+       "trades": 137,
+       "net_inr": -57963,
+       "win_pct": 58.4
+      }
+     },
+     "sl_mult=1.5": {
+      "fit": {
+       "trades": 119,
+       "net_inr": -95788,
+       "win_pct": 53.8
+      },
+      "oos": {
+       "trades": 137,
+       "net_inr": -59775,
+       "win_pct": 59.9
+      }
+     },
+     "sl_mult=2": {
+      "fit": {
+       "trades": 119,
+       "net_inr": -95788,
+       "win_pct": 53.8
+      },
+      "oos": {
+       "trades": 137,
+       "net_inr": -60538,
+       "win_pct": 59.9
+      }
+     }
+    },
+    "chosen": {
+     "set": "short_delta=0.2",
+     "fit": {
+      "trades": 55,
+      "net_inr": -40767,
+      "win_pct": 40.0
+     },
+     "oos": {
+      "trades": 72,
+      "net_inr": -54331,
+      "win_pct": 40.3
+     }
+    },
+    "base": {
+     "fit": {
+      "trades": 119,
+      "net_inr": -94315,
+      "win_pct": 53.8
+     },
+     "oos": {
+      "trades": 137,
+      "net_inr": -53304,
+      "win_pct": 59.9
+     }
+    },
+    "sets_positive_in_both": "0/7",
+    "sets_positive_oos": "0/7"
+   }
+  }
+ }
+}

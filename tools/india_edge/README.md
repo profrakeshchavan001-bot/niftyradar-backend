@@ -65,3 +65,26 @@ Sector map: `sectors.json` (no sector map existed in the repo; edit freely, unma
 - Data URLs are NSE archive files (`sec_bhavdata_full`, UDiFF `BhavCopy_NSE_FO`, `ind_close_all`). If NSE changes a format, `data/fetch.py` fails loudly per day and keeps the rest.
 - Holidays: a 404 older than 4 days is remembered in `data/.missing.json`.
 - `pyarrow` (parquet) and `pyyaml` (config) are added to the requirements next to pandas/numpy/requests.
+
+## Backtest
+
+```powershell
+.venv\Scripts\python data\fetch.py --from 2015-01-01 --to 2026-10-28   # long run; restartable, skips stored days
+.venv\Scripts\python backtest\run.py --train --test
+```
+
+Signals are produced as-of each day (data up to that close), top 5 of grade A/B, entry next open, stop 1.5x ATR(14), target 2R, exit at day-5 close, cost 0.1R, 1% risk. Train 2015-01-01 to 2022-12-31 (weights tuned on a coarse grid, best expectancy with at least 200 trades, saved to `config_tuned.yaml`); test 2023-01-01 to today with those weights untouched. `config.yaml` is never modified. Output: `backtest/out/report_<date>.md` (by grade, setup, direction) and `backtest/out/equity.csv`.
+
+Caveats: same-day stop and target counts as stop; prices are not adjusted for splits/bonus (rare outliers); pre-July-2024 F&O files use NSE's older format (handled in `fetch.py`); a day whose files NSE does not serve is logged and skipped.
+
+## Layers 2/3, paper bot, Morning Desk
+
+See `docs/INDIA-EDGE-RUNBOOK.md` (repo root). Quick tour on the synthetic fixtures:
+
+```powershell
+.venv\Scripts\python run_daily.py --replay 40
+.venv\Scripts\python weekly_review.py
+.venv\Scripts\python audit_lookahead.py
+```
+
+Settings for Layer 2/3 and the paper bot are in `config_exec.yaml`. `DATA_DIR` switches every script from the fixtures to real bhavcopy.
