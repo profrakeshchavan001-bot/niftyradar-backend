@@ -61,6 +61,7 @@ table{border-collapse:collapse;width:100%;margin-top:6px}th,td{border-bottom:1px
 
 module.exports = {
   name: 'leaderboard',
+  closedTradesByBot, // reused by src/paper/bots/mix/ so the suggestion engine reads the SAME trade lists, nothing re-fetched
   async register(ctx) {
     const { app, env, log } = ctx;
     app.get('/api/paper/bots-report', async (req, res) => {
