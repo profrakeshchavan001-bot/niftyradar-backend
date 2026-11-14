@@ -106,6 +106,8 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
     const b = crypto.createHash('sha256').update(secret).digest();
     return crypto.timingSafeEqual(a, b);
   };
+  require('../src/paper/ops/cookieAuth').attachCookieAuth(app, { okSecret, log }); // ?key= sets an HttpOnly cookie + redirects to the clean URL; ?key= still works
+
   // `read(limit)` answers { rows }; `custom(req)` answers { status?, body } for routes with their own shape.
   const route = (pathname, read, custom = null) => app.get(pathname, async (req, res) => {
     if (!secret) return res.status(503).json({ error: 'PAPER_ADMIN_SECRET not configured' });
