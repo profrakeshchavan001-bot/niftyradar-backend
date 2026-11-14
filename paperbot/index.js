@@ -17,6 +17,7 @@ const { istParts, nseSession } = require('./time');
 const { createHealthTracker, attachHealthRoute } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
 const { newsScore, eventBlock } = require('../src/paper/context/news');
 const { attachNewsCheckRoute } = require('../src/paper/context/newsCheck'); // GET /api/paper/news-check
+const { attachHomeRoute } = require('../src/paper/ops/home'); // GET /api/paper/home
 
 // The bot has its OWN database: PAPER_DATABASE_URL (any Postgres URL, for
 // example a free Supabase project, direct port 5432 or the pooler). It never
@@ -125,6 +126,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   const healthTracker = createHealthTracker();
   attachHealthRoute(app, { secret, okSecret, tracker: healthTracker, state });
   attachNewsCheckRoute(app, { secret, okSecret, newsScore, eventBlock });
+  attachHomeRoute(app, { secret, okSecret, tracker: healthTracker, state });
 
   // Read-only report page (plain HTML, for a phone). Same secret, sent as ?key= (or the x-paper-secret header).
   app.get('/api/paper/report', async (req, res) => {
