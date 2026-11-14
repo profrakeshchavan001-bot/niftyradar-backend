@@ -181,6 +181,14 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   setInterval(() => { try { nse.sample(); } catch (e) { /* sampling must never break the server */ } }, 10000).unref();
 
   require('../src/paper/scalp').attachScalp({ app, cron, axios, env, log, state, store, crypto: cryptoSrc, secret, okSecret, enabled, guarded }); // scalp strategy + /api/paper/scalp-report (docs/SCALP.md)
+
+  // Auto-load bots/ops/replay plugins (docs/BOT-INTERFACE.md, src/paper/pluginLoader.js).
+  // Fire-and-forget: a plugin failing to load must never stop the bot itself.
+  require('../src/paper/pluginLoader').loadPlugins({
+    app, cron, env, log, state, store, guarded, tz,
+    pool: typeof store.query === 'function' ? { query: store.query } : null,
+  }).catch((e) => log(`[paper-plugins] loadPlugins failed: ${e.message}`));
+
   cron.schedule('20 */5 9-15 * * 1-5', jobs.nseScan, tz); // 20 s after each 5-min candle closes
   cron.schedule('50 * 9-15 * * 1-5', jobs.nseMonitor, tz); // exits checked every minute
   cron.schedule('25 */5 * * * *', jobs.cryptoScan, tz);
