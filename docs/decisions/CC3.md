@@ -58,3 +58,21 @@ Built once CC2's `src/paper/lib/` and `src/paper/pluginLoader.js` landed on `mai
 
 **Not attempted:** `trend_smc` (item 2 of the overnight brief - EMA cross or BOS/CHoCH + order-block/FVG retest, premium/discount zones), the cross-bot leaderboard (`/api/paper/bots-report`, item 6), shadow-tracking of every skip (item 5), and the suggestion/mix engine (item 7). Each of these is a larger piece than `exhaustion_only` and would have needed either less verification tonight or less sleep than the brief's own 04:00 IST cutoff allows for honestly. Flagging rather than rushing them.
 
+
+## EXTRA: shared candle cache across bots (scan-time / memory check for one Render Free instance)
+
+The overnight brief's EXTRA section asks that every bot "fit one Render Free instance, using the shared candle cache and never fetching
+the same candles twice." Checked: the main crypto bot, the scalp bots and `exhaustion_only` all independently asked Binance for the same
+symbol's 5-minute candles through separate, uncached `createCryptoSource()` calls - up to 4 Binance requests per coin per cycle instead
+of 1. Fixed in `paperbot/index.js`: the one `cryptoSrc` instance already shared by the main bot and `attachScalp()` is now wrapped with
+`src/paper/lib/candleCache.js` (`createCachedCrypto`, 50 s TTL for 5-minute candles, 4 min for hourly - well under a candle's own close
+time, long enough to dedupe same-tick callers) and the SAME wrapped instance is also handed to the plugin loader as `ctx.cachedCrypto`,
+so `exhaustion_only`'s `register.js` reuses it instead of making its own. A call with a custom range or a non-default limit (the report
+page's chart) always bypasses the cache, so nothing that needs an exact window is ever served another caller's cached window.
+`test/paperCachedCrypto.test.js`: 5 passing (shared fetch, independent symbols, range/limit bypass, hourly cached separately, `price()`
+passed through unchanged). `scalp`/`scalp_wide` needed no changes at all - they already received `crypto` as an injected parameter, so
+wrapping it once at the source fixed all three without touching either of those two already-merged files.
+
+Not done: the main crypto bot's *own* internal candle-fetch calls inside `paperbot/bot.js` were left untouched beyond this (they already
+go through the now-cached `cryptoSrc`, so they benefit automatically); no attempt was made to also share NSE candles, since the brief's
+EXTRA item was about the crypto bots specifically and NSE has no equivalent duplication tonight.

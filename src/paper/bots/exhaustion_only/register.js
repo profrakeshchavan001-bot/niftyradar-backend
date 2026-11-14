@@ -35,9 +35,14 @@ module.exports = {
 
     if (!on) { log('[exhaustion_only] disabled (PAPER_EXHAUSTION_ENABLED=false)'); return; }
 
-    const axios = require('axios');
-    const { createCryptoSource } = require('../../../../paperbot/sources');
-    const crypto = createCryptoSource({ axios, log });
+    // Reuse the main bot's already-cached crypto source when the caller provides one (paperbot/index.js does: one Binance
+    // fetch per symbol shared by the main bot, the scalp bots and this plugin, not one each - see createCachedCrypto there).
+    // A test or any other caller that does not pass cachedCrypto still gets its own, uncached source, same as before.
+    const crypto = ctx.cachedCrypto || (() => {
+      const axios = require('axios');
+      const { createCryptoSource } = require('../../../../paperbot/sources');
+      return createCryptoSource({ axios, log });
+    })();
     const eStore = pool ? createPgExhaustionStore(pool) : createMemoryExhaustionStore();
     ctx.exhaustionMemoryStore = eStore; // so the report route above can read it even without a pool
 
