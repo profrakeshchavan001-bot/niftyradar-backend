@@ -11,6 +11,7 @@ const { loadConfig } = require('./config');
 const { newsCheck, FIVE_MIN } = require('./sources');
 const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
 const { createJudge, loadJudgeConfig, tradeFields } = require('../src/paper/decision/judge');
+const { classifyEmaCross } = require('../src/paper/lib/emaCross');
 
 // judgeOn: the judge (src/paper/decision/judge.js, docs/JUDGE.md) decides every NSE entry; index.js turns it on unless PAPER_JUDGE_ON=false.
 // judgeHelpers: test seam for { stockSectorView, newsScore, eventBlock }; by default the real modules are used when they exist.
@@ -71,7 +72,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     skipSeen.add(key);
     log(`[paperbot] skip ${market} ${symbol}: ${reason}`);
     await store.insertSkip({ market, symbol, skip_date: date, reason, r_factor: extra.r_factor ?? null, patterns: extra.patterns || null, trend_state: extra.trend_state || null,
-      data_source: extra.data_source ?? null, data_delay_sec: extra.data_delay_sec ?? null });
+      data_source: extra.data_source ?? null, data_delay_sec: extra.data_delay_sec ?? null, ema_cross: extra.ema_cross ?? null });
   }
 
   // Shared part of both scans: closed candles -> context -> patterns -> entry decision.
@@ -88,7 +89,13 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     if (!patterns.length) return null; // no setup, nothing to log
     const names = patterns.map((p) => p.name);
     const decision = E.decideEntry(patterns, ctx);
-    const extra = { r_factor: score, patterns: names, trend_state: ctx, trigger_t: last.t, ...src };
+    // EMA9/21 (5m) and EMA20/50 (15m/1h): a fresh cross with the trade is a strong confirmation, a
+    // cross against is a warning (docs/BOT-INTERFACE.md item 5) - never a hard block either way.
+    const tentativeDir = decision.direction || (patterns[0] && patterns[0].direction) || null;
+    const c15ForCross = c15 && c15.length ? c15 : E.aggregate(c5);
+    const c1hForCross = E.aggregate(c5, FIVE_MIN, 12 * FIVE_MIN);
+    const emaCross = tentativeDir ? classifyEmaCross({ direction: tentativeDir, c5, c15: c15ForCross, c1h: c1hForCross }) : 'unknown';
+    const extra = { r_factor: score, patterns: names, trend_state: ctx, trigger_t: last.t, ema_cross: emaCross, ...src };
     if (!decision.enter) { await skip(market, symbol, decision.reason, extra); return null; }
     return { c5, last, ctx, decision, extra };
   }
@@ -102,6 +109,7 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       trigger_t: last.t, trend_state: ctx,
       smc_tags: decision.patterns.filter((p) => p.kind === 'smc').map((p) => p.name),
       news_filter: news, entry_time: new Date(now()).toISOString(), max_fav_pct: 0, max_adv_pct: 0,
+      ema_cross: a.extra.ema_cross ?? null,
     };
   }
 

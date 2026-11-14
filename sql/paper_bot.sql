@@ -119,3 +119,8 @@ ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market 
 -- summaries and the judge the same way 'crypto_scalp' already is (both end in '_scalp'; src/paper/scalp/bot.js and paperbot/store.js rely on that).
 ALTER TABLE paper_trades DROP CONSTRAINT IF EXISTS paper_trades_market_check;
 ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp', 'crypto_wide_scalp'));
+
+-- EMA crossover confirmation (CC2 item 5, src/paper/lib/emaCross.js): 'fresh_with' / 'fresh_against' /
+-- 'confirmed_with' / 'confirmed_against' / 'mixed' / 'unknown'. Informational only - never changes entry/exit.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS ema_cross text;
+ALTER TABLE paper_skips  ADD COLUMN IF NOT EXISTS ema_cross text;

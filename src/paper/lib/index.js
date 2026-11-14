@@ -7,4 +7,5 @@ module.exports = {
   ...require('./levels'),
   ...require('./candleCache'),
   ...require('./exitSim'),
+  ...require('./emaCross'),
 };
