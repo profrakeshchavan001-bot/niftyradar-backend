@@ -86,6 +86,29 @@ test('plan: the nearest level wins, and a 1-hour swing / previous-day level is n
   assert.deepEqual([r2.plan.targetType, r2.plan.targetLevel, r2.plan.target], ['swing low 1h', 100.9, 101.0009]);
 });
 
+test('plan: a level closer than minLevelDistAtr x ATR14 to the entry is skipped for the next one out (CC2 item 4)', () => {
+  const s = scenario();
+  const H = 3600000;
+  const day = Date.UTC(2026, 10, 12, 0, 0);
+  const c1h = [k(day, 103, 104, 101.5, 103), k(day + H, 103, 104, 102, 103), k(S.START, 103, 104, 102, 103), k(S.START + H, 103, 104, 102, 103), k(S.START + 2 * H, 103, 104, 100.9, 103),
+    k(S.START + 3 * H, 103, 104, 102, 103), k(S.START + 4 * H, 103, 104, 102, 103)];
+  // ATR14(15m) = 0.6 (same scenario as the "nearest level wins" test above). Nearest support is the
+  // previous day low 101.5, distance 0.68 - within 2 x ATR (1.2), so with minLevelDistAtr: 2 it is
+  // skipped and the 1-hour swing low 100.9 (distance 1.28, outside 1.2) is used instead.
+  const r = L.planTrade({ entry: 102.18, direction: 'down', patterns: s.patterns, c5: s.c5, c15: s.c15, c1h, nowMs: s.now, opt: { minRr: 0, minLevelDistAtr: 2 } });
+  assert.deepEqual([r.ok, r.plan.targetType, r.plan.targetLevel], [true, 'swing low 1h', 100.9]);
+  // the default (minLevelDistAtr: 1) is far enough below 0.68's actual distance that the previous day low still wins
+  const r2 = L.planTrade({ entry: 102.18, direction: 'down', patterns: s.patterns, c5: s.c5, c15: s.c15, c1h, nowMs: s.now, opt: { minRr: 0 } });
+  assert.deepEqual([r2.ok, r2.plan.targetType, r2.plan.targetLevel], [true, 'previous day low', 101.5]);
+});
+
+test('plan: every level within minLevelDistAtr x ATR14 of the entry -> no target, named reason', () => {
+  const s = scenario();
+  const r = L.planTrade({ entry: 102.18, direction: 'down', patterns: s.patterns, c5: s.c5, c15: s.c15, c1h: s.c1h, nowMs: s.now, opt: { minLevelDistAtr: 10 } });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'every support level found is within 10 x ATR14 (0.6) of the entry, no room for a target');
+});
+
 test('manage: target, stop, breakeven at half way, then breakeven stop', () => {
   const short = { entry: 102.18, target: 99.099, stop: 103.12, short: true };
   // half way = 102.18 - 0.5 x 3.081 = 100.6395
