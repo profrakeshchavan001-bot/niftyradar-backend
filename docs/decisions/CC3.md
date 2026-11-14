@@ -76,3 +76,76 @@ wrapping it once at the source fixed all three without touching either of those 
 Not done: the main crypto bot's *own* internal candle-fetch calls inside `paperbot/bot.js` were left untouched beyond this (they already
 go through the now-cached `cryptoSrc`, so they benefit automatically); no attempt was made to also share NSE candles, since the brief's
 EXTRA item was about the crypto bots specifically and NSE has no equivalent duplication tonight.
+
+# CC3 round 2 (2026-11-14, continued)
+
+Four PRs this round, all merged with the owner's standing permission for this session: shadow tracking + leaderboard (#39), trend_smc
+(#42), and this one (mix + docs/BOTS.md). 4 of the raised cap of "at most 4 more merges" used.
+
+## Item 1: shadow tracking (done, merged in #39)
+
+Own `src/paper/shadow/` (schema + store), shared by scalp, scalp_wide and exhaustion_only (and, once it existed, trend_smc too). Each
+engine's "reward/risk below min_rr" skip branch - the one case with a complete entry/stop/target plan already computed - now also
+returns a `shadowPlan` in `extra`; every other skip reason (no setup, too few candles, no room for a target) genuinely has nothing to
+follow, so it carries none. `src/paper/scalp/bot.js` and `src/paper/bots/exhaustion_only/bot.js` record one on that skip and resolve
+open shadows in their own `monitor()`, using the SAME `evaluateExit()` a real trade of that bot would get (same breakeven/time-stop
+rules). Verified against a local Postgres: the schema is idempotent and the unique `(bot, symbol, trigger_t)` index does the dedupe on
+Postgres too, not just in the memory store.
+
+## Item 2: leaderboard (done, merged in #39)
+
+`src/paper/bots/leaderboard/` (a plugin, auto-loaded). `GET /api/paper/bots-report`. Stats worked out independently per bot
+(`computeBotStats`): win rate, net/gross/cost-% from `pnl_inr`/`gross_pnl_inr` (every bot's trade rows carry these - exhaustion_only and
+trend_smc deliberately use the SAME field names as scalp's `settle()` so one stats function works for all of them without a per-bot
+adapter), average win/loss, max drawdown (walks trades in the order they CLOSED, tracks the running peak of cumulative net P&L). A bot
+under 20 trades is shown (never hidden) but excluded from the ranked list and marked "too few trades, no conclusion"; a net loss after
+costs sets `lossAfterCosts: true` and is shown in red on the page, not quietly left out. `exhaustion_only`'s and `trend_smc`'s trades are
+read live at request time (`ctx.exhaustionMemoryStore` / `ctx.trendSmcMemoryStore`, set by each plugin's own `register()`), not captured
+at the leaderboard's own registration time - this was deliberate, because `src/paper/pluginLoader.js`'s plugin load order is whatever
+`fs.readdirSync` happens to return, not guaranteed alphabetical, so the leaderboard must never assume another plugin registered first.
+
+## Item 3: mix (done, merged this PR)
+
+`src/paper/bots/mix/` (a plugin). `GET /api/paper/mix-report`, labelled `"suggestion, needs owner approval"` in every response. Reuses
+`leaderboard`'s own `closedTradesByBot()` (exported for this reason) rather than re-querying every store a second time. Groups closed
+trades by (symbol, candle open time); a candle only one bot ever traded is not a vote. Weight = that bot's own win rate, zero unless it
+has 20+ trades (per the brief). Score = the weighted sum of directions (LONG/up = +1, SHORT/down = -1), normalized by the total weight
+of the bots that actually had an opinion on that candle - a bot with zero weight still shows in the "who voted" list but does not move
+the score. A score near zero (both sides equally weighted and opposite) is reported as "no agreement", never forced to a side by
+floating-point noise - this needed a small deadband (±0.05) once I noticed an exact tie could otherwise read as a direction due to
+rounding. The "weighted result" is a weighted average of what the voting bots' OWN trades on that candle actually scored - clearly an
+approximation (their real entries/stops/targets differ), and the report says so, since fully re-simulating a single combined position
+candle-by-candle was judged too large an addition for the time left tonight. It writes nothing, anywhere, ever.
+
+## Item 4: trend_smc (done, merged in #42)
+
+See `docs/BOTS.md` for the rule. Found CC2's `src/paper/lib/smc/` on `main` about 90 minutes into this round (checked by `git fetch`
+periodically, as the brief asked) - well before the brief's own "build a private helper by 02:30" fallback would have triggered, so no
+private SMC helper was needed. The one real gap: EMA20/50(15m) needs 51+ real 15-minute candles, more than `aggregate()` of a sane
+number of 5-minute candles can give, so a small, self-contained Binance 15-minute source was added inside `trend_smc/register.js` only
+(not the shared `paperbot/sources.js`, to avoid touching a file other windows may also be mid-edit on tonight).
+
+## Item 5: docs/BOTS.md (done)
+
+Updated with trend_smc, shadow tracking, the leaderboard and mix - each with a worked example where the brief asked for one.
+
+## Not attempted this round
+
+- The main **intraday** bot's own shadow tracking (the brief scoped this round's shadow tracking to "YOUR bots": scalp, scalp_wide,
+  exhaustion_only - trend_smc was added once it existed too, since it is also mine).
+- A UI or route that lets the owner actually **apply** a mix-suggested weight to a bot. Mix is read-only by design tonight; there is
+  nothing in the brief asking for it to write anything, and building a write path the owner never asked to be built seemed like the
+  wrong kind of initiative for an unattended overnight session.
+- A real backtest of "what a single combined position would have done" for mix, as opposed to the weighted-average-of-actual-trades
+  approximation above - flagged, not hidden.
+
+## VERIFY loop this round
+
+`node --test test/*.test.js`: 363 passing, 0 failing, after every rebase onto the other windows' work tonight (one real merge conflict,
+in `test/paperLib.test.js`, resolved in favor of the other window's more robust fix rather than my own). Every new/changed schema file
+(`src/paper/shadow/schema.sql`, `src/paper/bots/trend_smc/schema.sql`) applied twice against a local Postgres 16 to confirm idempotency,
+plus a real insert to confirm the constraints actually work, not just parse. Re-read every new file once more for look-ahead mistakes
+(a shadow or a mix suggestion reading a candle before it closed) and cost mistakes (the 0.23% round trip applied twice, or not at all)
+before each merge; found none beyond the two already described above (the entry-price mix-up in trend_smc's own test, and the
+mismatched test-fixture clocks), both caught by the tests themselves, not missed. Binance not verified live (no route from this
+sandbox); fixtures only throughout.
