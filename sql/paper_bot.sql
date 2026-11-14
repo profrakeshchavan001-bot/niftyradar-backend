@@ -114,3 +114,8 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS gross_pnl_inr  numeric;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS be_moved       boolean;  -- the stop was moved to breakeven
 ALTER TABLE paper_trades DROP CONSTRAINT IF EXISTS paper_trades_market_check;
 ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp'));
+
+-- scalp_wide (docs/SCALP.md "Scalp wide"): a second, slower crypto variant, own market key so it is excluded from the intraday report, the daily
+-- summaries and the judge the same way 'crypto_scalp' already is (both end in '_scalp'; src/paper/scalp/bot.js and paperbot/store.js rely on that).
+ALTER TABLE paper_trades DROP CONSTRAINT IF EXISTS paper_trades_market_check;
+ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp', 'crypto_wide_scalp'));
