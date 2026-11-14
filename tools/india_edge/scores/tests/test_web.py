@@ -18,7 +18,7 @@ class Serve(unittest.TestCase):
 
 
 class Page(unittest.TestCase):
-    html = (HERE / "web" / "index.html").read_text()
+    html = (HERE / "web" / "index.html").read_text(encoding="utf-8")
 
     def test_no_formula_or_weight_text_shipped_in_page(self):
         low = self.html.lower()

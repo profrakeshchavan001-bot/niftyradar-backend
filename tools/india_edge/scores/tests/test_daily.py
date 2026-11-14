@@ -45,6 +45,11 @@ class Base(unittest.TestCase):
         self.fetch_calls, self.notes = [], []
 
     def tearDown(self):
+        import logging
+        lg = logging.getLogger("scores.daily")
+        for h in list(lg.handlers):
+            lg.removeHandler(h)
+            h.close()
         if self.env_old is None:
             os.environ.pop("DATA_DIR", None)
         else:
@@ -89,11 +94,11 @@ class Happy(Base):
         write_days(self.data, fixture_days()[1])
         self.go()
         site = self.out / "site"
-        html = (site / "index.html").read_text()
+        html = (site / "index.html").read_text(encoding="utf-8")
         self.assertIn('<meta name="data-base" content="data/">', html)
         files = [p.name for p in site.rglob("*") if p.is_file()]
         self.assertFalse([f for f in files if f.endswith((".py", ".yaml", ".yml"))])
-        blob = " ".join(p.read_text() for p in (site / "data").glob("*.json")).lower()
+        blob = " ".join(p.read_text(encoding="utf-8") for p in (site / "data").glob("*.json")).lower()
         for bad in ("weight", "formula", "wmean", "band_strong"):
             self.assertNotIn(bad, blob)
 
