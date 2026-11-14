@@ -39,7 +39,7 @@ test('home page lists only the candidate links that are actually registered, in 
   } finally { server.close(); }
 });
 
-test('401 without the right key; carries ?key= through to every link href', async () => {
+test('401 without the right key; link hrefs never carry the raw secret (the cookie does the work)', async () => {
   const app = express();
   const secret = 'shh';
   const okSecret = (given) => given === secret;
@@ -54,7 +54,8 @@ test('401 without the right key; carries ?key= through to every link href', asyn
     assert.equal(bad.status, 401);
     const ok = await fetch(`http://localhost:${port}/api/paper/home?key=shh`);
     const html = await ok.text();
-    assert.match(html, /\/api\/paper\/health\?key=shh/);
+    assert.match(html, /href="\/api\/paper\/health"/);
+    assert.equal(html.includes('shh'), false); // the secret itself never appears in the page source
   } finally { server.close(); }
 });
 
