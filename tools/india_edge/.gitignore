@@ -17,3 +17,5 @@ logs/
 data/quarantine/
 data/manifest.json
 data/idxopt_audit.json
+backtest/out/*
+!backtest/out/.gitkeep
