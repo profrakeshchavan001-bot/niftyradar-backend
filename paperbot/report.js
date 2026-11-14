@@ -2,6 +2,7 @@
 // Paper bot reports: end-of-day summary, per-pattern stats, Sunday suggestions.
 // Reports only describe what happened. They never change a rule.
 const P = require('./patterns');
+const { weeklyAblationReport, loadJudgeConfig } = require('../src/paper/decision/judge');
 const { istParts } = require('./time');
 
 const inr = (x) => `Rs ${x >= 0 ? '+' : '-'}${Math.abs(Math.round(x)).toLocaleString('en-IN')}`;
@@ -142,7 +143,13 @@ function createReporter({ store, axios, env = process.env, now = Date.now, log =
       const date = istParts(now()).date;
       const weekAgo = istParts(now() - 7 * 86400000).date;
       const report = weeklySuggestions({ date, closed: await store.closedTrades(null), skips: await store.skipsSince(weekAgo), minTrades: cfg.learning.min_trades_for_conclusion, config: cfg });
-      return publish('weekly_suggestions', date, report);
+      const out = await publish('weekly_suggestions', date, report);
+      // which judge helper adds value (docs/JUDGE.md): a second message; suggestions only, nothing is applied
+      try {
+        const jr = weeklyAblationReport({ date, closed: await store.closedTrades(null), config: await loadJudgeConfig(store) });
+        await publish('judge_ablation', date, jr);
+      } catch (e) { log(`[paperbot] judge ablation report failed: ${e.message}`); }
+      return out;
     },
   };
 }

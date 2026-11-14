@@ -9,10 +9,11 @@ const path = require('path');
 const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'score_source', 'direction', 'patterns',
   'trigger_candles', 'trigger_t', 'trend_state', 'smc_tags', 'news_filter', 'instrument', 'simulated_option',
   'price_source', 'candle_source', 'qty', 'entry_price', 'entry_time', 'entry_underlying', 'exit_price', 'exit_time',
-  'exit_underlying', 'exit_reason', 'pnl_inr', 'fx_rate', 'fx_source', 'max_fav_pct', 'max_adv_pct', 'basis', 'legacy_rf', 'r_detail'];
-const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail']);
+  'exit_underlying', 'exit_reason', 'pnl_inr', 'fx_rate', 'fx_source', 'max_fav_pct', 'max_adv_pct', 'basis', 'legacy_rf', 'r_detail',
+  'judge_score', 'judge_take', 'judge_contributions', 'judge_basis']; // judge_*: docs/JUDGE.md
+const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
-  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf'];
+  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score'];
 const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state'];
 
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
