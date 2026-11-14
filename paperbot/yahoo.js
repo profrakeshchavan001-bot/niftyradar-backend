@@ -62,7 +62,9 @@ function createYahooSource({ axios, log = console.log, now = Date.now, sleep = d
   const allowed = new Set(universe.slice(0, MAX_UNIVERSE));
   const cache = new Map(); // `${symbol}|${interval}|${range}` -> { candles, meta, fetchedAt } or { error, fetchedAt }
   const inflight = new Map();
-  const stats = { requests: 0, retries: 0, failures: 0 };
+  // requests/retries/failures already existed; ok/lastError*/lastSuccessAt added for overnight item 3
+  // (real per-source status on GET /api/paper/health, instead of "unchecked").
+  const stats = { requests: 0, retries: 0, failures: 0, ok: 0, lastError: null, lastSuccessAt: null, lastErrorAt: null };
   let queue = Promise.resolve();
   let lastStart = -Infinity;
   let coolUntil = 0;
@@ -121,10 +123,12 @@ function createYahooSource({ axios, log = console.log, now = Date.now, sleep = d
         const fetchedAt = now();
         const entry = { ...parsed, fetchedAt, interval, quoteLagSec: parsed.meta.marketTime != null ? Math.max(0, Math.round((fetchedAt - parsed.meta.marketTime) / 1000)) : null };
         cache.set(key, entry);
+        stats.ok += 1; stats.lastSuccessAt = fetchedAt;
         return entry;
       } catch (e) {
         stats.failures += 1;
         const error = `Yahoo ${interval} candles for ${symbol} failed: ${e.response?.status ? `HTTP ${e.response.status}` : e.message}`;
+        stats.lastError = error; stats.lastErrorAt = now();
         cache.set(key, { error, fetchedAt: now() }); // not asked again in this window
         throw new Error(error);
       }

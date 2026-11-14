@@ -3,9 +3,9 @@
  * Overnight ops: one glance at whether the paper bot is alive, for GET /api/paper/health (+ &format=json).
  * Rule: a status is a real measurement or explicitly "unchecked" - never guessed, never invented.
  * Per-job scan times and errors come from createHealthTracker(), wrapped around the scan/monitor jobs in
- * paperbot/index.js (one line per job there). Per-source (Binance/Yahoo/Dhan) checks are not wired yet -
- * that needs a small hook inside paperbot/sources.js and paperbot/yahoo.js, left for a follow-up PR so this
- * stays inside src/paper/ops/ tonight.
+ * paperbot/index.js (one line per job there). Per-source (Binance/Yahoo/Dhan) status comes from a tiny
+ * ok/fail recorder inside paperbot/sources.js (Dhan's dhanCall(), Binance's get()) and paperbot/yahoo.js
+ * (its existing `stats` object, extended), exposed as state.nse.stats / state.crypto.stats / state.yahoo.stats.
  */
 const MAX_ERRORS = 10;
 const STALE_MS = 15 * 60 * 1000; // a module with no scan in 15 minutes is a problem (overnight brief, item 7)
@@ -93,11 +93,22 @@ async function buildHealth({ tracker, store, state, now = Date.now() }) {
     } catch (e) { /* counts stay null; the database error is already reported via db.ok */ }
   }
 
-  // Not instrumented yet (see file header): reported as "unchecked", never a made-up status.
+  // Real counts from each source's own recorder (see file header). "unchecked" only when that source
+  // object does not exist yet (bot disabled/starting) or it has never been asked anything - never guessed.
+  const sourceStatus = (stats) => {
+    if (!stats) return { status: 'unchecked', note: 'bot not ready yet' };
+    if (stats.ok === 0 && stats.fail === 0) return { status: 'unchecked', note: 'not asked yet this run', ok: 0, fail: 0 };
+    return {
+      status: stats.ok > 0 ? 'ok' : 'failing',
+      ok: stats.ok, fail: stats.fail,
+      lastError: stats.lastError, lastErrorAt: stats.lastErrorAt ? new Date(stats.lastErrorAt).toISOString() : null,
+      lastSuccessAt: stats.lastSuccessAt ? new Date(stats.lastSuccessAt).toISOString() : null,
+    };
+  };
   const dataSources = {
-    binance: { status: 'unchecked', note: 'per-source instrumentation not wired yet' },
-    yahoo: { status: 'unchecked', note: 'per-source instrumentation not wired yet' },
-    dhan: { status: 'unchecked', note: 'per-source instrumentation not wired yet' },
+    binance: sourceStatus(state && state.crypto && state.crypto.stats),
+    yahoo: sourceStatus(state && state.yahoo && state.yahoo.stats),
+    dhan: sourceStatus(state && state.nse && state.nse.stats),
   };
 
   // Alerts the alerts plugin (src/paper/ops/alerts/) stored; absent entirely when paper_alerts does not
@@ -138,6 +149,7 @@ function htmlPage(h) {
   const color = h.status === 'ALIVE' ? '#1a7f37' : '#c23';
   const row = (label, value) => `<tr><td style="padding:4px 8px;color:#666">${esc(label)}</td><td style="padding:4px 8px"><b>${esc(value)}</b></td></tr>`;
   const jobRows = Object.entries(h.jobs).map(([name, j]) => row(name, j.lastRunAt ? `${j.minutesAgo}m ago${j.stale ? ' (stale)' : ''}` : 'never')).join('');
+  const sourceRows = Object.entries(h.dataSources).map(([name, s]) => row(name, s.status === 'unchecked' ? `unchecked (${s.note})` : `${s.status} (${s.ok} ok, ${s.fail} fail${s.lastError ? `, last error: ${s.lastError}` : ''})`)).join('');
   const errRows = h.recentErrors.length
     ? `<h2>Recent errors</h2><ul>${h.recentErrors.map((e) => `<li>${esc(new Date(e.at).toISOString())} - ${esc(e.job)}: ${esc(e.message)}</li>`).join('')}</ul>`
     : '';
@@ -153,6 +165,7 @@ ${row('as of', h.asOf)}
 ${row('uptime', `${Math.round(h.uptimeSeconds / 60)} min`)}
 ${row('memory', h.memory ? `${h.memory.rssMb} MB` : 'n/a')}
 ${jobRows}
+${sourceRows}
 ${row('database', h.database.ok ? 'ok' : `FAIL (${h.database.error})`)}
 ${row('open trades (nse)', h.openTrades.nse ?? 'n/a')}
 ${row('open trades (crypto)', h.openTrades.crypto ?? 'n/a')}

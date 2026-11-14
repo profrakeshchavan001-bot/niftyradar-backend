@@ -188,6 +188,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   const cryptoSrc = createCachedCrypto(createCryptoSource({ axios, log }));
   state.nse = nse;
   state.crypto = cryptoSrc;
+  state.yahoo = yahoo; // overnight item 3: health.js reads state.yahoo.stats for the real per-source status
   const judgeOn = String(env.PAPER_JUDGE_ON ?? 'true').toLowerCase() !== 'false'; // the judge decides NSE entries (docs/JUDGE.md); PAPER_JUDGE_ON=false switches it off
   const bot = createBot({ store, nse, crypto: cryptoSrc, log, onConfig: (cfg) => { state.holidays = cfg.nse.holidays; }, judgeOn });
   const reporter = createReporter({ store, axios, env, log, loadConfig });
