@@ -63,6 +63,31 @@ points, not a rescale-to-100). Item 7 as written would replace that scheme;
 flagging here rather than quietly picking one on a night with no owner
 awake to ask.
 
+## Extras: IST/UTC edge tests + How-the-bot-thinks doc (5th and last merge tonight)
+
+`test/paperTimeEdges.test.js`: hand-computed tests at 09:15, 15:15, 15:30
+and midnight IST against `paperbot/time.js`. Found (not a bug, but worth
+recording): `nseSession`'s `minutes` field is whole-minute resolution
+(seconds dropped), so the market stays "open" for the ENTIRE 15:30:00-15:30:59
+minute and only closes at 15:31 IST, not one second after 15:30:00 - my
+first draft of this test assumed the latter and failed; fixed the test, not
+the code, since whole-minute checking is how the rest of the file already
+works (`nseSession`, `toMinutes`) and changing it now is a behaviour change
+nobody asked for. Also verified: the IST day rolls over at 18:30 UTC (5:30
+hours before UTC midnight), weekends and listed holidays close the market
+at every hour including 09:15, and a holiday on one date does not affect
+another date.
+
+`docs/HOW-THE-BOT-THINKS.md`: the full candles -> indicators -> patterns ->
+entry rule -> Judge -> sizing -> exit-levels -> exit-checking pipeline, one
+worked example per step, reusing tonight's own hand-worked numbers
+(the exhaustion reversal / level-based exit example from
+`test/paperCryptoLevels.test.js`) rather than inventing new ones.
+
+This is the 5th merge tonight - the cap the brief set (every merge restarts
+the live bot). No more merges from this session after this one; anything
+else found stays in this file for the next session or the owner.
+
 If another overnight session picks this up: start with item 3 (exit
 accuracy, checking every candle's high/low since the last check) since it is
 the most isolated correctness bug and the brief itself calls it out
