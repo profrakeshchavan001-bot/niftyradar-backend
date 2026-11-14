@@ -212,7 +212,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   // Live price samples for the fallback candle builder (memory only).
   setInterval(() => { try { nse.sample(); } catch (e) { /* sampling must never break the server */ } }, 10000).unref();
 
-  require('../src/paper/scalp').attachScalp({ app, cron, axios, env, log, state, store, crypto: cryptoSrc, secret, okSecret, enabled, guarded }); // scalp strategy + /api/paper/scalp-report (docs/SCALP.md)
+  require('../src/paper/scalp').attachScalp({ app, cron, axios, env, log, state, store, crypto: cryptoSrc, secret, okSecret, enabled, guarded, pool: typeof store.query === 'function' ? { query: store.query } : null }); // scalp strategy + /api/paper/scalp-report (docs/SCALP.md)
   require('../src/paper/replay').attachReplay({ app, cron, axios, env, log, secret, okSecret, enabled, guarded, liveStore: store }); // replay engine + /api/paper/replay-report (docs/REPLAY.md)
 
   // Auto-load bots/ops plugins (docs/BOT-INTERFACE.md, src/paper/pluginLoader.js).

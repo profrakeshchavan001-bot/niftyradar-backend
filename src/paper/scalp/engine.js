@@ -61,16 +61,19 @@ function analyse({ c1raw, c5raw, now, cfg, dayStartMs }) {
   const rewardNet = targetPct - costs;
   const riskNet = stopPct + costs;
   const rr = rewardNet / riskNet;
+  const sgn0 = long ? 1 : -1;
+  // shadow tracking (docs/SCALP.md "Shadow tracking"): the plan was fully worked out, only the reward/risk gate turned it down - so it is
+  // a real would-be trade a shadow can follow to its stop or target, not a dead end like "no setup" or "too few candles" above.
+  const shadowPlan = { direction: long ? 'LONG' : 'SHORT', entry_price: entry, sl_price: r(entry * (1 - sgn0 * stopPct / 100), 6), target_price: r(entry * (1 + sgn0 * targetPct / 100), 6), trigger_t: last.t };
   if (!(rewardNet > 0) || rr < cfg.min_rr) {
-    return { ok: false, extra: { ...extra, r_factor: r(rr, 2) }, reason: `reward/risk ${r(rr, 2)} after costs is below ${cfg.min_rr} (target ${r(targetPct, 2)}%, stop ${r(stopPct, 2)}%, costs ${r(costs, 2)}% round trip)` };
+    return { ok: false, extra: { ...extra, r_factor: r(rr, 2), shadowPlan }, reason: `reward/risk ${r(rr, 2)} after costs is below ${cfg.min_rr} (target ${r(targetPct, 2)}%, stop ${r(stopPct, 2)}%, costs ${r(costs, 2)}% round trip)` };
   }
-  const sgn = long ? 1 : -1;
   return {
     ok: true,
     plan: {
       direction: agree[0].direction, long, hits: agree, entry, atr, trend5, ctx5, last,
       stopPct: r(stopPct, 4), targetPct: r(targetPct, 4), costPct: r(costs, 4), rr: r(rr, 2), rewardNetPct: r(rewardNet, 4), riskNetPct: r(riskNet, 4),
-      stopPrice: r(entry * (1 - sgn * stopPct / 100), 6), targetPrice: r(entry * (1 + sgn * targetPct / 100), 6),
+      stopPrice: r(entry * (1 - sgn0 * stopPct / 100), 6), targetPrice: r(entry * (1 + sgn0 * targetPct / 100), 6),
       level: level == null ? null : { price: r(level, 6), pct: r(levelPct, 4) },
     },
   };
@@ -173,10 +176,11 @@ function analyseWide({ c5raw, c15raw, now, cfg, dayStartMs }) {
   const rewardNet = targetPct - costs;
   const riskNet = stopPct + costs;
   const rr = rewardNet / riskNet;
-  if (!(rewardNet > 0) || rr < cfg.min_rr) {
-    return { ok: false, extra: { ...extra, r_factor: r(rr, 2) }, reason: `reward/risk ${r(rr, 2)} after costs is below ${cfg.min_rr} (target ${r(targetPct, 2)}%, stop ${r(stopPct, 2)}%, costs ${r(costs, 2)}% round trip)` };
-  }
   const sgn = long ? 1 : -1;
+  const shadowPlan = { direction: long ? 'LONG' : 'SHORT', entry_price: entry, sl_price: r(entry * (1 - sgn * stopPct / 100), 6), target_price: r(entry * (1 + sgn * targetPct / 100), 6), trigger_t: last.t };
+  if (!(rewardNet > 0) || rr < cfg.min_rr) {
+    return { ok: false, extra: { ...extra, r_factor: r(rr, 2), shadowPlan }, reason: `reward/risk ${r(rr, 2)} after costs is below ${cfg.min_rr} (target ${r(targetPct, 2)}%, stop ${r(stopPct, 2)}%, costs ${r(costs, 2)}% round trip)` };
+  }
   return {
     ok: true,
     plan: {

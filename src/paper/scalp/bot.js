@@ -26,9 +26,18 @@ function basisTextWide(plan, symbol) {
     + 'Exits: target, stop, stop moved to breakeven half way, or out after the 45-minute time stop.';
 }
 
-function createScalpBot({ store, crypto, source1m, now = Date.now, log = console.log }) {
+function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, log = console.log }) {
   const skipSeen = new Set();
   const nseNoted = new Set();
+
+  // Shadow tracking (docs/BOTS.md): a skip whose plan made it all the way to the reward/risk gate carries a shadowPlan (full
+  // entry/stop/target) - followed on paper in its own table, never counted as a trade. A skip with no shadowPlan (no setup, too few
+  // candles, no room for a target) has nothing to follow, so it is just logged as before.
+  async function recordShadow(bot, symbol, reason, extra) {
+    if (!extra.shadowPlan || !shadowStore) return;
+    const date = istParts(now()).date;
+    await shadowStore.insertShadow({ bot, symbol, setup_date: date, trigger_t: extra.shadowPlan.trigger_t, direction: extra.shadowPlan.direction, entry_price: extra.shadowPlan.entry_price, sl_price: extra.shadowPlan.sl_price, target_price: extra.shadowPlan.target_price, skip_reason: reason });
+  }
 
   async function skip(symbol, reason, extra = {}) {
     const date = istParts(now()).date;
@@ -38,6 +47,26 @@ function createScalpBot({ store, crypto, source1m, now = Date.now, log = console
     skipSeen.add(key);
     log(`[scalp] skip ${symbol}: ${reason}`);
     await store.insertSkip({ market: MARKET, symbol, skip_date: date, reason, r_factor: extra.r_factor ?? null, patterns: extra.patterns || null, trend_state: extra.trend_state || null, data_source: 'binance_public', data_delay_sec: null });
+    await recordShadow('scalp', symbol, reason, extra);
+  }
+
+  // Walks every open shadow for `bot`, resolves it the same way a real trade of that bot would exit (same evaluateExit, same candles).
+  async function resolveShadows(bot, fetchCandles, intervalMs) {
+    if (!shadowStore) return { checked: 0, resolved: 0 };
+    const open = await shadowStore.openShadows(bot);
+    if (!open.length) return { checked: 0, resolved: 0 };
+    const cfg = bot === 'scalp' ? await loadScalpConfig(store) : await loadScalpWideConfig(store);
+    let resolved = 0;
+    for (const sh of open) {
+      let candles;
+      try { candles = await fetchCandles(sh.symbol); } catch (e) { log(`[${bot}] shadow candles for ${sh.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const ev = evaluateExit({ trade: sh, candles: E.closedOnly(candles, intervalMs, now()), nowMs: now(), cfg });
+      if (!ev.exit) continue;
+      await shadowStore.resolveShadow(sh.id, { resolved_reason: ev.reason, resolved_price: ev.price, resolved_time: new Date(ev.timeMs).toISOString() });
+      log(`[${bot}] shadow resolved ${sh.symbol}: ${ev.reason} @ ${ev.price} (would-be, never a trade)`);
+      resolved += 1;
+    }
+    return { checked: open.length, resolved };
   }
 
   async function cryptoScalpScan() {
@@ -79,7 +108,7 @@ function createScalpBot({ store, crypto, source1m, now = Date.now, log = console
 
   async function cryptoScalpMonitor() {
     const open = await store.openTrades(MARKET);
-    if (!open.length) return { checked: 0, closed: 0 };
+    if (!open.length) { await resolveShadows('scalp', (symbol) => source1m.candles1m(symbol, 40), 60000); return { checked: 0, closed: 0 }; }
     const cfg = await loadScalpConfig(store);
     let closed = 0;
     for (const t of open) {
@@ -96,6 +125,7 @@ function createScalpBot({ store, crypto, source1m, now = Date.now, log = console
       log(`[scalp] PAPER exit ${t.symbol}: ${ev.reason}, gross ${s.gross_pnl_usdt} net ${s.net_pnl_usdt} USDT (Rs ${s.pnl_inr})`);
       closed += 1;
     }
+    await resolveShadows('scalp', (symbol) => source1m.candles1m(symbol, 40), 60000);
     return { checked: open.length, closed };
   }
 
@@ -107,6 +137,7 @@ function createScalpBot({ store, crypto, source1m, now = Date.now, log = console
     skipSeen.add(key);
     log(`[scalp_wide] skip ${symbol}: ${reason}`);
     await store.insertSkip({ market: MARKET_WIDE, symbol, skip_date: date, reason, r_factor: extra.r_factor ?? null, patterns: extra.patterns || null, trend_state: extra.trend_state || null, data_source: 'binance_public', data_delay_sec: null });
+    await recordShadow('scalp_wide', symbol, reason, extra);
   }
 
   // scalp_wide: 5-minute entries, 15-minute trend. Reads the same 5-minute candles crypto.candles() already returns for the tight scalp's trend,
@@ -150,7 +181,7 @@ function createScalpBot({ store, crypto, source1m, now = Date.now, log = console
 
   async function cryptoScalpWideMonitor() {
     const open = await store.openTrades(MARKET_WIDE);
-    if (!open.length) return { checked: 0, closed: 0 };
+    if (!open.length) { await resolveShadows('scalp_wide', (symbol) => crypto.candles(symbol), 300000); return { checked: 0, closed: 0 }; }
     const cfg = await loadScalpWideConfig(store);
     let closed = 0;
     for (const t of open) {
@@ -167,6 +198,7 @@ function createScalpBot({ store, crypto, source1m, now = Date.now, log = console
       log(`[scalp_wide] PAPER exit ${t.symbol}: ${ev.reason}, gross ${s.gross_pnl_usdt} net ${s.net_pnl_usdt} USDT (Rs ${s.pnl_inr})`);
       closed += 1;
     }
+    await resolveShadows('scalp_wide', (symbol) => crypto.candles(symbol), 300000);
     return { checked: open.length, closed };
   }
 

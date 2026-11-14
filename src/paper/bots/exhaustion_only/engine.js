@@ -41,7 +41,9 @@ function decide(candles, context) {
   const riskNet = plan.plan.riskPct + costs;
   const rr = rewardNet / riskNet;
   if (!(rewardNet > 0) || rr < cfg.min_rr) {
-    return { take: false, direction: null, reason: `reward/risk ${r(rr, 2)} after costs is below ${cfg.min_rr} (target ${plan.plan.rewardPct}%, stop ${plan.plan.riskPct}%, costs ${r(costs, 2)}% round trip)`, extra: { patterns: [exhaustion.name], r_factor: r(rr, 2) } };
+    // shadow tracking (docs/BOTS.md): the plan was fully worked out, only the reward/risk gate turned it down - a real would-be trade.
+    const shadowPlan = { direction: direction === 'up' ? 'LONG' : 'SHORT', entry_price: entry, sl_price: plan.plan.stop, target_price: plan.plan.target, trigger_t: last.t };
+    return { take: false, direction: null, reason: `reward/risk ${r(rr, 2)} after costs is below ${cfg.min_rr} (target ${plan.plan.rewardPct}%, stop ${plan.plan.riskPct}%, costs ${r(costs, 2)}% round trip)`, extra: { patterns: [exhaustion.name], r_factor: r(rr, 2), shadowPlan } };
   }
   return {
     take: true, direction, entry, stop: plan.plan.stop, target: plan.plan.target, trigger_t: last.t,

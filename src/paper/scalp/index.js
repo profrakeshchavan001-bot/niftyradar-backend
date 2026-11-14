@@ -2,11 +2,18 @@
 // Scalp wiring: ONE hook called from paperbot/index.js. PAPER_SCALP_ENABLED (default true; "false" turns the scalp strategy off).
 //   - cron: scan every minute (5 s after the 1-minute candle closes), monitor every minute (35 s past)
 //   - GET /api/paper/scalp-report (same secret as the other paper routes): HTML, or JSON with ?format=json
+const fs = require('fs');
+const path = require('path');
 const { createScalpBot } = require('./bot');
 const { createScalpSource } = require('./source');
 const { buildScalpData, renderScalpReport } = require('./report');
+const { createMemoryShadowStore, createPgShadowStore } = require('../shadow/store');
 
-function attachScalp({ app, cron, axios, env = process.env, log = console.log, state, store, crypto, secret, okSecret, enabled, guarded, now = Date.now }) {
+async function ensureShadowSchema(pool, log) {
+  try { await pool.query(fs.readFileSync(path.join(__dirname, '..', 'shadow', 'schema.sql'), 'utf8')); } catch (e) { log(`[scalp] shadow schema failed: ${e.message}`); }
+}
+
+function attachScalp({ app, cron, axios, env = process.env, log = console.log, state, store, crypto, secret, okSecret, enabled, guarded, now = Date.now, pool = null }) {
   const scalpOn = env.PAPER_SCALP_ENABLED !== 'false';
   // read-only report, registered whether or not the scalp is running (it then shows what is stored)
   app.get('/api/paper/scalp-report', async (req, res) => {
@@ -23,7 +30,9 @@ function attachScalp({ app, cron, axios, env = process.env, log = console.log, s
     }
   });
   if (!scalpOn) { log('[scalp] disabled (PAPER_SCALP_ENABLED=false)'); return { enabled: false }; }
-  const bot = createScalpBot({ store, crypto, source1m: createScalpSource({ axios }), now, log });
+  const shadowStore = pool ? createPgShadowStore(pool) : createMemoryShadowStore();
+  if (pool) ensureShadowSchema(pool, log); // fire-and-forget, same as every other idempotic schema here (schema.sql is additive and safe to race)
+  const bot = createScalpBot({ store, crypto, source1m: createScalpSource({ axios }), shadowStore, now, log });
   const tz = { timezone: 'Asia/Kolkata' };
   cron.schedule('5 * * * * *', guarded('scalp scan', bot.cryptoScalpScan, log), tz);
   cron.schedule('35 * * * * *', guarded('scalp monitor', bot.cryptoScalpMonitor, log), tz);

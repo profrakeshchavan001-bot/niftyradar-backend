@@ -7,6 +7,7 @@ const { decide, evaluateExit, settle, costPct } = require('../src/paper/bots/exh
 const { EXHAUSTION_ONLY_DEFAULTS } = require('../src/paper/bots/exhaustion_only/config');
 const { createExhaustionBot, MARKET } = require('../src/paper/bots/exhaustion_only/bot');
 const { createMemoryExhaustionStore } = require('../src/paper/bots/exhaustion_only/store');
+const { createMemoryShadowStore } = require('../src/paper/shadow/store');
 const { findPluginDirs } = require('../src/paper/pluginLoader');
 
 const MIN = 60000; const FIVE = 5 * MIN;
@@ -114,12 +115,28 @@ function harness(over = {}) {
   const s = scene(over);
   const padded = candles5Padded();
   const store = createMemoryExhaustionStore();
+  const shadowStore = createMemoryShadowStore();
   const logs = [];
   const clock = { t: padded[padded.length - 1].t + FIVE + 5000 };
   const crypto = { candles: async () => padded, hourly: async () => s.c1h, usdtInr: async () => ({ rate: 88, source: 'test' }) };
-  const bot = createExhaustionBot({ store, crypto, loadCfg: async () => s.cfg, now: () => clock.t, log: (m) => logs.push(m) });
-  return { s, padded, store, logs, clock, bot };
+  const bot = createExhaustionBot({ store, crypto, loadCfg: async () => s.cfg, shadowStore, now: () => clock.t, log: (m) => logs.push(m) });
+  return { s, padded, store, shadowStore, logs, clock, bot };
 }
+
+test('bot: a skipped setup is shadow-tracked (never counted as a trade) and the monitor resolves it to its would-be exit', async () => {
+  const h = harness({ cfg: { min_rr: 100 } }); // guaranteed skip, same fixture as the "below min_rr" test above
+  await h.bot.scan();
+  const shadows = h.shadowStore._db.rows;
+  assert.equal(shadows.length, 3);
+  assert.ok(shadows.every((r) => r.bot === 'exhaustion_only' && r.status === 'open' && r.direction === 'LONG'));
+  const target = shadows[0].target_price;
+  h.padded.push({ t: h.padded[h.padded.length - 1].t + FIVE, o: 100.44, h: target + 1, l: 100.4, c: target + 0.5, v: 1 }); // clears the target
+  h.clock.t += FIVE + 5000;
+  await h.bot.monitor();
+  const row = h.shadowStore._db.rows[0];
+  assert.equal(row.status, 'resolved'); assert.equal(row.resolved_reason, 'target'); assert.equal(row.resolved_price, target);
+  assert.equal(h.store._db.trades.length, 0, 'a shadow is never counted as a trade');
+});
 
 // bot.js leaves decide() to build its own 15-min candles from the padded array (E.aggregate), same as the main crypto bot - the exact
 // target it lands on (whichever real level is nearest) is NOT the fabricated 103 swing high from the engine-level tests above, since
