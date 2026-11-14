@@ -86,6 +86,7 @@ function createPgStore(getPool) {
   const q = async (text, params) => (await pool.query(text, params)).rows.map(fromRow);
   return {
     kind: 'postgres',
+    query: pool.query, // raw access for a plugin's own idempotent schema.sql (src/paper/pluginLoader.js); nothing existing uses this
     init: ensure,
     async noteTrade(id, fields) { return this.updateTrade(id, fields); },
     async getConfig() {
