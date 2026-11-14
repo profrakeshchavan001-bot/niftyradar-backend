@@ -155,13 +155,25 @@ function axiosFetch(url, opts) { // only used on a Node without global fetch
     .then((r) => ({ ok: r.status >= 200 && r.status < 300, status: r.status, text: async () => String(r.data ?? '') }));
 }
 
+// Two header sets tried in order: `primary` (our honest bot UA) then `alternate` (a plain desktop-browser UA,
+// since NSE in particular answers a scripted UA with a block more often than a browser-shaped one). Never
+// used to hide who we are from a source that wants to know (Referer stays nseindia.com either way).
+function headerVariants(o, url, accept) {
+  const isNse = url.includes('nseindia.com');
+  return [
+    { 'User-Agent': o.userAgent, Accept: accept, 'Accept-Language': 'en-IN,en;q=0.8', Referer: isNse ? 'https://www.nseindia.com/' : undefined },
+    { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36', Accept: accept, 'Accept-Language': 'en-US,en;q=0.9', Referer: isNse ? 'https://www.nseindia.com/get-quotes/equity' : undefined },
+  ];
+}
+
 function createNewsContext(options = {}) {
   const o = {
     fetchImpl: options.fetchImpl || (typeof fetch === 'function' ? fetch : axiosFetch),
     now: options.now || (() => Date.now()),
+    sleep: options.sleep || ((ms) => new Promise((r) => setTimeout(r, ms))),
     userAgent: options.userAgent || 'NiftyRadarPaperBot/1.0 (research; low-rate RSS reader; no scraping of personal data)',
     cacheMs: options.cacheMs ?? 600000, failMs: options.failMs ?? 60000, staleMs: options.staleMs ?? 3600000,
-    maxCallsPerMinute: options.maxCallsPerMinute ?? 5, timeoutMs: options.timeoutMs ?? 8000,
+    maxCallsPerMinute: options.maxCallsPerMinute ?? 5, timeoutMs: options.timeoutMs ?? 8000, retryBackoffMs: options.retryBackoffMs ?? 500,
     names: { ...NAMES, ...(options.names || {}) },
     sources: { google: true, et: true, moneycontrol: true, nse: true, ...(options.sources || {}) },
   };
@@ -170,7 +182,25 @@ function createNewsContext(options = {}) {
   const inflight = new Map(); // url -> Promise
   const calls = []; // timestamps of feed calls in the last minute
   const results = new Map(); // `${kind}:${symbol}` -> { at, value }
-  const stats = { feedCalls: 0 };
+  const diag = new Map(); // url -> last outcome: { ok, at, attempts, headerSet, error }
+  const stats = { feedCalls: 0, retries: 0 };
+
+  /** One source URL, trying each header set in headerVariants() in turn, with a short backoff before a retry. */
+  async function fetchOnce(url, accept) {
+    const variants = headerVariants(o, url, accept);
+    let lastErr = null;
+    for (let i = 0; i < variants.length; i++) {
+      if (i > 0) { stats.retries += 1; await o.sleep(o.retryBackoffMs * i); }
+      try {
+        const res = await o.fetchImpl(url, { headers: variants[i], signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(o.timeoutMs) : undefined });
+        if (!res || !res.ok) throw new Error(`HTTP ${res ? res.status : 'none'}`);
+        const text = await res.text();
+        if (typeof text !== 'string' || !text.trim()) throw new Error('empty answer');
+        return { text, attempts: i + 1, headerSet: i === 0 ? 'primary' : 'alternate' };
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('fetch failed');
+  }
 
   /** Text of a feed, or null. Fresh cache first, then the call budget, then the network. A stale copy (under staleMs) is used when the network is not allowed or fails. */
   async function getText(url, accept) {
@@ -184,13 +214,15 @@ function createNewsContext(options = {}) {
     calls.push(t); stats.feedCalls += 1;
     const p = (async () => {
       try {
-        const res = await o.fetchImpl(url, { headers: { 'User-Agent': o.userAgent, Accept: accept, 'Accept-Language': 'en-IN,en;q=0.8', Referer: url.includes('nseindia.com') ? 'https://www.nseindia.com/' : undefined }, signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(o.timeoutMs) : undefined });
-        if (!res || !res.ok) throw new Error(`HTTP ${res ? res.status : 'none'}`);
-        const text = await res.text();
-        if (typeof text !== 'string' || !text.trim()) throw new Error('empty answer');
+        const { text, attempts, headerSet } = await fetchOnce(url, accept);
         raw.set(url, { at: o.now(), text }); failed.delete(url);
+        diag.set(url, { ok: true, at: o.now(), attempts, headerSet, error: null });
         return { text, stale: false };
-      } catch { failed.set(url, o.now()); return staleCopy; } finally { inflight.delete(url); }
+      } catch (e) {
+        failed.set(url, o.now());
+        diag.set(url, { ok: false, at: o.now(), attempts: headerVariants(o, url, accept).length, headerSet: null, error: e && e.message ? e.message : String(e) });
+        return staleCopy;
+      } finally { inflight.delete(url); }
     })();
     inflight.set(url, p);
     return p;
@@ -274,7 +306,8 @@ function createNewsContext(options = {}) {
     });
   }
 
-  return { newsScore, eventBlock, stats, _clear: () => { raw.clear(); failed.clear(); results.clear(); calls.length = 0; } };
+  const diagFor = (url) => diag.get(url) || null;
+  return { newsScore, eventBlock, stats, diagFor, URLS_used: URLS, _clear: () => { raw.clear(); failed.clear(); results.clear(); diag.clear(); calls.length = 0; } };
 }
 
 let shared = null;
@@ -285,4 +318,5 @@ module.exports = {
   KEYWORDS, NEGATION, DUE_SOON, BIG_WORDS, URLS, NAMES, RECENCY, HEADLINE_CAP, POINTS_TO_SCORE,
   newsScore: (symbol, opt) => defaultContext().newsScore(symbol, opt),
   eventBlock: (symbol, opt) => defaultContext().eventBlock(symbol, opt),
+  defaultContext,
 };
