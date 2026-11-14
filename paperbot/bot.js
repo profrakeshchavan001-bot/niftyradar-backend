@@ -13,6 +13,7 @@ const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
 const { createJudge, loadJudgeConfig, tradeFields } = require('../src/paper/decision/judge');
 const { classifyEmaCross } = require('../src/paper/lib/emaCross');
 const { tagSmc } = require('../src/paper/lib/smc');
+const Lib = require('../src/paper/lib/exitSim');
 
 // judgeOn: the judge (src/paper/decision/judge.js, docs/JUDGE.md) decides every NSE entry; index.js turns it on unless PAPER_JUDGE_ON=false.
 // judgeHelpers: test seam for { stockSectorView, newsScore, eventBlock }; by default the real modules are used when they exist.
@@ -341,33 +342,46 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     const watch = await legacyPending();
     if (!open.length && !watch.size) return { checked: 0 };
     const c = (await loadConfig(store)).crypto;
-    const prices = new Map(); // one price read per coin per check
+    const prices = new Map(); // one price read per coin per check (still used for tracking + the legacy fixed-rule path)
     for (const symbol of new Set([...open, ...watch.values()].map((t) => t.symbol))) {
       try { prices.set(symbol, await crypto.price(symbol)); } catch (e) { log(`[paperbot] crypto price for ${symbol} failed: ${e.response?.status || e.message}`); }
     }
     let closed = 0;
     for (const t of open) {
       const price = prices.get(t.symbol);
-      if (!price) continue;
       const short = t.direction === 'SHORT';
-      const pct = E.changePct(t.entry_price, price, short);
       let reason = null;
+      let exitPrice = null;
       if (t.target_price == null || t.stop_active == null) {
         // a trade opened before level-based exits existed: it finishes on the fixed rule it was opened with
+        if (!price) continue;
         const r = E.evaluateExit({ entry: t.entry_price, current: price, targetPct: c.target_pct, stopPct: c.stop_pct, short });
-        if (r.exit) reason = r.reason;
+        if (r.exit) { reason = r.reason; exitPrice = price; } else { await track(t, E.changePct(t.entry_price, price, short)); continue; }
       } else {
-        const m = L.manageTrade({ entry: t.entry_price, target: t.target_price, stop: t.stop_active, short, price, breakevenDone: !!t.breakeven_time, breakevenAt: c.breakeven_at });
-        if (m.action === 'exit') reason = m.reason;
-        if (m.action === 'breakeven') {
-          await store.updateTrade(t.id, { stop_active: t.entry_price, breakeven_time: new Date(now()).toISOString() });
-          log(`[paperbot] PAPER crypto ${t.symbol}: ${Math.round(c.breakeven_at * 100)}% of the way to the target covered at ${price}, stop moved to the entry ${t.entry_price}`);
+        // Candle-accurate exit (CC2 round 2 item 1, src/paper/lib/exitSim.js): checks the stop and the
+        // target against every closed candle's high/low since the entry, not only this minute's tick -
+        // a spike between two checks is no longer missed. Walked from the entry every time (idempotent,
+        // deterministic) using the ORIGINAL stop (sl_price), not whatever stop_active currently holds.
+        let candles = [];
+        try {
+          const raw = await crypto.candles(t.symbol);
+          candles = E.closedOnly(raw, FIVE_MIN, now()).filter((k) => k.t + FIVE_MIN > Date.parse(t.entry_time));
+        } catch (e) { log(`[paperbot] crypto candles for ${t.symbol} (exit check) failed: ${e.response?.status || e.message}`); }
+        if (!candles.length) { if (price) await track(t, E.changePct(t.entry_price, price, short)); continue; }
+        const sim = Lib.simulateExit({ entry: t.entry_price, target: t.target_price, stop: t.sl_price, short, breakevenAt: c.breakeven_at, candles });
+        if (sim.exit) { reason = sim.reason; exitPrice = sim.price; } else {
+          if (sim.action === 'breakeven' && t.stop_active !== sim.stopActive) {
+            await store.updateTrade(t.id, { stop_active: sim.stopActive, breakeven_time: t.breakeven_time || new Date(now()).toISOString() });
+            log(`[paperbot] PAPER crypto ${t.symbol}: ${Math.round(c.breakeven_at * 100)}% of the way to the target covered (by a candle high/low), stop moved to the entry ${sim.stopActive}`);
+          }
+          if (price) await track(t, E.changePct(t.entry_price, price, short));
+          continue;
         }
       }
-      if (!reason) { await track(t, pct); continue; }
       const fx = await crypto.usdtInr(c.usdt_inr_fallback);
-      const pnlUsdt = (price - t.entry_price) * t.qty * (short ? -1 : 1);
-      await closeTrade(t, price, price, reason, pnlUsdt * fx.rate, pct, { fx_rate: fx.rate, fx_source: fx.source });
+      const pct = E.changePct(t.entry_price, exitPrice, short);
+      const pnlUsdt = (exitPrice - t.entry_price) * t.qty * (short ? -1 : 1);
+      await closeTrade(t, exitPrice, exitPrice, reason, pnlUsdt * fx.rate, pct, { fx_rate: fx.rate, fx_source: fx.source });
       closed += 1;
     }
     // A/B only: what the old fixed +target% / -stop% rule would have done with the same entry. Never used for an exit.

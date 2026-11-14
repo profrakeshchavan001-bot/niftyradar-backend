@@ -216,3 +216,55 @@ Full suite: 292/295 - the 3 failures (`newsCheck`, `opsCookieAuth`,
 `opsHome`) all pre-exist on `main` before this PR (confirmed by stashing
 this diff); CC4's folders, not touched here, not CC2's to fix per this
 round's brief.
+
+### Item 1 - wire exit accuracy into the LIVE crypto monitor (NSE deferred)
+
+`paperbot/bot.js` `cryptoMonitor()`: the level-based exit branch now fetches
+every closed candle since the trade's entry (`crypto.candles(symbol)`,
+`closedOnly`) and runs `simulateExit()` (`src/paper/lib/exitSim.js`, built
+last round, not wired in until now) instead of checking a single tick
+against `manageTrade()`. Walked fresh from the entry every call, using the
+ORIGINAL stop (`sl_price`) - idempotent and deterministic, so re-checking
+never changes a past decision. A breakeven move or an exit found by the
+walk is written the same way as before (`stop_active`, `breakeven_time`,
+`closeTrade`). The legacy fixed-rule branch (for trades opened before
+levels existed) is untouched in behaviour, only refactored to share the
+same `reason`/`exitPrice` variables.
+
+**Bug found while updating the test rig, fixed, not just worked around:**
+the refactor of the legacy branch first had a missing `continue` after
+`track()` on a non-exit tick - every legacy-rule trade would fall through
+into `closeTrade()` with `exitPrice: null` on its very next check,
+regardless of price (`test/paperCryptoLevels.test.js`'s "old fixed rule, no
+levels stored" test caught this immediately: the trade closed at the FIRST
+check instead of the second). Added the missing `continue`; the test is
+what caught it, exactly as the VERIFY loop is for.
+
+Test rig rewrite (`test/paperCryptoLevels.test.js` `rig()`/`at()`, never
+deleted, all 15 tests in the file still present and passing): `at(spec)` now
+appends a real CLOSED 5-minute candle (a flat "doji" `[spec,spec,spec,spec]`
+unless a `[o,h,l,c]` tuple is given) and runs `cryptoMonitor()`, instead of
+only setting a tick price - the real unit the new mechanism checks against.
+New hand-worked numbers follow from this: a stop/target is now booked AT
+THE LEVEL, never at the tick/candle close that merely crossed it (e.g. the
+stop test's exit price changed from 103.2 - the tick that triggered it - to
+103.12, the stop level itself; pnl from -292.82 to -269.85). The breakeven
+test now books at EXACTLY the entry price for a true zero P&L, where the
+old tick-based version booked at whatever price happened to be showing
+(-5.74), which was never really what "breakeven" was supposed to mean.
+`test/paperReplay.test.js`'s crypto stop test had the exact same
+tick-without-a-candle gap and needed the same fix (push a real candle, not
+just set the mock's `price` variable) plus the same new numbers; both the
+main summary line and the per-pattern line were updated in that file too.
+
+**NSE monitor is NOT wired to candle-accurate exits.** NSE trades the
+OPTION PREMIUM (real quote or simulated from the underlying's spot move via
+`simOptionPrice`), which has no OHLC candle history of its own to check
+highs/lows against - that would need the underlying's candles translated
+through the same delta formula into a premium range per candle, which is
+exactly the level-based-NSE-exits work (item 4's still-deferred second
+half) done PROPERLY, not a shortcut bolted onto the exit checker alone.
+Noted again here so it does not get lost between rounds.
+
+Full suite after this item: 292/295 (same 3 pre-existing CC4 failures as
+the SMC PR above, confirmed unrelated).
