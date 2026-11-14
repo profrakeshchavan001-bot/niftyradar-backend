@@ -138,3 +138,48 @@ CC5 had already exported this for exactly this purpose; one line, `state.replay 
 needed to reach it). Honesty note on the time window: `paper_trades.entry_time` is exact, so trade counts
 are exact; `paper_skips.skip_date` is a DATE only (no time of day), so the skip count is from yesterday's
 calendar date onward, not exactly 18:00 - said on the card itself.
+## CC4 add-on v2: Telegram trade alerts
+`src/paper/ops/telegramAlerts/` (new plugin, auto-loaded): reads newly opened/closed trades from the
+stores on a 20s timer - never called from inside a bot's decision code.
+- **Covered**: intraday (`crypto`), scalp (`crypto_scalp`), scalp_wide (`crypto_wide_scalp`) - all three
+  live in the shared `paper_trades` table this plugin's `ctx.store` already points at.
+- **NOT covered, deliberately**: exhaustion_only and trend_smc keep their own tables
+  (`src/paper/bots/exhaustion_only/store.js`, `src/paper/bots/trend_smc/store.js`) with no shared reference
+  this plugin can reach without one wiring line in each bot's own `register.js` to expose its store on
+  `state` - out of this add-on's time budget tonight. Never guessed in; no fake alerts for them. A natural
+  follow-up: each bot's `register.js` adds `state.exhaustionOnlyStore = store;` (one line), and this
+  plugin's `BOT_MARKETS`-style list grows by one entry pointing at that store instead of `ctx.store`.
+- Entry message: exact layout (direction+coin+bot on line 1; Entry/Target/Stop with the level type in
+  brackets straight from the trade row's own `target_type`/`stop_type` columns - `swing high 1h`, `order
+  block`, `FVG edge`, `prev day high` are literally what `paperbot/cryptoLevels.js`'s level planner already
+  writes there; `fixed %` only as the legacy fallback when a row has neither); `Target lagne par ≈ +₹X` /
+  `Stop lagne par ≈ -₹Y` = qty × distance to the level, minus an estimated round-trip cost (default 0.23%,
+  same number `src/paper/scalp/config.js`'s `costPct()` already uses with its defaults), converted at the
+  trade's own `fx_rate` if the row has one, else `env.USDINR_FALLBACK`, else shown in USD with "rate n/a" -
+  never a silently invented rate; Reward:Risk from the row's own `rr` when stored, else target/stop ratio;
+  `Kyu:` is the basis string's first two lines/sentences only.
+- Exit message: result word (target/stop/breakeven/other), net INR with sign, minutes in trade.
+- Item 3: this plugin only ever formats entry/exit text - no summary/brief/weekly code path exists here at
+  all (checked by a test that greps every sent message for those words).
+- Dedupe (item 4): `telegram_alert_log(bot, trade_id, event)` PRIMARY KEY, one `INSERT ... ON CONFLICT DO
+  NOTHING RETURNING 1` per event - a row already there means already sent, survives a redeploy because the
+  table does. No database (`PAPER_DATABASE_URL` unset): falls back to an in-memory `Set`, logged once,
+  honestly not redeploy-safe in that case.
+- Rate limit + digest (item 4): `src/paper/ops/telegramAlerts/rateLimit.js`, 30 sends/hour then one
+  combined digest per 10 minutes - pure, injectable clock, ephemeral by design (the DB dedupe above is the
+  real "never twice" guarantee, not this counter).
+- Failure handling (item 5): every Telegram POST has a 5s timeout; a failure is caught, logged (never the
+  URL - it holds the token), and the loop moves to the next trade - one bad send never blocks or slows
+  scanning.
+- `GET /api/paper/health` gets a `telegram: { configured, lastSendOk }` line (item 6), read from
+  `state.telegramStats`, which this plugin updates after every real send attempt.
+- Tests: `test/opsTelegramFormat.test.js` (9, every INR number hand-worked), `test/opsTelegramRateLimit.test.js`
+  (4), `test/opsTelegramRegister.test.js` (10, fake Telegram endpoint + fake pool - dedupe across a
+  simulated redeploy, rate limit, no summaries ever, a failure never breaks the next trade in the same
+  check). **Not verified live** - this sandbox cannot reach api.telegram.org; fixtures/fakes only.
+
+### VERIFY loop, round 3 + add-on
+`npm test`: 450/450. Real headless Chromium at 390×844 (fake `TELEGRAM_BOT_TOKEN`/`PAPER_ADMIN_SECRET` in
+env) against `/home`, `/health` (HTML and `&format=json`), `/report`: no secret, no Telegram token, no
+`postgres://`/`PAPER_DATABASE_URL` substring anywhere in the rendered page, and the cookie confirmed
+invisible to `document.cookie`.
