@@ -14,6 +14,7 @@ const { buildReport, chartData } = require('./reportPage');
 const { loadUniverse } = require('./yahoo');
 const { loadConfig, DEFAULTS, merge } = require('./config');
 const { istParts, nseSession } = require('./time');
+const { createHealthTracker, attachHealthRoute } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
 
 // The bot has its OWN database: PAPER_DATABASE_URL (any Postgres URL, for
 // example a free Supabase project, direct port 5432 or the pooler). It never
@@ -119,6 +120,9 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   route('/api/paper/trades', (limit) => state.store.listTrades(limit));
   route('/api/paper/skips', (limit) => state.store.listSkips(limit));
 
+  const healthTracker = createHealthTracker();
+  attachHealthRoute(app, { secret, okSecret, tracker: healthTracker, state });
+
   // Read-only report page (plain HTML, for a phone). Same secret, sent as ?key= (or the x-paper-secret header).
   app.get('/api/paper/report', async (req, res) => {
     res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
@@ -162,8 +166,8 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   const tz = { timezone: 'Asia/Kolkata' };
   const job = (name, fn) => guarded(name, fn, log);
   const jobs = {
-    nseScan: job('nse scan', bot.nseScan), nseMonitor: job('nse monitor', bot.nseMonitor),
-    cryptoScan: job('crypto scan', bot.cryptoScan), cryptoMonitor: job('crypto monitor', bot.cryptoMonitor),
+    nseScan: job('nse scan', healthTracker.wrap('nseScan', bot.nseScan)), nseMonitor: job('nse monitor', healthTracker.wrap('nseMonitor', bot.nseMonitor)),
+    cryptoScan: job('crypto scan', healthTracker.wrap('cryptoScan', bot.cryptoScan)), cryptoMonitor: job('crypto monitor', healthTracker.wrap('cryptoMonitor', bot.cryptoMonitor)),
   };
   state.ready = true; // the database is only opened when the first job needs it
   log(`[paperbot] ready (PAPER ONLY, storage: ${store.kind}, Telegram: ${env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID ? 'on' : 'off, summaries are only stored'})`);
