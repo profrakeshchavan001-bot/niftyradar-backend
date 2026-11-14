@@ -8,7 +8,7 @@
 //  - one open trade at a time per symbol (matches the live cron: scan only runs when nothing is open for that coin)
 //  - entry price, stop and target are fixed at the decision candle, exactly as analyse() returns them
 //  - exits (target / stop / breakeven / time) and settlement (fees + slippage) reuse evaluateExit()/settle() unchanged
-const { analyse, evaluateExit, settle } = require('../scalp/engine');
+const { analyse, analyseWide, evaluateExit, settle } = require('../scalp/engine');
 const { sizeCrypto } = require('../../../paperbot/engine');
 const { istDayStart } = require('../../../paperbot/time');
 
@@ -135,4 +135,132 @@ function replayRandomBaseline({ symbol, candles1m, realTrades, cfg, fxRate = 88,
   return trades;
 }
 
-module.exports = { scanSignals, resolveTrade, replayScalp, replayRandomBaseline, mulberry32, WINDOW_1M, WINDOW_5M };
+// scalp_wide (round 2 adapter): single 5-minute candle stream, real analyseWide() (src/paper/scalp/engine.js),
+// SAME evaluateExit()/settle() the tight scalp uses -- including its (pre-existing, live) 1-minute-granularity
+// candle-close math, which is why resolveTrade()/sizeFor() below are reused unchanged rather than rewritten.
+function scanSignalsWide({ candles5m, cfg }) {
+  const signals = [];
+  for (let i = cfg.min_candles_5m - 1; i < candles5m.length; i++) {
+    const now = candles5m[i].t + 5 * MIN;
+    const c5raw = candles5m.slice(Math.max(0, i - WINDOW_5M + 1), i + 1);
+    const a = analyseWide({ c5raw, now, cfg, dayStartMs: istDayStart(now) });
+    if (a.ok) signals.push({ i, now, plan: a.plan });
+  }
+  return signals;
+}
+
+function replayScalpWide({ symbol, candles5m, cfg, fxRate = 88 }) {
+  const signals = scanSignalsWide({ candles5m, cfg });
+  const trades = [];
+  let nextFreeIndex = cfg.min_candles_5m - 1;
+  for (const sig of signals) {
+    if (sig.i < nextFreeIndex) continue;
+    const plan = sig.plan;
+    const size = sizeFor(cfg, plan.stopPct, plan.entry);
+    if (!size) continue;
+    const trade = {
+      direction: plan.long ? 'LONG' : 'SHORT', entry_price: plan.entry, trigger_t: plan.last.t,
+      sl_price: plan.stopPrice, target_price: plan.targetPrice, qty: size.qty,
+    };
+    const r = resolveTrade({
+      symbol, candles1m: candles5m, triggerIndex: sig.i, trade, cfg, fxRate,
+      extra: { stopPct: plan.stopPct, targetPct: plan.targetPct, rr: plan.rr, patterns: plan.hits.map((h) => h.name) },
+    });
+    if (!r.resolved) break;
+    trades.push({ ...r.row, hour_utc: new Date(r.row.entry_t).getUTCHours() });
+    if (r.nextIndex == null) break;
+    nextFreeIndex = r.nextIndex + 1;
+  }
+  return trades;
+}
+
+// --- Generic adapter for any bot that already follows docs/BOT-INTERFACE.md's decide(candles, context) /
+// evaluateExit({trade, candles}) / settle({trade, exitPrice, cfg, fxRate}) shape (src/paper/bots/*/engine.js).
+// Covers exhaustion_only today and any future bot built the same way (e.g. trend_smc), with zero new code
+// per bot beyond a small adapter file that wires up that bot's own imports (see src/paper/replay/adapters/).
+function scanDecideSignals({ candles, intervalMs, decide, buildContext, cfg, minCandles, window = 330 }) {
+  const signals = [];
+  for (let i = minCandles - 1; i < candles.length; i++) {
+    const now = candles[i].t + intervalMs;
+    const win = candles.slice(Math.max(0, i - window + 1), i + 1);
+    const context = buildContext(win, now, cfg);
+    const d = decide(win, context);
+    if (d && d.take) signals.push({ i, now, decision: d });
+  }
+  return signals;
+}
+
+function resolveDecideTrade({ symbol, candles, triggerIndex, decision: d, evaluateExitFn, settleFn, cfg, fxRate, qty, stepMs }) {
+  const trade = { direction: d.direction === 'up' ? 'LONG' : 'SHORT', entry_price: d.entry, sl_price: d.stop, target_price: d.target, trigger_t: d.trigger_t, qty };
+  const future = candles.slice(triggerIndex + 1);
+  const ev = evaluateExitFn({ trade, candles: future });
+  if (!ev.exit) return { resolved: false };
+  const s = settleFn({ trade, exitPrice: ev.price, cfg, fxRate });
+  const exitIdx = candles.findIndex((k) => k.t + stepMs === ev.timeMs);
+  return {
+    resolved: true,
+    nextIndex: exitIdx > triggerIndex ? exitIdx : null,
+    row: {
+      symbol, direction: trade.direction, entry_t: d.trigger_t, entry_price: d.entry, qty,
+      exit_t: ev.timeMs, exit_price: ev.price, exit_reason: ev.reason,
+      stop_pct: round(Math.abs(d.entry - d.stop) / d.entry * 100, 4), target_pct: round(Math.abs(d.target - d.entry) / d.entry * 100, 4),
+      rr: d.rr ?? null, patterns: d.pattern ? [d.pattern] : (d.patterns || []), ...s,
+    },
+  };
+}
+
+function replayDecideBot({ symbol, candles, intervalMs, decide, buildContext, evaluateExitFn, settleFn, cfg, fxRate = 88, minCandles, window = 330 }) {
+  const signals = scanDecideSignals({ candles, intervalMs, decide, buildContext, cfg, minCandles, window });
+  const trades = [];
+  let nextFreeIndex = minCandles - 1;
+  for (const sig of signals) {
+    if (sig.i < nextFreeIndex) continue;
+    const d = sig.decision;
+    const stopPct = Math.abs(d.entry - d.stop) / d.entry * 100;
+    const size = sizeFor(cfg, stopPct, d.entry);
+    if (!size) continue;
+    const r = resolveDecideTrade({ symbol, candles, triggerIndex: sig.i, decision: d, evaluateExitFn, settleFn, cfg, fxRate, qty: size.qty, stepMs: intervalMs });
+    if (!r.resolved) break;
+    trades.push({ ...r.row, hour_utc: new Date(r.row.entry_t).getUTCHours() });
+    if (r.nextIndex == null) break;
+    nextFreeIndex = r.nextIndex + 1;
+  }
+  return trades;
+}
+
+// Random-entry baseline, generalised for any strategy (round 2): same shape as replayRandomBaseline() above
+// but driven through the generic resolveDecideTrade(), so scalp_wide/exhaustion_only/intraday_crypto get a
+// random baseline for free via their own evaluateExitFn/settleFn, with no new per-strategy code.
+function replayRandomGeneric({ symbol, candles, stepMs, minCandles, realTrades, evaluateExitFn, settleFn, cfg, fxRate = 88, seed = 1 }) {
+  if (!realTrades.length || candles.length <= minCandles) return [];
+  const rng = mulberry32(seed);
+  const trades = [];
+  const start = minCandles - 1;
+  const pEntry = Math.min(1, realTrades.length / Math.max(1, candles.length - start));
+  let i = start; let guard = 0;
+  while (i < candles.length && guard < candles.length * 2) {
+    guard += 1;
+    if (rng() >= pEntry) { i += 1; continue; }
+    const sample = realTrades[Math.floor(rng() * realTrades.length)];
+    const long = rng() < 0.5;
+    const sgn = long ? 1 : -1;
+    const entry = candles[i].c;
+    const size = sizeFor(cfg, sample.stop_pct, entry);
+    if (!size) { i += 1; continue; }
+    const decision = {
+      direction: long ? 'up' : 'down', entry, trigger_t: candles[i].t, pattern: 'random_baseline',
+      stop: round(entry * (1 - sgn * sample.stop_pct / 100)), target: round(entry * (1 + sgn * sample.target_pct / 100)),
+    };
+    const r = resolveDecideTrade({ symbol, candles, triggerIndex: i, decision, evaluateExitFn, settleFn, cfg, fxRate, qty: size.qty, stepMs });
+    if (!r.resolved) break;
+    trades.push({ ...r.row, hour_utc: new Date(r.row.entry_t).getUTCHours() });
+    i = r.nextIndex != null ? r.nextIndex + 1 : i + 1;
+  }
+  return trades;
+}
+
+module.exports = {
+  scanSignals, resolveTrade, replayScalp, replayRandomBaseline, mulberry32, WINDOW_1M, WINDOW_5M,
+  scanSignalsWide, replayScalpWide, sizeFor, round,
+  scanDecideSignals, resolveDecideTrade, replayDecideBot, replayRandomGeneric,
+};

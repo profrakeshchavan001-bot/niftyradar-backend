@@ -65,3 +65,50 @@ noted for whoever picks this lane up next. Will keep checking `src/paper/bots/` 
   look-ahead check passes on real Binance history (this was never reachable from the sandbox tonight).
 - Decide whether the "intraday crypto" (paperbot/engine.js) adapter should be CC5's next lane or another
   window's, since it is a second surface with its own level-based exit rules (`paperbot/cryptoLevels.js`).
+
+---
+
+# Round 2 (three more adapters, live-bot safety guard, bigger filter study)
+
+Branch `claude/cc5-adapters-round2`, rebased on `origin/main` after it picked up `exhaustion_only` (CC3),
+the shared `src/paper/lib/exitSim.js`/`emaCross.js` (CC2) and `/api/paper/health` (CC4).
+
+## Decisions (round 2)
+
+1. **scalp_wide, exhaustion_only, intraday_crypto all adapted** this round (item 1). scalp_wide and
+   exhaustion_only reuse their own live `decide`/`analyseWide`/`evaluateExit`/`settle` with no new logic,
+   only window-shaping. intraday_crypto composes real pieces into the `decide(candles,context)` shape; two
+   deliberate differences from the live bot (candle-accurate exit instead of tick-based, and the brief's
+   uniform cost model since the live bot's own P&L has none) are documented plainly in `docs/REPLAY.md`
+   rather than silently changing the numbers.
+2. **Generic adapter layer added** (`scanDecideSignals`/`resolveDecideTrade`/`replayDecideBot`/
+   `replayRandomGeneric` in `simulator.js`) so **trend_smc, when it lands, needs only a small adapter file**
+   like `adapters/exhaustionOnly.js` -- no new simulator or look-ahead code. Checked `src/paper/bots/` again
+   after this round's rebase: still only `exhaustion_only`; will keep checking every ~30 min as instructed.
+3. **Live-bot safety guard** (`safety.js`, item 2): the 02:00 IST automatic run is skipped (never started,
+   just logged) when `src/paper/ops/health.js`'s own `buildHealth()` would report `PROBLEM`, or when this
+   process's RSS is over 400 MB (Render Free is 512 MB). A manual run is never blocked. The round-1 "also run
+   once on startup if the code changed" trigger is **removed**: the round-2 brief narrows automatic runs to
+   "02:00 IST and manual start" only, so that extra trigger would now be out of scope.
+4. **Filter study extended** (item 3) with a real with/without split per SMC tag and an EMA-cross breakdown
+   using the real `classifyEmaCross()`, recomputed per trade from the stored 5-minute history at its own
+   entry time. Both stay descriptive, not a true ablation, for the same reason as round 1's pattern
+   breakdown: neither is a config knob or a hard block in the live `decide()` functions.
+5. **Report + health export** (item 4): `/api/paper/replay-report` now shows a last-run line (run id,
+   trigger, status, started, candles loaded, runtime) and a row per strategy; `attachReplay()` now returns
+   `getLastRunStatus()` (also exported as `lastRunStatus`) for the health page to call directly, without
+   touching `src/paper/ops/health.js` myself (staying in my own folder, per the rules).
+6. **Per-strategy live config**: scalp_wide and exhaustion_only read their config from the main paperbot
+   store the same way the live bots do (`loadScalpWideConfig`, `loadExhaustionConfig`); intraday_crypto reads
+   `paperbot/config.js`'s `DEFAULTS.crypto`/`DEFAULTS.patterns` the same way, with the uniform cost fields
+   layered on top (see item 1). Falls back to each strategy's own defaults if the live store is unavailable.
+7. **Binance still unreachable from this sandbox** (not re-checked this round; round 1's result stands).
+   Everything tested against the fixtures in `test/` and synthetic candle generators; not verified live.
+
+## Needs Rakesh (round 2)
+
+- Same as round 1: watch the first real Render run (`/api/paper/replay-report`) and the look-ahead result on
+  real Binance history.
+- Decide who owns wiring `lastRunStatus()` into `src/paper/ops/health.js` (CC4's file, not touched here).
+- `trend_smc`: once it lands, point its own decide/evaluateExit/settle at `adapters/` following
+  `exhaustionOnly.js`'s pattern -- should be a small follow-up, not a new engine change.
