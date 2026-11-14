@@ -14,7 +14,7 @@ const { buildReport, chartData } = require('./reportPage');
 const { loadUniverse } = require('./yahoo');
 const { loadConfig, DEFAULTS, merge } = require('./config');
 const { istParts, nseSession } = require('./time');
-const { defaultTracker, attachHealthRoute, JOB_NAMES, STALE_MS } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
+const { defaultTracker, attachHealthRoute, JOB_NAMES, STALE_MS, NSE_JOBS } = require('../src/paper/ops/health'); // overnight glance page: GET /api/paper/health
 const { newsScore, eventBlock } = require('../src/paper/context/news');
 const { attachNewsCheckRoute } = require('../src/paper/context/newsCheck'); // GET /api/paper/news-check
 const { attachHomeRoute } = require('../src/paper/ops/home'); // GET /api/paper/home
@@ -124,13 +124,26 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   app.get('/api/paper/ping', (req, res) => {
     const p = istParts(Date.now());
     const session = nseSession(Date.now(), state.holidays);
-    // Overnight item 4: a short status line, in-memory only (no database read - this is hit every 5 min
-    // by the free Render pinger and must stay cheap), no secrets, no stack traces, no error text.
+    // Overnight item 4 (round 2) + round 3 item 2: a short status line + reason, in-memory only (no
+    // database read - this is hit every 5 min by the free Render pinger and must stay cheap), no secrets,
+    // no stack traces. ALIVE/DEGRADED/PROBLEM mirrors health.js's buildHealth(): an nse job idle because
+    // the market is closed is NOT a fault (the 02:40 IST false "PROBLEM" this fixes).
     const now = Date.now();
     const jobs = healthTracker.snapshot().jobs;
-    const stale = !enabled || !state.ready || JOB_NAMES.some((n) => { const j = jobs[n]; return !j || now - j.lastRunAt > STALE_MS; });
-    const status = !enabled ? 'disabled' : stale ? 'PROBLEM' : 'ALIVE';
-    res.set('Cache-Control', 'no-store').json({ ok: true, paperOnly: true, botEnabled: enabled, status, istDate: p.date, istTime: p.hhmm, insideMarketHours: session.open, marketNote: session.reason || 'NSE open (09:15-15:30 IST)', cryptoAlwaysOpen: true });
+    const staleNames = JOB_NAMES.filter((n) => {
+      const j = jobs[n];
+      const past = !j || now - j.lastRunAt > STALE_MS;
+      return past && (!NSE_JOBS.includes(n) || session.open);
+    });
+    const problems = [];
+    if (!enabled) problems.push('paper bot disabled');
+    else if (!state.ready) problems.push('paper bot still starting');
+    if (staleNames.length) problems.push(`no scan in 15+ min: ${staleNames.join(', ')}`);
+    const degraded = [];
+    if (!session.open) degraded.push(`NSE closed (${session.reason || 'outside market hours'})`);
+    const status = problems.length ? 'PROBLEM' : degraded.length ? 'DEGRADED' : 'ALIVE';
+    const reason = problems.length ? problems.join('; ') : degraded.length ? degraded.join('; ') : 'all modules scanning';
+    res.set('Cache-Control', 'no-store').json({ ok: true, paperOnly: true, botEnabled: enabled, status, reason, istDate: p.date, istTime: p.hhmm, insideMarketHours: session.open, marketNote: session.reason || 'NSE open (09:15-15:30 IST)', cryptoAlwaysOpen: true });
   });
 
   // Read-only admin routes (GET only). Protected by PAPER_ADMIN_SECRET (or
@@ -255,7 +268,7 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   setInterval(() => { try { nse.sample(); } catch (e) { /* sampling must never break the server */ } }, 10000).unref();
 
   require('../src/paper/scalp').attachScalp({ app, cron, axios, env, log, state, store, crypto: cryptoSrc, secret, okSecret, enabled, guarded, pool: typeof store.query === 'function' ? { query: store.query } : null }); // scalp strategy + /api/paper/scalp-report (docs/SCALP.md)
-  require('../src/paper/replay').attachReplay({ app, cron, axios, env, log, secret, okSecret, enabled, guarded, liveStore: store, liveState: state }); // replay engine + /api/paper/replay-report (docs/REPLAY.md)
+  state.replay = require('../src/paper/replay').attachReplay({ app, cron, axios, env, log, secret, okSecret, enabled, guarded, liveStore: store, liveState: state }); // replay engine + /api/paper/replay-report (docs/REPLAY.md); state.replay.getLastRunStatus() for the home page morning card (round 3 item 3)
 
   // Auto-load bots/ops plugins (docs/BOT-INTERFACE.md, src/paper/pluginLoader.js).
   // Fire-and-forget: a plugin failing to load must never stop the bot itself.

@@ -34,11 +34,13 @@ test('tracker.wrap records a failed run, rethrows, and keeps the last 10 errors 
   assert.equal(snap.jobs.cryptoScan.error, 'boom');
 });
 
-test('ALIVE: bot ready, all 4 jobs scanned just now, database reachable, no errors', async () => {
-  const tracker = createHealthTracker({ now: () => NOW });
+test('ALIVE: bot ready, all 4 jobs scanned just now, database reachable, no errors, NSE open, Telegram configured', async () => {
+  const marketOpenNow = Date.UTC(2026, 10, 13, 5, 0); // Fri 13 Nov 2026 10:30 IST - NSE open (NOW above is a Saturday)
+  const tracker = createHealthTracker({ now: () => marketOpenNow });
   for (const name of JOB_NAMES) tracker.recordRun(name, true);
   const store = createMemoryStore();
-  const h = await buildHealth({ tracker, store, state: { enabled: true, ready: true }, now: NOW });
+  const env = { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C' };
+  const h = await buildHealth({ tracker, store, state: { enabled: true, ready: true }, now: marketOpenNow, env });
   assert.equal(h.status, 'ALIVE');
   assert.equal(h.database.ok, true);
   assert.equal(h.openTrades.nse, 0);
@@ -127,4 +129,79 @@ test('a source with a real stats object reports real ok/fail counts and the last
   assert.equal(h.dataSources.yahoo.status, 'ok');
   assert.equal(h.dataSources.dhan.status, 'failing'); // 0 ok, 5 fail: a real source that is actually down, not "unchecked"
   assert.equal(h.dataSources.dhan.lastError, 'HTTP 808: Authentication Failed');
+});
+
+// Round 3 item 2: ALIVE / DEGRADED / PROBLEM, not just ALIVE/PROBLEM.
+const MARKET_OPEN = Date.UTC(2026, 10, 13, 5, 0); // Fri 13 Nov 2026 10:30 IST
+const WEEKEND = Date.UTC(2026, 10, 14, 4, 0); // Sat 14 Nov 2026 09:30 IST (NOW above)
+
+test('DEGRADED, not PROBLEM: NSE closed on the weekend, crypto scanning fine (the 02:40 IST false alarm)', async () => {
+  const tracker = createHealthTracker({ now: () => WEEKEND });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true); // nse jobs "ran" too, doesn't matter - closed anyway
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: WEEKEND, env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C' } });
+  assert.equal(h.status, 'DEGRADED');
+  assert.match(h.reason, /NSE closed/);
+  assert.deepEqual(h.problems, []);
+});
+
+test('PROBLEM beats DEGRADED: NSE closed AND crypto has not scanned in 15+ min', async () => {
+  const tracker = createHealthTracker({ now: () => WEEKEND });
+  tracker.recordRun('nseScan', true); tracker.recordRun('nseMonitor', true); // irrelevant, nse is closed
+  // cryptoScan/cryptoMonitor never recorded -> stale, and crypto runs 24/7 so it counts
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: WEEKEND });
+  assert.equal(h.status, 'PROBLEM');
+  assert.match(h.reason, /cryptoScan/);
+});
+
+test('DEGRADED: Dhan down but Yahoo fallback is ok - not a PROBLEM', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const state = { enabled: true, ready: true, nse: { stats: { ok: 0, fail: 3, lastError: 'HTTP 808', lastErrorAt: MARKET_OPEN, lastSuccessAt: null } }, yahoo: { stats: { ok: 5, fail: 0, lastError: null, lastErrorAt: null, lastSuccessAt: MARKET_OPEN } } };
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state, now: MARKET_OPEN, env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C' } });
+  assert.equal(h.status, 'DEGRADED');
+  assert.match(h.reason, /Dhan down, Yahoo fallback working/);
+  assert.deepEqual(h.problems, []);
+});
+
+test('PROBLEM: Dhan AND Yahoo both failing (no working fallback for NSE)', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const state = { enabled: true, ready: true, nse: { stats: { ok: 0, fail: 3, lastError: 'x', lastErrorAt: MARKET_OPEN, lastSuccessAt: null } }, yahoo: { stats: { ok: 0, fail: 3, lastError: 'y', lastErrorAt: MARKET_OPEN, lastSuccessAt: null } } };
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state, now: MARKET_OPEN });
+  assert.equal(h.status, 'PROBLEM');
+  assert.match(h.reason, /NSE data sources \(Dhan and Yahoo\) both failing/);
+});
+
+test('PROBLEM: Binance failing with no fallback (crypto has only one candle source)', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const state = { enabled: true, ready: true, crypto: { stats: { ok: 0, fail: 5, lastError: 'HTTP 503', lastErrorAt: MARKET_OPEN, lastSuccessAt: null } } };
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state, now: MARKET_OPEN });
+  assert.equal(h.status, 'PROBLEM');
+  assert.match(h.reason, /Binance.*no fallback/);
+});
+
+test('DEGRADED: Telegram not configured, everything else fine', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
+  assert.equal(h.status, 'DEGRADED');
+  assert.match(h.reason, /Telegram not configured/);
+  assert.equal(h.telegram.configured, false);
+});
+
+// Add-on v2 item 6: /api/paper/health shows Telegram configured yes/no, last send ok/fail.
+test('telegram: configured + last send ok, read from state.telegramStats', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const state = { enabled: true, ready: true, telegramStats: { lastSendOk: true } };
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state, now: MARKET_OPEN, env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C' } });
+  assert.deepEqual(h.telegram, { configured: true, lastSendOk: true });
+});
+
+test('telegram: not configured, no sends yet -> configured false, lastSendOk null (never guessed)', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
+  assert.deepEqual(h.telegram, { configured: false, lastSendOk: null });
 });

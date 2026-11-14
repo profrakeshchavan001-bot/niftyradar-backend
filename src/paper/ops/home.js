@@ -7,6 +7,7 @@
  * hardcoded guess, so the list is always honest about what this server can actually answer right now.
  */
 const { buildHealth } = require('./health');
+const { buildMorningCard } = require('./morningCard');
 
 const CANDIDATE_LINKS = [
   { path: '/api/paper/health', label: 'Health', desc: 'is everything scanning right now' },
@@ -28,8 +29,36 @@ function routeExists(app, path) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-function htmlHome({ status, reason, links, latestSummary, recentAlerts = [] }) {
-  const color = status === 'ALIVE' ? '#1a7f37' : '#c23';
+const BOT_LABELS = { nse: 'NSE', nse_scalp: 'NSE scalp', crypto: 'Crypto', crypto_scalp: 'Crypto scalp', crypto_wide_scalp: 'Crypto wide scalp' };
+
+/** Round 3 item 3: the morning card, plain words, big numbers, green/red. */
+function htmlMorningCard(card, dataSources, replayStatus) {
+  if (!card) return '';
+  const botRows = card.perBot.length
+    ? card.perBot.map((b) => {
+        const netColor = b.netInr > 0 ? '#1a7f37' : b.netInr < 0 ? '#c23' : '#444';
+        const reasons = b.topSkipReasons.map((r) => `${r.count}x ${esc(r.reason)}`).join('<br>') || 'none';
+        return `<div style="padding:8px 0;border-top:1px solid #eee">
+          <div style="font-weight:600">${esc(BOT_LABELS[b.bot] || b.bot)}</div>
+          <div style="font-size:14px">${b.trades} trade(s)${b.open ? ` (${b.open} open)` : ''} &middot; ${b.wins}W/${b.losses}L &middot; <b style="color:${netColor}">${b.netInr >= 0 ? '+' : ''}&#8377;${Math.abs(b.netInr).toLocaleString('en-IN')}</b></div>
+          <div style="font-size:13px;color:#666">${b.skips} skip(s) - top reasons: ${reasons}</div>
+        </div>`;
+      }).join('')
+    : '<div style="color:#999;font-size:13px">No trades or skips by any bot since the window started.</div>';
+  const sourceLine = Object.entries(dataSources || {}).map(([name, s]) => `${name}: ${s.status === 'ok' ? '🟢' : s.status === 'failing' ? '🔴' : '⚪'} ${s.status}`).join(' &middot; ');
+  const replayLine = replayStatus
+    ? (replayStatus.error ? `error: ${esc(replayStatus.error)}` : `${esc(replayStatus.status)} (${esc(replayStatus.trigger)}, finished ${esc(replayStatus.finishedAt || 'in progress')})`)
+    : 'no run yet';
+  return `<div style="margin-bottom:16px;padding:12px 14px;border:1px solid #ddd;border-radius:10px;background:#f7f9fc">
+    <div style="font-weight:700;font-size:15px;margin-bottom:4px">Since 18:00 IST yesterday${card.approxSkipWindow ? ' (skip counts: from yesterday\'s date, not the exact hour)' : ''}</div>
+    ${botRows}
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;font-size:13px;color:#444">Data sources: ${sourceLine}</div>
+    <div style="font-size:13px;color:#444">Replay last run: ${replayLine}</div>
+  </div>`;
+}
+
+function htmlHome({ status, reason, links, latestSummary, recentAlerts = [], morningCard = null, dataSources = {}, replayStatus = null }) {
+  const color = status === 'ALIVE' ? '#1a7f37' : status === 'DEGRADED' ? '#b8860b' : '#c23';
   // No ?key= in these hrefs: cookieAuth.js (src/paper/ops/cookieAuth.js) already set the HttpOnly cookie
   // on this same visit, so the browser carries it to every link below with no secret in the page source.
   const linkRows = links.map((l) => `<a href="${esc(l.path)}" style="display:block;padding:12px 14px;margin:8px 0;border:1px solid #ddd;border-radius:10px;text-decoration:none;color:#111">
@@ -50,6 +79,7 @@ function htmlHome({ status, reason, links, latestSummary, recentAlerts = [] }) {
     : '';
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Paper bot</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:16px">
+${htmlMorningCard(morningCard, dataSources, replayStatus)}
 <h1 style="color:${color};font-size:32px;margin:4px 0">${esc(status)}</h1>
 <p style="color:#444">${esc(reason)}</p>
 ${alertsBlock}
@@ -70,10 +100,16 @@ function attachHomeRoute(app, { secret, okSecret, tracker, state }) {
       const h = await buildHealth({ tracker, store: state.store, state, now: Date.now() });
       const links = CANDIDATE_LINKS.filter((l) => routeExists(app, l.path));
       let latestSummary = null;
+      let morningCard = null;
       if (state.store) {
         try { const rows = await state.store.listSummaries(1); latestSummary = rows[0] || null; } catch (e) { /* home page still loads without it */ }
+        try { morningCard = await buildMorningCard({ store: state.store, now: Date.now() }); } catch (e) { /* home page still loads without it */ }
       }
-      res.type('html').send(htmlHome({ status: h.status, reason: h.reason, links, latestSummary, recentAlerts: h.recentAlerts }));
+      let replayStatus = null;
+      if (state.replay && typeof state.replay.getLastRunStatus === 'function') {
+        try { replayStatus = await state.replay.getLastRunStatus(); } catch (e) { /* home page still loads without it */ }
+      }
+      res.type('html').send(htmlHome({ status: h.status, reason: h.reason, links, latestSummary, recentAlerts: h.recentAlerts, morningCard, dataSources: h.dataSources, replayStatus }));
     } catch (e) {
       res.status(500).type('text').send('could not build the home page');
     }
