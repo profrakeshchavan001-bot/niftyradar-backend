@@ -16,6 +16,7 @@ const DEFAULTS = {
     sim_delta: 0.5, // used only when no real option price is available
     sim_premium_pct: 2.5, // assumed ATM premium as % of spot, simulated trades only
     min_candles: 21,
+    min_turnover_inr: 10000000, // liquidity floor: today's traded value (price x volume) must be at least Rs 1 crore
     // NSE trading holidays (yyyy-mm-dd, IST). OWNER: please verify against the
     // NSE circular and add next year's list. A day with no fresh candle is
     // skipped anyway.
@@ -33,6 +34,7 @@ const DEFAULTS = {
     usdt_inr_fallback: 88, // used only if the live USDT/INR rate cannot be read; flagged on the trade
   },
   patterns: { lookback: 6, minTrend: 4, smallBodyRatio: 0.5, swing: 10 },
+  rfactor: { capAtr: 3, fallbackAtr: 2, swingK: 2, swingLookback: 40 }, // see docs/R-FACTOR.md
   learning: { min_trades_for_conclusion: 20 },
 };
 

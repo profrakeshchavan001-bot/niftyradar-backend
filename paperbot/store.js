@@ -2,17 +2,17 @@
 // Paper bot storage. Two stores with the same methods:
 //  - createPgStore(pool): Neon Postgres (tables in sql/paper_bot.sql)
 //  - createMemoryStore(): in-process, used by tests and as a loud fallback when
-//    DATABASE_URL is not set (data is then lost on restart).
+//    PAPER_DATABASE_URL is not set (data is then lost on restart).
 const fs = require('fs');
 const path = require('path');
 
 const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'score_source', 'direction', 'patterns',
   'trigger_candles', 'trigger_t', 'trend_state', 'smc_tags', 'news_filter', 'instrument', 'simulated_option',
   'price_source', 'candle_source', 'qty', 'entry_price', 'entry_time', 'entry_underlying', 'exit_price', 'exit_time',
-  'exit_underlying', 'exit_reason', 'pnl_inr', 'fx_rate', 'fx_source', 'max_fav_pct', 'max_adv_pct', 'basis'];
-const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value']);
+  'exit_underlying', 'exit_reason', 'pnl_inr', 'fx_rate', 'fx_source', 'max_fav_pct', 'max_adv_pct', 'basis', 'legacy_rf', 'r_detail'];
+const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
-  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct'];
+  'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf'];
 const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state'];
 
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
@@ -28,6 +28,7 @@ function createMemoryStore() {
     async setConfigIfMissing(key, value) { if (!(key in db.config)) db.config[key] = copy(value); },
     async insertTrade(t) { const row = { id: ++seq, status: 'open', ...copy(t) }; db.trades.push(row); return row.id; },
     async updateTrade(id, fields) { const row = db.trades.find((t) => t.id === id); if (row) Object.assign(row, copy(fields)); },
+    async noteTrade(id, fields) { return this.updateTrade(id, fields); },
     async openTrades(market) { return copy(db.trades.filter((t) => t.market === market && t.status === 'open')); },
     async tradesForDay(market, date) { return copy(db.trades.filter((t) => t.market === market && t.trade_date === date)); },
     async closedTrades(market) { return copy(db.trades.filter((t) => t.status === 'closed' && (!market || t.market === market))); },
@@ -56,13 +57,25 @@ function fromRow(row) {
 
 const toParam = (col, v) => (v !== undefined && v !== null && JSON_COLS.has(col) ? JSON.stringify(v) : v === undefined ? null : v);
 
-function createPgStore(pool) {
+// `getPool` is called on first use only (lazy connect). The tables are created
+// on that first connect (sql/paper_bot.sql is idempotent); a failed attempt is
+// tried again on the next query.
+function createPgStore(getPool) {
+  let conn = null;
+  let ready = null;
+  const db = () => { if (!conn) conn = typeof getPool === 'function' ? getPool() : getPool; return conn; };
+  const ensure = () => {
+    if (!ready) {
+      ready = db().query(fs.readFileSync(path.join(__dirname, '..', 'sql', 'paper_bot.sql'), 'utf8')).catch((e) => { ready = null; throw e; });
+    }
+    return ready;
+  };
+  const pool = { query: async (text, params) => { await ensure(); return db().query(text, params); } };
   const q = async (text, params) => (await pool.query(text, params)).rows.map(fromRow);
   return {
     kind: 'postgres',
-    async init() {
-      await pool.query(fs.readFileSync(path.join(__dirname, '..', 'sql', 'paper_bot.sql'), 'utf8'));
-    },
+    init: ensure,
+    async noteTrade(id, fields) { return this.updateTrade(id, fields); },
     async getConfig() {
       const rows = await q('SELECT key, value FROM paper_config');
       return Object.fromEntries(rows.map((r) => [r.key, r.value]));
@@ -100,4 +113,53 @@ function createPgStore(pool) {
   };
 }
 
-module.exports = { createMemoryStore, createPgStore, clampLimit };
+// Write-through cache in front of a store, so the minute-by-minute jobs do not
+// poll the database. Open trades and the day's trades are read once and then
+// kept in step in memory; the config is re-read at most every 10 minutes;
+// best / worst % of an open trade stays in memory until the trade closes.
+// Steady state with no trade event = zero queries.
+function createCachedStore(inner, { now = Date.now, configTtlMs = 600000 } = {}) {
+  const copy = (x) => JSON.parse(JSON.stringify(x));
+  const open = new Map(); // market -> rows
+  let day = new Map(); // `${market}|${date}` -> rows
+  let cfg = null;
+  const rowsOf = (id) => [...open.values(), ...day.values()].flat().filter((t) => t.id === id);
+  return {
+    ...inner,
+    kind: inner.kind,
+    init: () => inner.init(),
+    async getConfig() {
+      if (!cfg || now() - cfg.at > configTtlMs) cfg = { value: await inner.getConfig(), at: now() };
+      return copy(cfg.value);
+    },
+    async setConfigIfMissing(key, value) { await inner.setConfigIfMissing(key, value); cfg = null; },
+    async openTrades(market) {
+      if (!open.has(market)) open.set(market, await inner.openTrades(market));
+      return copy(open.get(market));
+    },
+    async tradesForDay(market, date) {
+      const key = `${market}|${date}`;
+      if (!day.has(key)) {
+        day = new Map([...day].filter(([k]) => k.endsWith(`|${date}`))); // drop older days
+        day.set(key, await inner.tradesForDay(market, date));
+      }
+      return copy(day.get(key));
+    },
+    async insertTrade(t) {
+      const id = await inner.insertTrade(t);
+      const row = { status: 'open', ...copy(t), id };
+      if (open.has(t.market)) open.get(t.market).push(row);
+      const key = `${t.market}|${t.trade_date}`;
+      if (day.has(key)) day.get(key).push({ ...row });
+      return id;
+    },
+    async updateTrade(id, fields) {
+      await inner.updateTrade(id, fields);
+      for (const row of rowsOf(id)) Object.assign(row, copy(fields));
+      if (fields.status === 'closed') for (const [m, rows] of open) open.set(m, rows.filter((t) => t.id !== id));
+    },
+    async noteTrade(id, fields) { for (const row of rowsOf(id)) Object.assign(row, copy(fields)); },
+  };
+}
+
+module.exports = { createMemoryStore, createPgStore, createCachedStore, clampLimit };

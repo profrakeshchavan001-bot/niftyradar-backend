@@ -16,7 +16,7 @@ const fx = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'paper_re
 const MIN = 60000;
 const FIVE = 5 * MIN;
 
-function nseHarness({ optionLtp, news = [] }) {
+function nseHarness({ optionLtp, news = [], feedStopsAt = Infinity }) {
   const clock = { t: fx.nse.sessionStart };
   const store = createMemoryStore();
   const logs = [];
@@ -26,12 +26,13 @@ function nseHarness({ optionLtp, news = [] }) {
     ranking: () => {
       const price = spotNow();
       if (!price) return null;
-      return [{ symbol: 'TESTSTK', price, pct: -1.8 }, { symbol: 'AAA', price: 100, pct: 0.5 }, { symbol: 'BBB', price: 100, pct: -0.4 },
-        { symbol: 'CCC', price: 100, pct: 0.3 }, { symbol: 'DDD', price: 100, pct: 0.6 }, { symbol: 'EEE', price: 100, pct: -0.2 }];
+      const volume = 1000000;
+      return [{ symbol: 'TESTSTK', price, pct: -1.8, volume }, { symbol: 'AAA', price: 100, pct: 2.5, volume }, { symbol: 'BBB', price: 100, pct: -0.4, volume },
+        { symbol: 'CCC', price: 100, pct: 0.3, volume }, { symbol: 'DDD', price: 100, pct: 0.6, volume }, { symbol: 'THIN', price: 100, pct: -3, volume: 10 }];
     },
     spot: (s) => (s === 'TESTSTK' ? spotNow() : null),
     // includes the candle still forming, like a live feed does
-    candles: async (s) => ({ candles: s === 'TESTSTK' ? fx.nse.candles.filter((k) => k.t <= clock.t) : [], source: 'replay_fixture' }),
+    candles: async (s) => ({ candles: s === 'TESTSTK' ? fx.nse.candles.filter((k) => k.t <= Math.min(clock.t, feedStopsAt)) : [], source: 'replay_fixture' }),
     optionQuote: async (s, dir, fixed) => {
       const ltp = optionLtp ? optionLtp(clock.t) : null;
       return ltp ? { ltp, strike: fixed?.strike ?? 490, expiry: fixed?.expiry ?? '2026-11-26', spot: spotNow() } : null;
@@ -66,7 +67,18 @@ test('replay NSE: exhaustion reversal -> CALL at the real option price -> target
   assert.equal(t.market, 'nse');
   assert.equal(t.direction, 'CALL');
   assert.ok(t.patterns.includes('exhaustion_reversal'));
-  assert.equal(t.r_factor, 4); // |-1.8| / median of (1.8, 0.6, 0.5, 0.4, 0.3, 0.2) = (0.4 + 0.5) / 2 = 0.45 -> 1.8 / 0.45 = 4
+  // Real R factor, CALL side: no swing low below 492, so stop = 1 x ATR; the nearest level above is the
+  // previous-day low 499.8 (7.8 away), more than 3 x ATR (ATR is about 1.41), so target = 3 x ATR -> R = 3.
+  assert.equal(t.r_factor, 3);
+  assert.equal(t.r_detail.long.stopBasis, 'atr');
+  assert.equal(t.r_detail.long.targetBasis, 'capped at 3 x ATR');
+  assert.equal(t.r_detail.short.r, 2); // PUT side: no level below, target = 2 x ATR, stop = 1 x ATR
+  assert.deepEqual(t.r_detail.prevDay, { high: 500.6, low: 499.8 });
+  // old move-size value kept next to it: 1.8 x 1.8 + 0.5 = 3.74; by size of move it was 3rd (THIN -3%, AAA +2.5%)
+  assert.equal(t.legacy_rf, 3.74);
+  assert.equal(t.r_detail.legacyRank, 3);
+  assert.equal(t.r_detail.rRank, 1);
+  assert.match(t.score_source, /^r_factor_v2/);
   assert.equal(t.simulated_option, false);
   assert.equal(t.instrument, 'TESTSTK 2026-11-26 490 CE');
   assert.equal(t.entry_time, new Date(ist(11, 5, 20)).toISOString());
@@ -86,10 +98,9 @@ test('replay NSE: exhaustion reversal -> CALL at the real option price -> target
   assert.equal(t.pnl_inr, 4200);
   assert.equal(t.exit_time, new Date(ist(11, 8, 50)).toISOString());
   assert.equal(t.max_fav_pct, 10.5);
-  // skips were written with a reason, once each (not once per scan)
-  const skips = h.store._db.skips;
-  assert.ok(skips.some((s) => s.symbol === 'AAA' && /not enough 5-min candles/.test(s.reason)));
-  assert.equal(skips.filter((s) => s.symbol === 'AAA').length, 1);
+  // ranking: only liquid stocks with valid candles are ranked (THIN is illiquid, AAA-DDD have no candles)
+  assert.ok(h.logs.some((l) => /NSE rank: 1 ranked, 1 below the liquidity floor, 4 without valid candles; top: TESTSTK R 3/.test(l)));
+  assert.equal(h.store._db.skips.filter((s) => s.symbol !== 'TESTSTK').length, 0);
 });
 
 test('replay NSE: no option price -> simulated (flagged) -> forced exit at 15:15', async () => {
@@ -133,6 +144,27 @@ test('replay NSE: max trades per day is respected', async () => {
   await h.runSession();
   assert.equal(h.store._db.trades.length, 0);
   assert.ok(h.store._db.skips.some((s) => s.symbol === 'TESTSTK' && /max 0 trades/.test(s.reason)));
+});
+
+test('wake after sleep: stale data is refused, missed candles are not replayed, current candle is traded once', async () => {
+  // 1) feed stopped at the trigger candle (closed 11:05); the bot wakes at 11:20: data is 3 candles old -> nothing
+  const stale = nseHarness({ optionLtp: () => 20, feedStopsAt: ist(11, 0) });
+  stale.clock.t = ist(11, 20, 20);
+  await stale.bot.nseScan();
+  assert.equal(stale.store._db.trades.length, 0);
+  assert.ok(stale.logs.some((l) => /0 ranked, 1 below the liquidity floor, 5 without valid candles/.test(l)));
+  // 2) live feed, the bot wakes at 11:20 having slept through the 11:05 signal: that old candle is not traded
+  const late = nseHarness({ optionLtp: () => 20 });
+  late.clock.t = ist(11, 20, 20);
+  await late.bot.nseScan();
+  assert.equal(late.store._db.trades.length, 0);
+  // 3) the bot wakes right on the signal candle: traded, and a second run on the same candle adds nothing
+  const onTime = nseHarness({ optionLtp: () => 20 });
+  onTime.clock.t = ist(11, 5, 20);
+  await onTime.bot.nseScan();
+  onTime.clock.t = ist(11, 6, 5);
+  await onTime.bot.nseScan();
+  assert.equal(onTime.store._db.trades.length, 1);
 });
 
 test('replay crypto: exhaustion reversal down -> SHORT -> stop, P&L in INR; then summary', async () => {

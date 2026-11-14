@@ -10,20 +10,6 @@ const median = (arr) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-// R-factor (proxy v1). The backend has no R-factor code of its own, so the
-// bot uses a relative-move factor built from the live quotes it already has:
-//   R = |stock % change today| / median |% change| of the whole basket.
-// R = 2 means the stock is moving twice as much as the typical basket stock.
-function rankRFactor(stocks, topN = 5) {
-  const rows = (stocks || []).filter((s) => s && s.symbol && Number.isFinite(s.pct) && s.price > 0);
-  const base = median(rows.map((s) => Math.abs(s.pct)));
-  if (!(base > 0)) return [];
-  return rows
-    .map((s) => ({ symbol: s.symbol, price: s.price, pct: s.pct, rFactor: P.round(Math.abs(s.pct) / base, 2) }))
-    .sort((a, b) => b.rFactor - a.rFactor || a.symbol.localeCompare(b.symbol))
-    .slice(0, topN);
-}
-
 // Crypto momentum score (used in place of R-factor):
 //   0.4 x volume spike   (last volume / average of the 20 before it)
 // + 0.3 x range expansion (last high-low / average of the 20 before it)
@@ -148,7 +134,7 @@ const candleText = (k) => `O ${k.o} H ${k.h} L ${k.l} C ${k.c}`;
 // One plain-English sentence saying why the trade was taken.
 function basisSentence({ market, symbol, score, direction, patterns, ctx, news, simulated }) {
   const what = market === 'nse' ? (direction === 'up' ? 'Bought a CALL' : 'Bought a PUT') : (direction === 'up' ? 'Went LONG' : 'Went SHORT');
-  const scoreText = market === 'nse' ? `it was in the top R-factor list (R ${score})` : `its momentum score was ${score}`;
+  const scoreText = market === 'nse' ? `it was in the top R-factor list (risk-reward R ${score})` : `its momentum score was ${score}`;
   const p = patterns.map((x) => `${x.name.replace(/_/g, ' ')} (${x.note})`).join('; ');
   const against = patterns.some((x) => x.kind === 'reversal') && ctx.trend15 !== direction ? ' This is a reversal trade against the trend, by design.' : '';
   const sim = simulated ? ' Option price is SIMULATED from the stock move (delta 0.5), not a real quote.' : '';
@@ -156,6 +142,6 @@ function basisSentence({ market, symbol, score, direction, patterns, ctx, news, 
 }
 
 module.exports = {
-  median, rankRFactor, momentumScore, closedOnly, aggregate, buildContext, decideEntry,
+  median, momentumScore, closedOnly, aggregate, buildContext, decideEntry,
   sizeNse, sizeCrypto, simOptionPrice, changePct, evaluateExit, basisSentence, candleText,
 };

@@ -22,17 +22,20 @@ function series(startMs, startPrice, steps) {
 const rep = (n, fn) => Array.from({ length: n }, (_, i) => fn(i));
 
 // NSE: Friday 13 Nov 2026, 09:15 IST = 03:45 UTC. 14 flat candles, a fall
-// (5 red, 1 green), a small red candle, then the green trigger candle that
+// (6 red candles), a small red candle, then the green trigger candle that
 // closes at 11:05 IST, then a slow drift up until 15:30.
 const nseStart = Date.UTC(2026, 10, 13, 3, 45);
 const nse = series(nseStart, 500, [
   ...rep(14, (i) => [i % 2 ? -0.4 : 0.4, 0.2, 1000]),
-  [-2, 0.2, 1500], [-2, 0.2, 1500], [1, 0.2, 1200], [-2, 0.2, 1500], [-2, 0.2, 1500], [-2, 0.2, 1500],
+  [-1.5, 0.2, 1500], [-1.5, 0.2, 1500], [-1, 0.2, 1200], [-1.5, 0.2, 1500], [-1.5, 0.2, 1500], [-2, 0.2, 1500],
   [-0.4, 0.2, 900],
   [1.4, 0.1, 3000],
   ...rep(53, () => [0.02, 0.01, 800]),
 ]);
 nse[21].h = 492.2; // trigger candle: O 490.6 H 492.2 L 490.5 C 492
+// The day before (Thu 12 Nov, 09:15-15:30 IST): 75 quiet candles around 500, so
+// the 15-min ATR and the previous-day high / low exist, as they do on a live feed.
+const nsePrev = series(nseStart - 86400000, 500, rep(75, (i) => [i % 2 ? -0.4 : 0.4, 0.2, 1000]));
 
 // Crypto: same day from 06:00 IST = 00:30 UTC. 32 flat candles, a rise
 // (5 green, 1 red), a small green candle, then the red trigger candle.
@@ -47,7 +50,7 @@ const crypto = series(cryptoStart, 100, [
 
 fs.writeFileSync(path.join(__dirname, 'paper_replay.json'), JSON.stringify({
   note: 'Hand-built candles for the replay test. Not real market data.',
-  nse: { symbol: 'TESTSTK', sessionStart: nseStart, candles: nse },
+  nse: { symbol: 'TESTSTK', sessionStart: nseStart, candles: [...nsePrev, ...nse] },
   crypto: { symbol: 'BTCUSDT', start: cryptoStart, candles: crypto },
 }, null, 1));
-console.log(`nse ${nse.length} candles, crypto ${crypto.length} candles`);
+console.log(`nse ${nsePrev.length} + ${nse.length} candles, crypto ${crypto.length} candles`);
