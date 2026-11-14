@@ -106,10 +106,25 @@ test('today counts only count rows dated today, not yesterday (hand-checked: 1 o
   assert.equal(h.openTrades.nse, 1); // only the open RELIANCE trade
 });
 
-test('data sources are reported as "unchecked", never a made-up status', async () => {
+test('data sources are reported as "unchecked" when not yet asked anything, never a made-up status', async () => {
   const tracker = createHealthTracker({ now: () => NOW });
   const h = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: NOW });
   assert.equal(h.dataSources.binance.status, 'unchecked');
   assert.equal(h.dataSources.yahoo.status, 'unchecked');
   assert.equal(h.dataSources.dhan.status, 'unchecked');
+});
+
+test('a source with a real stats object reports real ok/fail counts and the last error (overnight item 3)', async () => {
+  const tracker = createHealthTracker({ now: () => NOW });
+  const state = {
+    enabled: true, ready: true,
+    crypto: { stats: { ok: 40, fail: 2, lastError: 'HTTP 451', lastErrorAt: NOW - 60000, lastSuccessAt: NOW - 5000 } },
+    yahoo: { stats: { ok: 10, fail: 0, lastError: null, lastErrorAt: null, lastSuccessAt: NOW - 10000 } },
+    nse: { stats: { ok: 0, fail: 5, lastError: 'HTTP 808: Authentication Failed', lastErrorAt: NOW - 1000, lastSuccessAt: null } },
+  };
+  const h = await buildHealth({ tracker, store: createMemoryStore(), state, now: NOW });
+  assert.deepEqual(h.dataSources.binance, { status: 'ok', ok: 40, fail: 2, lastError: 'HTTP 451', lastErrorAt: new Date(NOW - 60000).toISOString(), lastSuccessAt: new Date(NOW - 5000).toISOString() });
+  assert.equal(h.dataSources.yahoo.status, 'ok');
+  assert.equal(h.dataSources.dhan.status, 'failing'); // 0 ok, 5 fail: a real source that is actually down, not "unchecked"
+  assert.equal(h.dataSources.dhan.lastError, 'HTTP 808: Authentication Failed');
 });

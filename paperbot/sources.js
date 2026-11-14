@@ -81,6 +81,19 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
   let dhanRetryAt = 0; // after a failed Dhan candle read, Dhan is not asked again for 15 minutes
   let lastYahooNote = '';
   const DHAN_RETRY_MS = 3 * FIVE_MIN;
+  // Overnight item 3: a real per-source status for GET /api/paper/health, instead of "unchecked".
+  const dhanStats = { ok: 0, fail: 0, lastError: null, lastSuccessAt: null, lastErrorAt: null };
+  async function dhanCall(fn) {
+    try {
+      const r = await queueDhanCall(fn);
+      dhanStats.ok += 1; dhanStats.lastSuccessAt = now();
+      return r;
+    } catch (e) {
+      dhanStats.fail += 1; dhanStats.lastErrorAt = now();
+      dhanStats.lastError = e.response?.status ? `HTTP ${e.response.status}` : e.message;
+      throw e;
+    }
+  }
   const dhanQuotes = () => {
     const m = getMovers();
     if (!m || !m.data || now() - m.time > 120000) return null;
@@ -92,7 +105,7 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
   async function dhanIntraday(symbol) {
     const id = getSecurityId(symbol);
     if (!id) throw new Error(`no security id for ${symbol}`);
-    const res = await queueDhanCall(() => axios.post(`${DHAN_BASE}/charts/intraday`, {
+    const res = await dhanCall(() => axios.post(`${DHAN_BASE}/charts/intraday`, {
       securityId: String(id), exchangeSegment: 'NSE_EQ', instrument: 'EQUITY', interval: '5', oi: false,
       fromDate: fmt(istDayStart(now()) - 5 * 86400000), toDate: fmt(now() + 60000),
     }, { headers: DHAN_HEADERS, timeout: 15000 }));
@@ -109,10 +122,11 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
     const wait = lastChainCall + 3100 - Date.now();
     if (wait > 0) await sleep(wait);
     lastChainCall = Date.now();
-    return queueDhanCall(() => axios.post(url, body, { headers: DHAN_HEADERS, timeout: 15000 }));
+    return dhanCall(() => axios.post(url, body, { headers: DHAN_HEADERS, timeout: 15000 }));
   }
 
   return {
+    stats: dhanStats, // overnight item 3: real ok/fail counts + last error/success for GET /api/paper/health
     // Live quotes of the basket (the same data the Movers page shows). When
     // Dhan has none, the quotes Yahoo sent with its candles (top 60 F&O stocks).
     ranking() {
@@ -233,16 +247,23 @@ function createNseSource({ axios, queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSec
 // Binance PUBLIC market data. No key, no account, no orders.
 function createCryptoSource({ axios, log = console.log, now = Date.now, hosts = ['https://data-api.binance.vision', 'https://api.binance.com'] }) {
   let fx = { rate: null, time: 0 };
+  // Overnight item 3: a real per-source status for GET /api/paper/health, instead of "unchecked".
+  const stats = { ok: 0, fail: 0, lastError: null, lastSuccessAt: null, lastErrorAt: null };
   async function get(pathname, params) {
     let lastErr;
     for (const h of hosts) {
       try {
-        return (await axios.get(`${h}${pathname}`, { params, timeout: 15000 })).data;
+        const data = (await axios.get(`${h}${pathname}`, { params, timeout: 15000 })).data;
+        stats.ok += 1; stats.lastSuccessAt = now();
+        return data;
       } catch (e) { lastErr = e; }
     }
+    stats.fail += 1; stats.lastErrorAt = now();
+    stats.lastError = lastErr.response?.status ? `HTTP ${lastErr.response.status}` : lastErr.message;
     throw lastErr;
   }
   return {
+    stats,
     async candles(symbol, limit = 330, range = null) {
       const rows = await get('/api/v3/klines', { symbol, interval: '5m', limit, ...(range ? { startTime: range.startMs, endTime: range.endMs } : {}) });
       return rows.map((r) => ({ t: r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] })).filter((k) => [k.t, k.o, k.h, k.l, k.c].every(Number.isFinite));
