@@ -29,7 +29,10 @@ test('shouldSkipAutoRun: a healthy live bot with normal memory never skips', asy
   const now = 1700000000000;
   const r = await shouldSkipAutoRun({ liveState: { enabled: true, ready: true }, liveStore: fakeStore(), tracker: freshTracker(now), now: () => now });
   assert.equal(r.skip, false);
-  assert.equal(r.health.status, 'ALIVE');
+  // Not PROBLEM (that's the only status shouldSkipAutoRun acts on); it may read DEGRADED at this fixed
+  // timestamp (NSE closed overnight / Telegram not configured in this env) - round 3 item 2's 3-level
+  // health status, see src/paper/ops/health.js - which correctly never skips a run on its own.
+  assert.notEqual(r.health.status, 'PROBLEM');
 });
 
 test('shouldSkipAutoRun: the live bot disabled/not ready reports PROBLEM, and the run is skipped', async () => {

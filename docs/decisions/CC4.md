@@ -106,3 +106,35 @@ field smoke-tested end to end against the real wired server.
 
 ### Not verified live (sandbox has no outbound network)
 The morning brief and Telegram sends have never gone out for real - fixture/mock-only throughout.
+
+---
+
+## CC4 round 3
+
+### Item 1: test truth
+Fresh `git clone` of `origin/main` (eb4c9ec) into a new empty directory, `npm ci`, full suite run twice
+under TZ=UTC and TZ=Asia/Kolkata, with PAPER_ADMIN_SECRET set and unset: **8/8 conditions, 412/412 clean,
+every time**. Also ran 3x sequential (`--test-concurrency=1`) to rule out ordering/flake: clean. CC2's
+"380/384" total doesn't even match this commit's own test count (412), so it was a stale/older checkout,
+not a real failure on this commit. No code change made for this item.
+
+### Item 2: ALIVE / DEGRADED / PROBLEM
+`src/paper/ops/health.js` and `paperbot/index.js`'s `/api/paper/ping`: the 02:40 IST false "PROBLEM" was
+nseScan/nseMonitor correctly idle because NSE was closed (weekend), which the old staleness check didn't
+know how to tell apart from a real stall. Now: NSE job staleness only counts while `nseSession(now,
+holidays).open` is true (crypto is 24/7, so its staleness always counts); PROBLEM = a job that should be
+scanning hasn't in 15+ min, DB down, or a crypto/NSE source down with no working fallback; DEGRADED = NSE
+closed, Dhan down but Yahoo fallback working, or Telegram not configured; priority PROBLEM > DEGRADED >
+ALIVE. Fixed one cross-window test (`test/paperReplaySafety.test.js`) whose fixed timestamp now reads
+DEGRADED instead of ALIVE at that instant - loosened its assertion to the real contract (`skip === false`
+only happens when status is not PROBLEM), not the exact label.
+
+### Item 3: morning card
+`src/paper/ops/morningCard.js` (new) + top of `src/paper/ops/home.js`: since 18:00 IST yesterday, per bot
+(nse, nse_scalp, crypto, crypto_scalp, crypto_wide_scalp - exhaustion_only/trend_smc/mix keep their own
+tables, not pulled in, same reasoning as the daily summary) - trades, wins/losses, net INR, skip count and
+top 3 skip reasons. Plus data-source status and replay's last run (`state.replay.getLastRunStatus()` -
+CC5 had already exported this for exactly this purpose; one line, `state.replay = attachReplay(...)`,
+needed to reach it). Honesty note on the time window: `paper_trades.entry_time` is exact, so trade counts
+are exact; `paper_skips.skip_date` is a DATE only (no time of day), so the skip count is from yesterday's
+calendar date onward, not exactly 18:00 - said on the card itself.

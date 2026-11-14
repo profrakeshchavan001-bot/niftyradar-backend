@@ -6,9 +6,21 @@
  * paperbot/index.js (one line per job there). Per-source (Binance/Yahoo/Dhan) status comes from a tiny
  * ok/fail recorder inside paperbot/sources.js (Dhan's dhanCall(), Binance's get()) and paperbot/yahoo.js
  * (its existing `stats` object, extended), exposed as state.nse.stats / state.crypto.stats / state.yahoo.stats.
+ *
+ * Round 3, item 2: ALIVE / DEGRADED / PROBLEM, not just ALIVE/PROBLEM. The 02:40 IST false "PROBLEM" (NSE
+ * closed overnight, so nseScan/nseMonitor are correctly idle - that is not a fault) is the reason this
+ * exists: nse job staleness only counts while nseSession(now, holidays).open is true (paperbot/time.js).
+ * Crypto runs 24/7, so cryptoScan/cryptoMonitor staleness always counts. PROBLEM = a job that SHOULD be
+ * scanning right now hasn't in 15+ min, the database is down, or every crypto data source has failed with
+ * no fallback. DEGRADED = NSE closed (weekend/holiday), a source down but its fallback is working (Dhan
+ * down, Yahoo up), or Telegram not configured. Priority: PROBLEM > DEGRADED > ALIVE.
  */
+const { nseSession } = require('../../../paperbot/time');
+
 const MAX_ERRORS = 10;
 const STALE_MS = 15 * 60 * 1000; // a module with no scan in 15 minutes is a problem (overnight brief, item 7)
+const NSE_JOBS = ['nseScan', 'nseMonitor'];
+const CRYPTO_JOBS = ['cryptoScan', 'cryptoMonitor'];
 
 function createHealthTracker({ now = Date.now } = {}) {
   const jobs = new Map(); // name -> { lastRunAt, ok, error }
@@ -66,19 +78,24 @@ async function dbStatus(store) {
 const JOB_NAMES = ['nseScan', 'nseMonitor', 'cryptoScan', 'cryptoMonitor'];
 
 /** Assembles the whole health snapshot. `now` is injected ms for tests; defaults to the real clock. */
-async function buildHealth({ tracker, store, state, now = Date.now() }) {
+async function buildHealth({ tracker, store, state, now = Date.now(), env = process.env }) {
   const snap = tracker.snapshot();
   const db = await dbStatus(store);
   const todayIst = istDateFromMs(now);
 
+  const session = nseSession(now, (state && state.holidays) || []); // { open, reason }
   const jobs = {};
-  const staleJobs = [];
+  const staleJobs = []; // a job that SHOULD be scanning now and has not - a real fault
+  const idleJobs = []; // a job correctly idle right now (NSE closed) - not a fault
   for (const name of JOB_NAMES) {
     const j = snap.jobs[name];
     const ageMin = j ? minutesAgo(j.lastRunAt, now) : null;
-    const stale = j == null || ageMin * 60000 > STALE_MS;
+    const pastStaleWindow = j == null || ageMin * 60000 > STALE_MS;
+    const expectedToRunNow = !NSE_JOBS.includes(name) || session.open; // crypto is 24/7; nse only during session.open
+    const stale = pastStaleWindow && expectedToRunNow;
+    if (pastStaleWindow && !expectedToRunNow) idleJobs.push(name);
     if (stale) staleJobs.push(name);
-    jobs[name] = { lastRunAt: j ? new Date(j.lastRunAt).toISOString() : null, minutesAgo: ageMin, ok: j ? j.ok : null, error: j ? j.error : null, stale };
+    jobs[name] = { lastRunAt: j ? new Date(j.lastRunAt).toISOString() : null, minutesAgo: ageMin, ok: j ? j.ok : null, error: j ? j.error : null, stale, idle: pastStaleWindow && !expectedToRunNow };
   }
 
   let openTrades = { nse: null, crypto: null };
@@ -119,20 +136,38 @@ async function buildHealth({ tracker, store, state, now = Date.now() }) {
     catch (e) { /* table may not exist yet, or the database is down - already reported via database.ok */ }
   }
 
+  // PROBLEM: real faults only.
   const problems = [];
   if (!state || !state.enabled) problems.push('paper bot disabled (PAPER_BOT_ENABLED=false)');
   else if (!state.ready) problems.push('paper bot still starting');
   if (!db.ok) problems.push(`database: ${db.error}`);
   if (staleJobs.length) problems.push(`no scan in 15+ min: ${staleJobs.join(', ')}`);
   if (snap.errors.length) problems.push(`${snap.errors.length} recent error(s)`);
+  // Binance is crypto's only candle source in this codebase - no fallback - so it failing is a real fault.
+  if (dataSources.binance.status === 'failing') problems.push('crypto data source (Binance) failing, no fallback');
+  // NSE has a fallback (Dhan -> Yahoo); both down together is a real fault, not just degraded.
+  if (dataSources.dhan.status === 'failing' && dataSources.yahoo.status !== 'ok') problems.push('NSE data sources (Dhan and Yahoo) both failing');
+
+  // DEGRADED: expected / non-fatal conditions, only checked when not already a PROBLEM.
+  const degraded = [];
+  if (!session.open) degraded.push(`NSE closed (${session.reason || 'outside market hours'})`);
+  if (dataSources.dhan.status === 'failing' && dataSources.yahoo.status === 'ok') degraded.push('Dhan down, Yahoo fallback working');
+  const telegramConfigured = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID);
+  if (!telegramConfigured) degraded.push('Telegram not configured (alerts stored only)');
+
+  const status = problems.length ? 'PROBLEM' : degraded.length ? 'DEGRADED' : 'ALIVE';
+  const reason = problems.length ? problems.join('; ') : degraded.length ? degraded.join('; ') : 'all modules scanning, database ok, no recent errors';
 
   return {
     paperOnly: true,
-    status: problems.length ? 'PROBLEM' : 'ALIVE',
-    reason: problems.length ? problems.join('; ') : 'all modules scanning, database ok, no recent errors',
+    status,
+    reason,
+    problems,
+    degraded,
     asOf: new Date(now).toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
     memory: process.memoryUsage ? { rssMb: Math.round(process.memoryUsage().rss / 1048576) } : null,
+    nseSession: session,
     jobs,
     dataSources,
     database: db,
@@ -140,13 +175,14 @@ async function buildHealth({ tracker, store, state, now = Date.now() }) {
     today,
     recentErrors: snap.errors,
     recentAlerts,
+    telegram: { configured: telegramConfigured, lastSendOk: state && state.telegramStats ? state.telegramStats.lastSendOk : null },
   };
 }
 
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
 function htmlPage(h) {
-  const color = h.status === 'ALIVE' ? '#1a7f37' : '#c23';
+  const color = h.status === 'ALIVE' ? '#1a7f37' : h.status === 'DEGRADED' ? '#b8860b' : '#c23';
   const row = (label, value) => `<tr><td style="padding:4px 8px;color:#666">${esc(label)}</td><td style="padding:4px 8px"><b>${esc(value)}</b></td></tr>`;
   const jobRows = Object.entries(h.jobs).map(([name, j]) => row(name, j.lastRunAt ? `${j.minutesAgo}m ago${j.stale ? ' (stale)' : ''}` : 'never')).join('');
   const sourceRows = Object.entries(h.dataSources).map(([name, s]) => row(name, s.status === 'unchecked' ? `unchecked (${s.note})` : `${s.status} (${s.ok} ok, ${s.fail} fail${s.lastError ? `, last error: ${s.lastError}` : ''})`)).join('');
@@ -167,6 +203,7 @@ ${row('memory', h.memory ? `${h.memory.rssMb} MB` : 'n/a')}
 ${jobRows}
 ${sourceRows}
 ${row('database', h.database.ok ? 'ok' : `FAIL (${h.database.error})`)}
+${row('Telegram', `configured ${h.telegram.configured ? 'yes' : 'no'}, last send ${h.telegram.lastSendOk === null ? 'n/a' : h.telegram.lastSendOk ? 'ok' : 'FAIL'}`)}
 ${row('open trades (nse)', h.openTrades.nse ?? 'n/a')}
 ${row('open trades (crypto)', h.openTrades.crypto ?? 'n/a')}
 ${row('today trades', h.today.trades ?? 'n/a')}
@@ -197,4 +234,4 @@ function attachHealthRoute(app, { secret, okSecret, tracker, state }) {
   });
 }
 
-module.exports = { createHealthTracker, defaultTracker, buildHealth, attachHealthRoute, htmlPage, JOB_NAMES, STALE_MS };
+module.exports = { createHealthTracker, defaultTracker, buildHealth, attachHealthRoute, htmlPage, JOB_NAMES, STALE_MS, NSE_JOBS, CRYPTO_JOBS };
