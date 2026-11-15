@@ -224,6 +224,28 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
     };
   });
 
+  // Task Group B: "why so few trades" - tallies stored paper_skips reasons by filter and gives a
+  // retrospective, clearly-labelled win-rate estimate for the main filters (take_threshold, the Judge's
+  // own helper weights via its existing ablation()). REPORT-ONLY: reads paper_skips / paper_trades
+  // through the existing store, never writes anything and never affects a live decision - see
+  // src/paper/decision/filterStrictness.js. Same secret/cookie-auth convention as every other route here.
+  app.get('/api/paper/filter-report', async (req, res) => {
+    res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+    if (!secret) return res.status(503).type('text').send('PAPER_ADMIN_SECRET not configured');
+    if (!okSecret(req.get('x-paper-secret') || req.query.key)) return res.status(401).type('text').send('Unauthorized');
+    if (!enabled || !state.ready) return res.status(503).type('text').send(enabled ? 'paper bot is starting' : 'paper bot is disabled (PAPER_BOT_ENABLED=false)');
+    try {
+      const { buildFilterStrictnessReport, toMarkdown } = require('../src/paper/decision/filterStrictness');
+      // No limit cap (unlike listSkips, which clamps to 500): a strictness tally needs every stored row.
+      const [skips, closedTrades] = await Promise.all([state.store.skipsSince('2000-01-01'), state.store.closedTrades()]);
+      const report = buildFilterStrictnessReport({ skips, closedTrades });
+      if (req.query.format === 'md') return res.type('text').send(toMarkdown(report));
+      res.json(report);
+    } catch (e) {
+      res.status(500).type('text').send('could not build the filter-strictness report');
+    }
+  });
+
   const healthTracker = defaultTracker(); // shared with the alerts plugin (src/paper/ops/alerts/), if loaded
   state.healthTracker = healthTracker; // so server.js can expose it on the public, unauthenticated GET /health
   state.jobRegistry = {}; // name -> the actual guarded+tracked tick function, filled in below and by every bots/ plugin (watchdog target)
