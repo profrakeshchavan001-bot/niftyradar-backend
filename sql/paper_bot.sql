@@ -177,6 +177,31 @@ CREATE TABLE IF NOT EXISTS paper_shadows (
 CREATE INDEX IF NOT EXISTS paper_shadows_market_date_idx ON paper_shadows (market, shadow_date);
 CREATE INDEX IF NOT EXISTS paper_shadows_open_idx ON paper_shadows (market, status);
 
+-- Judge SMC shadow logging (Task Group B, docs/decisions/GROUP-A-MONDAY-READINESS.md item 3, gated by
+-- JUDGE_SMC_LIVE, default off): the real live Judge decision (src/paper/decision/judge.js, completely
+-- unchanged) next to a shadow decision that also scores SMC/ICT tags as an added helper
+-- (src/paper/decision/judgeSmcShadow.js), for the SAME candidate, both markets. INFORMATIONAL ONLY -
+-- never read by any entry/exit decision, and NOT the same table as paper_shadows above (that one is
+-- CC2's unrelated rejected-setup-followed-to-its-stop/target tracking).
+CREATE TABLE IF NOT EXISTS paper_judge_shadows (
+  id                   bigserial PRIMARY KEY,
+  market               text NOT NULL,
+  symbol               text NOT NULL,
+  judge_date           date NOT NULL,
+  direction            text,                 -- 'long' / 'short'
+  real_score           numeric,              -- judge.js, today's weights, unchanged
+  real_take            boolean,
+  real_contributions   jsonb,
+  real_basis           text,
+  shadow_score         numeric,              -- judgeSmcShadow.js: same candidate, smc added as a 7th helper
+  shadow_take          boolean,
+  shadow_contributions jsonb,
+  shadow_basis         text,
+  smc_tags             jsonb,                -- src/paper/lib/smc tagSmc() output for this candidate
+  created_at           timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS paper_judge_shadows_market_date_idx ON paper_judge_shadows (market, judge_date);
+
 -- CC3 round 3 (restart safety): a restart mid-cycle that re-scans the still-current candle must never double-enter a trade.
 -- NULL trigger_t (older rows, option trades that never set it) are not compared by a UNIQUE index, so this changes nothing for them.
 CREATE UNIQUE INDEX IF NOT EXISTS paper_trades_once_idx ON paper_trades (market, symbol, trigger_t);

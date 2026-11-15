@@ -10,7 +10,7 @@ const { createMemoryStore } = require('../paperbot/store');
 const fx = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'paper_replay.json'), 'utf8'));
 const MIN = 60000; const FIVE = 5 * MIN;
 
-function harness({ judgeOn, judgeHelpers, niftyTrend }) {
+function harness({ judgeOn, judgeHelpers, niftyTrend, smcShadowOn }) {
   const clock = { t: fx.nse.sessionStart };
   const store = createMemoryStore();
   const closedAt = () => fx.nse.candles.filter((k) => k.t + FIVE <= clock.t);
@@ -24,7 +24,7 @@ function harness({ judgeOn, judgeHelpers, niftyTrend }) {
     news: async () => [],
     ...(niftyTrend ? { niftyTrend: async () => niftyTrend } : {}),
   };
-  const bot = createBot({ store, nse, crypto: null, now: () => clock.t, log: () => {}, judgeOn, judgeHelpers });
+  const bot = createBot({ store, nse, crypto: null, now: () => clock.t, log: () => {}, judgeOn, judgeHelpers, smcShadowOn });
   async function runSession() {
     for (let m = 0; m <= 375; m++) { const base = fx.nse.sessionStart + m * MIN; if (m % 5 === 0) { clock.t = base + 20000; await bot.nseScan(); } clock.t = base + 50000; await bot.nseMonitor(); }
   }
@@ -88,4 +88,56 @@ test('the Sunday job also stores the judge ablation report (its own summary), an
   assert.match(store._db.summaries[1].body, /Nothing below is applied/); assert.match(store._db.summaries[1].body, /Too few trades, no conclusion/);
   const after = await store.getConfig();
   assert.equal(JSON.stringify(after), before, 'no rule or weight was changed');
+});
+
+// Task Group B (JUDGE_SMC_LIVE / smcShadowOn): SHADOW MODE ONLY. These prove (1) with the flag off -
+// the default - nothing new runs or is stored, trade/skip behaviour is byte-identical to every test
+// above; (2) with the flag on, both a real decision (today's unchanged weights) and a shadow decision
+// (SMC/ICT tags as an added helper) are computed and logged for the same candidate, and the REAL
+// take/skip decision used by the rest of the bot is unaffected either way.
+test('JUDGE_SMC_LIVE flag OFF (the default): no paper_judge_shadows row is ever written, and the trade is identical to the "judge on, good helpers" case above', async () => {
+  const h = harness({ judgeOn: true, judgeHelpers: strong, niftyTrend: 'up' }); // smcShadowOn omitted -> defaults to false in createBot
+  await h.runSession();
+  assert.equal(h.store._db.judgeShadows.length, 0);
+  const t = h.store._db.trades[0];
+  assert.ok(t); assert.equal(t.judge_take, true);
+  assert.deepEqual({ ...t.judge_contributions, pattern: 0 }, { r_factor: 25, pattern: 0, sector: 16, news: 7.5, market_trend: 10, time: 10 });
+});
+
+test('JUDGE_SMC_LIVE flag ON: a shadow row is logged for the taken candidate, with both decisions, and the real decision/trade still matches the flag-off case exactly', async () => {
+  const h = harness({ judgeOn: true, judgeHelpers: strong, niftyTrend: 'up', smcShadowOn: true });
+  await h.runSession();
+  const t = h.store._db.trades[0];
+  assert.ok(t); assert.equal(t.judge_take, true);
+  // the REAL decision used for the actual trade is unaffected by the flag (same figures as flag off)
+  assert.deepEqual({ ...t.judge_contributions, pattern: 0 }, { r_factor: 25, pattern: 0, sector: 16, news: 7.5, market_trend: 10, time: 10 });
+  assert.ok(h.store._db.judgeShadows.length >= 1, 'at least one shadow row logged');
+  const row = h.store._db.judgeShadows.find((s) => s.symbol === 'TESTSTK' && s.real_take);
+  assert.ok(row, JSON.stringify(h.store._db.judgeShadows));
+  assert.equal(row.market, 'nse');
+  assert.equal(row.real_score, t.judge_score, 'the logged real_score matches the real Judge\'s own stored score');
+  assert.equal(row.real_take, true);
+  assert.deepEqual(row.real_contributions, t.judge_contributions);
+  assert.ok(Number.isFinite(row.shadow_score));
+  assert.ok('smc' in row.shadow_contributions, 'the shadow decision scores a 7th helper the real one does not have');
+  assert.ok(!('smc' in row.real_contributions));
+  assert.ok(Array.isArray(row.smc_tags));
+});
+
+test('JUDGE_SMC_LIVE flag ON but judgeOn OFF: the shadow still logs both decisions (for comparison), while the real, judge-less entry path behaves exactly as the plain "judge off" case', async () => {
+  const h = harness({ judgeOn: false, judgeHelpers: strong, niftyTrend: 'up', smcShadowOn: true });
+  await h.runSession();
+  const t = h.store._db.trades[0];
+  assert.ok(t); assert.equal(t.judge_score, undefined, 'judge off: the trade itself still carries no judge_* fields');
+  assert.ok(h.store._db.judgeShadows.length >= 1);
+  const row = h.store._db.judgeShadows[0];
+  assert.ok(Number.isFinite(row.real_score) && Number.isFinite(row.shadow_score), 'shadow logging computes its own real+shadow decisions even though judgeOn never gates this run');
+});
+
+test('JUDGE_SMC_LIVE on: a shadow-logging failure (store.insertJudgeShadow throws) is swallowed - the scan still completes and the trade is still taken', async () => {
+  const h = harness({ judgeOn: true, judgeHelpers: strong, niftyTrend: 'up', smcShadowOn: true });
+  h.store.insertJudgeShadow = async () => { throw new Error('db down'); };
+  await h.runSession();
+  const t = h.store._db.trades[0];
+  assert.ok(t); assert.equal(t.judge_take, true);
 });

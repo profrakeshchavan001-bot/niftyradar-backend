@@ -12,6 +12,7 @@ const { newsCheck, FIVE_MIN } = require('./sources');
 const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
 const { createJudge, loadJudgeConfig, tradeFields } = require('../src/paper/decision/judge');
 const { judge2, tradeFields2 } = require('../src/paper/decision/judge2');
+const { createShadowJudge } = require('../src/paper/decision/judgeSmcShadow');
 const { classifyEmaCross } = require('../src/paper/lib/emaCross');
 const { tagSmc } = require('../src/paper/lib/smc');
 const Lib = require('../src/paper/lib/exitSim');
@@ -19,9 +20,37 @@ const { recoveryLimit } = require('../src/paper/lib/recoveryWindow');
 
 // judgeOn: the judge (src/paper/decision/judge.js, docs/JUDGE.md) decides every NSE entry; index.js turns it on unless PAPER_JUDGE_ON=false.
 // judgeHelpers: test seam for { stockSectorView, newsScore, eventBlock }; by default the real modules are used when they exist.
-function createBot({ store, nse, crypto, now = Date.now, log = console.log, onConfig = () => {}, judgeOn = false, judgeHelpers = {} }) {
+// smcShadowOn: Task Group B (docs/decisions/GROUP-A-MONDAY-READINESS.md item 3), SHADOW MODE ONLY -
+// default OFF (index.js turns it on only when JUDGE_SMC_LIVE=true). With it off, nothing below runs:
+// the real Judge and every real take/skip decision are exactly as before, flag or no flag. With it on,
+// for every candidate that reaches the Judge (both markets) it ALSO computes the real decision
+// (today's unchanged weights) and a shadow decision (SMC/ICT tags scored as an added helper,
+// src/paper/decision/judgeSmcShadow.js) and logs both to paper_judge_shadows - never read by any
+// entry/exit decision.
+function createBot({ store, nse, crypto, now = Date.now, log = console.log, onConfig = () => {}, judgeOn = false, judgeHelpers = {}, smcShadowOn = false }) {
   const skipSeen = new Set();
   const candleCache = new Map(); // symbol -> { candles, source, at }
+
+  // Shadow logging only (Task Group B). Computes BOTH the real Judge decision (judge.js, completely
+  // unchanged) and a shadow decision (judgeSmcShadow.js) for the SAME candidate, and stores both in
+  // paper_judge_shadows for later comparison. Never read by, and never allowed to affect, a real
+  // take/skip decision. A failure here is logged and swallowed - it must never stop the real scan.
+  async function logSmcShadow(market, symbol, candidate) {
+    try {
+      const config = await loadJudgeConfig(store);
+      const real = createJudge({ config, ...judgeHelpers });
+      const shadow = createShadowJudge({ config, ...judgeHelpers });
+      const [rd, sd] = await Promise.all([real(candidate), shadow(candidate)]);
+      await store.insertJudgeShadow({
+        market, symbol, judge_date: istParts(now()).date, direction: candidate.direction,
+        real_score: rd.score, real_take: rd.take, real_contributions: rd.contributions, real_basis: rd.basis,
+        shadow_score: sd.score, shadow_take: sd.take, shadow_contributions: sd.contributions, shadow_basis: sd.basis,
+        smc_tags: candidate.smcTags || null,
+      });
+    } catch (e) {
+      log(`[paperbot] SMC judge shadow logging failed (ignored, never blocks the real scan): ${e.message}`);
+    }
+  }
 
   // Candles of one stock, read again only when the clock has moved into a new
   // `bucketMs` window since the last read (15 min for ranking, 5 min for patterns).
@@ -170,10 +199,15 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
 
       const dir = a.decision.direction;
       let jd = null;
+      let niftyTrend; // no Nifty candle source yet: that helper then earns half its points
+      if (judgeOn || smcShadowOn) niftyTrend = typeof nse.niftyTrend === 'function' ? await nse.niftyTrend() : undefined;
+      const judgeCandidate = { symbol: s.symbol, market: 'nse', direction: dir === 'up' ? 'long' : 'short', rFactor: dir === 'up' ? s.r.long.r : s.r.short.r, patterns: a.decision.patterns, niftyTrend, time: now() };
+      // Shadow mode only (Task Group B, JUDGE_SMC_LIVE): runs independently of judgeOn, for every
+      // candidate that reaches this point, so a rejected-by-judgeOn candidate is still logged.
+      if (smcShadowOn) await logSmcShadow('nse', s.symbol, { ...judgeCandidate, smcTags: a.extra.smc_tags, rawDir: dir });
       if (judgeOn) { // ONE decision from every helper; a hard block or a score under the threshold means no trade
-        const niftyTrend = typeof nse.niftyTrend === 'function' ? await nse.niftyTrend() : undefined; // no Nifty candle source yet: that helper then earns half its points
         const judge = createJudge({ config: await loadJudgeConfig(store), ...judgeHelpers });
-        jd = await judge({ symbol: s.symbol, market: 'nse', direction: dir === 'up' ? 'long' : 'short', rFactor: dir === 'up' ? s.r.long.r : s.r.short.r, patterns: a.decision.patterns, niftyTrend, time: now() });
+        jd = await judge(judgeCandidate);
         if (!jd.take) { await skip('nse', s.symbol, `judge ${jd.score}/100: ${jd.basis}`, a.extra); continue; }
       }
       const lot = nse.lotSize(s.symbol);
@@ -313,6 +347,15 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       if (score == null || score < c.min_momentum_score) { await skip('crypto', s.symbol, `momentum score ${score} is below ${c.min_momentum_score}`, a.extra); continue; }
       const dir = a.decision.direction;
       const price = a.ctx.price;
+      // Shadow mode only (Task Group B, JUDGE_SMC_LIVE): the live Judge is NSE-only today, but this
+      // task also wants crypto's would-be score logged for comparison - never read by any real crypto
+      // entry decision below (that stays on momentum score / planTrade, completely unchanged).
+      if (smcShadowOn) {
+        await logSmcShadow('crypto', s.symbol, {
+          symbol: s.symbol, market: 'crypto', direction: dir === 'up' ? 'long' : 'short', rFactor: null,
+          patterns: a.decision.patterns, smcTags: a.extra.smc_tags, rawDir: dir, time: now(),
+        });
+      }
       // Target and stop from price levels; a trade needs reward / risk of at least levels.minRr.
       let c1h = [];
       try { if (typeof crypto.hourly === 'function') c1h = E.closedOnly(await crypto.hourly(s.symbol), 12 * FIVE_MIN, now()); } catch (e) { log(`[paperbot] 1-hour candles for ${s.symbol} failed (${e.response?.status || e.message}); 1-hour levels come from the 5-min candles only`); }
