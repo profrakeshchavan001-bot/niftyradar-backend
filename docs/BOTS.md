@@ -95,12 +95,22 @@ exhaustion_only/trend_smc) - it writes nothing anywhere.
 ## Mix (`src/paper/bots/mix/`, a plugin): `GET /api/paper/mix-report` (+ `&format=json`) - **SUGGESTIONS ONLY**
 
 Labelled `"suggestion, needs owner approval"` on every response, in the HTML and the JSON both. **It never places a trade and never
-changes any bot's rules or weights.** For every candle that 2 or more bots actually traded (same symbol, same candle open time), it
-works out a score-weighted vote: each bot's weight is its own win rate, but **only for bots with 20+ closed trades** - a bot under that
-still shows in the leaderboard but contributes nothing to a vote. The "weighted result" is the weighted average of what those bots'
-*own* trades on that candle actually scored - an approximation (each bot's real entry/stop/target differed slightly), not a fresh
-backtest of one combined position, and the report says so. Equal weights pointing opposite directions is reported as "no agreement",
-never forced to a side.
+changes any bot's rules or weights.** Three read-only sections, all built purely from trades every bot already took:
+
+1. **Score-weighted vote**: for every candle that 2 or more bots actually traded (same symbol, same candle open time), a
+   score-weighted vote: each bot's weight is its own win rate, but **only for bots with 20+ closed trades** - a bot under that still
+   shows in the leaderboard but contributes nothing to a vote. The "weighted result" is the weighted average of what those bots'
+   *own* trades on that candle actually scored - an approximation (each bot's real entry/stop/target differed slightly), not a fresh
+   backtest of one combined position, and the report says so. Equal weights pointing opposite directions is reported as "no
+   agreement", never forced to a side.
+2. **Per-bot scoreboard** (Task Group C): the same `computeBotStats()` the leaderboard uses (net INR after costs, win rate, max
+   drawdown), with `avgRFactor` (real risk-reward at entry, `docs/R-FACTOR.md`) and `tradesPerDay` added on top.
+3. **Mix candidate** (Task Group C, `src/paper/bots/mix/stats.js` `buildMixCandidate`): a plain-English, descriptive-only analysis of
+   which entry pattern / SMC tag each bot's own best-performing trades share, against that bot's own static reward/risk floor -
+   i.e. what a combined "best-of" bot's entry+filter rule-set would look like if assembled from these slices. **It changes no live
+   filter, threshold or bot, and builds/wires no new engine** - it only describes, in the report's text, what the existing bots'
+   best slices have in common. Reads `paper_shadows` (if that table exists) only to report its row count; its absence never fails
+   the route.
 
 ## Report
 

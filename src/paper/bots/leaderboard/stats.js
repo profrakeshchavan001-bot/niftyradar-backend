@@ -9,6 +9,19 @@ const netOf = (t) => t.pnl_inr ?? t.net_pnl_inr ?? 0; // every bot's trade row c
 const grossOf = (t) => (Number.isFinite(t.gross_pnl_inr) ? t.gross_pnl_inr : netOf(t)); // no cost model recorded (e.g. intraday) = gross == net
 const minutesOf = (t) => (t.exit_time && t.entry_time ? (Date.parse(t.exit_time) - Date.parse(t.entry_time)) / 60000 : null);
 const exitMs = (t) => (t.exit_time ? Date.parse(t.exit_time) : Date.parse(t.entry_time));
+// Real risk-reward at entry (docs/R-FACTOR.md): exhaustion_only/trend_smc store it as `rr`, scalp/scalp_wide/intraday as `r_factor` -
+// both mean "reward distance / risk distance, after costs where the bot applies a cost model". Used for Task Group C's "avg R" column.
+const rFactorOf = (t) => {
+  const v = t.rr ?? t.r_factor;
+  const n = typeof v === 'string' ? Number(v) : v;
+  return Number.isFinite(n) ? n : null;
+};
+// Calendar date (IST not needed here - just a day bucket for "trades/day"): trade_date column when the bot wrote one, else the exit day.
+const dateOf = (t) => {
+  if (t.trade_date) return String(t.trade_date).slice(0, 10);
+  const ms = exitMs(t);
+  return Number.isFinite(ms) ? new Date(ms).toISOString().slice(0, 10) : null;
+};
 
 // Max drawdown of the bot's own virtual balance: walks closed trades in the order they closed, tracks the running peak of
 // cumulative net P&L, and returns the largest peak-to-trough drop seen (0 if the balance only ever grew).
@@ -30,6 +43,8 @@ function computeBotStats(closed, minTrades = MIN_TRADES) {
   const gross = closed.reduce((s, t) => s + grossOf(t), 0);
   const costs = gross - net;
   const mins = closed.map(minutesOf).filter((m) => Number.isFinite(m));
+  const rVals = closed.map(rFactorOf).filter((v) => v != null);
+  const days = new Set(closed.map(dateOf).filter(Boolean));
   return {
     trades: closed.length,
     winRatePct: closed.length ? round((wins.length / closed.length) * 100, 1) : null,
@@ -41,6 +56,8 @@ function computeBotStats(closed, minTrades = MIN_TRADES) {
     avgLossInr: losses.length ? round(losses.reduce((s, t) => s + netOf(t), 0) / losses.length, 2) : null,
     maxDrawdownInr: maxDrawdownInr(closed),
     avgMinutes: mins.length ? round(mins.reduce((a, b) => a + b, 0) / mins.length, 1) : null,
+    avgRFactor: rVals.length ? round(rVals.reduce((a, b) => a + b, 0) / rVals.length, 2) : null, // real risk-reward at entry, docs/R-FACTOR.md
+    tradesPerDay: days.size ? round(closed.length / days.size, 2) : null, // distinct calendar days with a closed trade
     conclusion: closed.length >= minTrades ? 'enough trades' : NO_CONCLUSION,
     ranked: closed.length >= minTrades,
     lossAfterCosts: closed.length > 0 && net < 0,
@@ -64,4 +81,4 @@ function dailyWinners(byBot) {
   });
 }
 
-module.exports = { computeBotStats, dailyWinners, maxDrawdownInr, NO_CONCLUSION, MIN_TRADES, netOf, grossOf };
+module.exports = { computeBotStats, dailyWinners, maxDrawdownInr, NO_CONCLUSION, MIN_TRADES, netOf, grossOf, rFactorOf, dateOf };
