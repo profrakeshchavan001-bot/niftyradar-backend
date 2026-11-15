@@ -20,6 +20,8 @@ Solves: "trade the top R-factor stocks in demo using candle patterns, log WHY ea
 
 `exhaustion_reversal` (may trade against the trend), `bullish_engulfing`, `bearish_engulfing`, `hammer`, `shooting_star`, `morning_star`, `evening_star`, `inside_bar_breakout`, `liquidity_sweep`, `order_block`, `fvg_retest`. Exact rules are in the comments of `paperbot/patterns.js`.
 
+**`exhaustion_reversal` is two different rules, on purpose.** Crypto (the main bot, scalp, scalp_wide, `exhaustion_only`) keeps the original single-candle rule: small red candle in a falling move, closing below VWAP, then ONE green candle closing above its high (mirror for a rise) - `exhaustionReversal()`. **NSE uses a stricter, owner-specified rule** (`exhaustionReversalConfirmed()`, only reached through `paperbot/bot.js`'s `analyse()` with `variant: 'nse'`): that first green candle only starts the reversal and is never itself a signal - entry is confirmed only on a SECOND green candle closing above the first green candle's high (mirror: two reds confirm a short). Both write the same pattern name, `exhaustion_reversal`, so the Judge's `pattern_strength` weight (0.8) applies unchanged either way.
+
 ## Environment variables
 
 | Name | Purpose |
