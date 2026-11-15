@@ -54,6 +54,31 @@ test('entry: a swing high 0.26 % above leaves no room (0.2589 - 0.1 = 0.1589 % <
   assert.match(a.reason, /^only 0\.26% of room to the nearest resistance 100\.7; after leaving 0\.1% the target would be 0\.16%, below the 0\.3% minimum$/);
 });
 
+// CC group D crypto-levels audit: target/stop must come from a real level, never a flat % of entry with nothing on the chart behind
+// it. plan.level/targetType/stopType carry the level's own type so the basis text can bracket it, same convention as
+// exhaustion_only/trend_smc and the Telegram alert format (target_type/stop_type).
+test('entry: target and stop carry the level type, so the basis brackets it for BOTH target and stop (no fixed-% label)', () => {
+  const a = analyse({ ...scene(), cfg: FREE });
+  assert.equal(a.ok, true, a.reason);
+  assert.deepEqual([a.plan.level.type, a.plan.targetType], ["today's high", "today's high"]);
+  assert.equal(a.plan.stopType, 'pattern low + 0.5 x ATR14(1m)');
+  const { basisText } = require('../src/paper/scalp/bot');
+  const basis = basisText(a.plan, 'BTCUSDT');
+  assert.match(basis, /Target 100\.9422 \(today's high\), stop 100\.333929 \(pattern low \+ 0\.5 x ATR14\(1m\)\)/);
+});
+
+// Entry unchanged (100.44, same 1-min pattern candles), but every 5-min candle's high is capped at 100.40 (below the entry), so
+// no swing high AND no today's high remain above the entry - no real resistance level exists on the chart at all. Before this fix
+// the bot fell back to a flat target = entry x (1 + 0.5%) = 100.9422 with NOTHING on the chart behind it (the exact
+// "target = entry * 1.02" anti-pattern the owner flagged); now it is a skip, like scalp_wide and src/paper/lib/levels.js already do.
+test('entry: no level above the entry at all -> SKIPPED, never a flat entry x (1 + cap%) target with nothing on the chart behind it', () => {
+  const s = scene();
+  const capped = { ...s, c5raw: s.c5raw.map((k) => ({ ...k, h: Math.min(k.h, 100.40) })) };
+  const a = analyse({ ...capped, cfg: FREE });
+  assert.equal(a.ok, false);
+  assert.equal(a.reason, "no resistance level (5-min swing or today's high) in the way; scalp needs one to target");
+});
+
 test('entry: stop is capped at 0.3 %: a wide pattern candle (low 99.90, 0.54 away) gives 0.3 not 0.54 %', () => {
   const s = scene(); s.c1raw[s.c1raw.length - 2] = { ...s.c1raw[s.c1raw.length - 2], l: 99.90 };
   const a = analyse({ ...s, cfg: FREE });
@@ -112,6 +137,16 @@ test('scalp_wide entry: a level only 0.40 % away is below the 0.8 % / 1xATR floo
   const a = analyseWide({ ...sceneWide({ highOverride: 100.84 }), cfg: FREE_WIDE });
   assert.equal(a.ok, false);
   assert.match(a.reason, /^nearest resistance 100\.84 is only 0\.4% away, below the 0\.8% needed \(0\.8% minimum, or 1 x ATR 0\.09%, whichever is larger\)$/);
+});
+
+test("scalp_wide entry: target carries the level type (today's high) and the basis brackets both target and stop", () => {
+  const a = analyseWide({ ...sceneWide(), cfg: FREE_WIDE });
+  assert.equal(a.ok, true, a.reason);
+  assert.deepEqual([a.plan.level.type, a.plan.targetType], ["today's high", "today's high"]);
+  assert.equal(a.plan.stopType, 'pattern low + 0.5 x ATR14(5m)');
+  const { basisTextWide } = require('../src/paper/scalp/bot');
+  const basis = basisTextWide(a.plan, 'BTCUSDT');
+  assert.match(basis, /Target 102\.025 \(today's high\), stop 100\.333929 \(pattern low \+ 0\.5 x ATR14\(5m\)\)/);
 });
 
 test('scalp_wide entry: too few 5-min or 15-min candles, and a stale candle, are refused in plain words', () => {
@@ -193,7 +228,11 @@ test('bot: with costs off, each of BTC / ETH / SOL gets exactly ONE open scalp t
   // size: risk 2 % of 1000 = 20 USDT / stop 0.1056 % = 18,939 -> capped at capital / 3 coins = 333.33 USDT -> 333.33 / 100.44 = 3.3187 coins
   assert.equal(Math.round(t.qty * 10000) / 10000, 3.3187);
   assert.equal(t.sl_price, 100.333929); assert.equal(t.target_price, 100.9422); assert.equal(t.r_factor, 4.73);
+  // target_type/stop_type stored on the row (CC group D audit): the shared Telegram alert format (src/paper/ops/telegramAlerts/format.js)
+  // brackets these for every bot; without them a scalp trade's alert would wrongly show "(fixed %)".
+  assert.deepEqual([t.target_type, t.stop_type], ["today's high", 'pattern low + 0.5 x ATR14(1m)']);
   assert.match(t.basis, /^Scalp LONG on BTCUSDT: the 1-min chart showed exhaustion reversal/); assert.match(t.basis, /reward\/risk 4\.73 after costs/);
+  assert.match(t.basis, /Target 100\.9422 \(today's high\), stop 100\.333929 \(pattern low \+ 0\.5 x ATR14\(1m\)\)/);
   assert.equal(t.data_source, 'binance_public'); assert.equal(t.trigger_t, h.s.last.t);
   assert.equal((await h.bot.cryptoScalpScan()).entered.length, 0, 'one open scalp per coin');
   assert.equal(h.store._db.trades.length, 3);
@@ -248,7 +287,9 @@ test('bot: scalp_wide opens one trade per coin under its OWN market/strategy, wi
   assert.ok(rows.every((t) => t.market === 'crypto_wide_scalp' && t.strategy === 'scalp_wide' && t.status === 'open' && t.direction === 'LONG'));
   const t = rows[0];
   assert.equal(t.sl_price, 100.333929); assert.equal(t.target_price, 102.025); assert.equal(t.r_factor, 4.02);
+  assert.deepEqual([t.target_type, t.stop_type], ["today's high", 'pattern low + 0.5 x ATR14(5m)']);
   assert.match(t.basis, /^Scalp wide LONG on BTCUSDT: the 5-min chart showed exhaustion reversal/); assert.match(t.basis, /reward\/risk 4\.02 after costs/);
+  assert.match(t.basis, /Target 102\.025 \(today's high\), stop 100\.333929 \(pattern low \+ 0\.5 x ATR14\(5m\)\)/);
   assert.equal((await h.bot.cryptoScalpWideScan()).entered.length, 0, 'one open scalp_wide per coin');
   assert.deepEqual(await h.store.openTrades('crypto_scalp'), [], 'the tight scalp never sees scalp_wide trades');
   assert.deepEqual(await h.store.openTrades('crypto'), [], 'nor does the intraday crypto monitor');
