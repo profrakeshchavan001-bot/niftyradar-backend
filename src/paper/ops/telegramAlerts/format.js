@@ -8,6 +8,18 @@
 // bot did not store one; always labelled "≈" because it is an estimate either way.
 const DEFAULT_COST_PCT = 0.0023;
 
+/** "15-Nov 10:41 PM IST" for a Date/ISO string; 'n/a' when missing or invalid (never throws). */
+function istTime(value) {
+  if (!value) return 'n/a';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'n/a';
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(d);
+  const g = (t) => (parts.find((x) => x.type === t) || {}).value || '';
+  return `${g('day')}-${g('month')} ${g('hour')}:${g('minute')} ${String(g('dayPeriod')).toUpperCase()} IST`;
+}
+
+const tradeTag = (trade) => (trade.id != null ? `Trade #${trade.id}` : 'Trade');
+
 const emojiDir = (direction) => (direction === 'LONG' ? '🟢 LONG' : '🔴 SHORT');
 
 /** { rate, source } from the trade row's own fx_rate/fx_source, else the env fallback, else null (never invented). */
@@ -51,7 +63,9 @@ function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallba
   const rr = trade.rr != null ? Number(trade.rr) : (stop.usd > 0 ? Math.round((target.usd / stop.usd) * 100) / 100 : null);
   const money = (m, sign) => (fx ? `${sign}₹${m.inr.toLocaleString('en-IN')}` : `${sign}$${m.usd} (rate n/a)`);
   return [
-    `${emojiDir(trade.direction)} ${trade.symbol} [${botLabel}]`,
+    `${tradeTag(trade)} | ${botLabel}`,
+    `${emojiDir(trade.direction)} ${trade.symbol}`,
+    `Entry time: ${istTime(trade.entry_time)}`,
     `Entry: ${trade.entry_price}`,
     `Target: ${trade.target_price} (${trade.target_type || 'fixed %'})`,
     `Stop: ${trade.sl_price} (${trade.stop_type || 'fixed %'})`,
@@ -69,10 +83,13 @@ function formatExit(trade, botLabel) {
   const net = trade.pnl_inr != null ? Number(trade.pnl_inr) : null;
   const resultWord = { target: 'TARGET hit', stop: 'STOP hit', breakeven: 'breakeven' }[trade.exit_reason] || (trade.exit_reason || 'closed');
   return [
-    `${trade.symbol} [${botLabel}] closed - ${resultWord}`,
+    `EXIT ${tradeTag(trade)} | ${botLabel}`,
+    `${trade.symbol} closed - ${resultWord}`,
+    `Entry time: ${istTime(trade.entry_time)}`,
+    `Exit time: ${istTime(trade.exit_time)}`,
     net != null ? `Net: ${net >= 0 ? '+' : '-'}₹${Math.abs(Math.round(net)).toLocaleString('en-IN')}` : 'Net: n/a',
     minutes != null ? `Time in trade: ${minutes} min` : null,
   ].filter(Boolean).join('\n');
 }
 
-module.exports = { formatEntry, formatExit, estimateMove, fxInfo, firstTwoLines, DEFAULT_COST_PCT };
+module.exports = { istTime, formatEntry, formatExit, estimateMove, fxInfo, firstTwoLines, DEFAULT_COST_PCT };

@@ -33,21 +33,23 @@ test('fxInfo: trade row fx_rate wins; else env fallback; else null', () => {
 test('formatEntry: exact layout, level types in brackets, hand-checked INR, Reward:Risk, Kyu first 2 lines only', () => {
   const text = formatEntry(LONG, 'intraday', { costPct: 0 });
   const lines = text.split('\n');
-  assert.equal(lines[0], '🟢 LONG BTCUSDT [intraday]');
-  assert.equal(lines[1], 'Entry: 100');
-  assert.equal(lines[2], 'Target: 110 (swing high 1h)');
-  assert.equal(lines[3], 'Stop: 95 (pattern low + 1xATR)');
-  assert.equal(lines[4], 'Target lagne par ≈ +₹9,000'); // 100usd x 90 = 9000
-  assert.equal(lines[5], 'Stop lagne par ≈ -₹4,500'); // 50usd x 90 = 4500
-  assert.equal(lines[6], 'Reward:Risk 2.00'); // 100/50
-  assert.equal(lines[7], '');
-  assert.equal(lines[8], 'Kyu: order_block retest. 15m trend up, VWAP reclaim.'); // only first 2 lines, "extra line" dropped
+  assert.equal(lines[0], 'Trade | intraday'); // LONG fixture has no id
+  assert.equal(lines[1], '🟢 LONG BTCUSDT');
+  assert.equal(lines[2], 'Entry time: n/a'); // fixture has no entry_time
+  assert.equal(lines[3], 'Entry: 100');
+  assert.equal(lines[4], 'Target: 110 (swing high 1h)');
+  assert.equal(lines[5], 'Stop: 95 (pattern low + 1xATR)');
+  assert.equal(lines[6], 'Target lagne par ≈ +₹9,000'); // 100usd x 90 = 9000
+  assert.equal(lines[7], 'Stop lagne par ≈ -₹4,500'); // 50usd x 90 = 4500
+  assert.equal(lines[8], 'Reward:Risk 2.00'); // 100/50
+  assert.equal(lines[9], '');
+  assert.equal(lines[10], 'Kyu: order_block retest. 15m trend up, VWAP reclaim.'); // only first 2 lines, "extra line" dropped
 });
 
 test('formatEntry: SHORT direction emoji; missing level type falls back to "fixed %" (legacy rule)', () => {
   const t = { ...LONG, direction: 'SHORT', target_type: null, stop_type: null };
   const text = formatEntry(t, 'scalp', { costPct: 0 });
-  assert.match(text, /^🔴 SHORT BTCUSDT \[scalp\]/);
+  assert.match(text, /^Trade \| scalp\n🔴 SHORT BTCUSDT/);
   assert.match(text, /Target: 110 \(fixed %\)/);
   assert.match(text, /Stop: 95 \(fixed %\)/);
 });
@@ -75,7 +77,7 @@ test('formatEntry: nativeInr (Task Group C - NSE bots) shows rupees directly, no
 test('formatExit: result word, net INR (+/-), time in trade in minutes (hand-checked)', () => {
   const t = { symbol: 'BTCUSDT', exit_reason: 'target', pnl_inr: 4500, entry_time: '2026-11-14T10:00:00Z', exit_time: '2026-11-14T10:37:00Z' };
   const text = formatExit(t, 'intraday');
-  assert.equal(text, 'BTCUSDT [intraday] closed - TARGET hit\nNet: +₹4,500\nTime in trade: 37 min');
+  assert.equal(text, 'EXIT Trade | intraday\nBTCUSDT closed - TARGET hit\nEntry time: 14-Nov 3:30 PM IST\nExit time: 14-Nov 4:07 PM IST\nNet: +₹4,500\nTime in trade: 37 min');
 });
 
 test('formatExit: a loss shows a minus sign; stop/breakeven/other exit reasons worded plainly', () => {
