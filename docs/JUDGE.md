@@ -34,3 +34,14 @@ Each trade stores `judge_score`, `judge_take`, `judge_contributions` and `judge_
 
 ## Not changed by the judge
 Entry timing, option choice, size, target, stop and exit rules stay as they were.
+
+## SMC/ICT shadow logging (`JUDGE_SMC_LIVE`, default off)
+`JUDGE_SMC_LIVE=true` turns on **shadow logging only** (Task Group B, `docs/decisions/GROUP-A-MONDAY-READINESS.md`
+item 3): for every candidate the judge reaches (both NSE and crypto), it also computes a second,
+parallel decision with the stock's SMC/ICT tags (`src/paper/lib/smc`) scored as a 7th helper, `smc`,
+at weight 15 - the same weight `judge2.js`'s own parallel SMC helper already uses - with every weight
+(including `smc`) renormalized the same way the six existing helpers already are. This is
+`src/paper/decision/judgeSmcShadow.js`. Both the real decision (unchanged) and the shadow decision are
+written to their own table, `paper_judge_shadows`, for the owner to compare later. With the flag off
+(the default) none of this code path runs at all; with it on, the real take/skip decision used by the
+rest of the bot is still exactly the one above - the shadow decision never feeds a trade.

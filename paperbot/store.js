@@ -19,15 +19,23 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
   'strategy', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr', 'be_moved', // scalp: docs/SCALP.md
   'ema_cross', // EMA9/21 (5m) / EMA20/50 (15m,1h) crossover confirmation, src/paper/lib/emaCross.js
   'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis']; // PARALLEL scorer, src/paper/decision/judge2.js - never a live decision
-const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions', 'judge2_contributions']);
+const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions', 'judge2_contributions', 'real_contributions', 'shadow_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
   'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'judge2_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr',
-  'stop_price', 'result_pct']; // shadow tracking (paper_shadows)
+  'stop_price', 'result_pct', // shadow tracking (paper_shadows)
+  'real_score', 'shadow_score']; // judge SMC shadow logging (paper_judge_shadows)
 const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec', 'ema_cross', 'smc_tags',
   'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis'];
 // Shadow tracking (CC2 round 2 item 4): a rejected setup followed to its own hypothetical stop/target.
 const SHADOW_COLS = ['market', 'symbol', 'shadow_date', 'direction', 'reason', 'entry_price', 'target_price', 'stop_price',
   'status', 'outcome', 'result_pct', 'entry_time', 'exit_time', 'basis'];
+// Judge SMC shadow logging (Task Group B, JUDGE_SMC_LIVE): the real Judge decision (judge.js,
+// unchanged) next to a shadow decision (src/paper/decision/judgeSmcShadow.js) for the same candidate -
+// its OWN table (paper_judge_shadows), never paper_shadows above (that one is CC2's unrelated
+// rejected-setup tracking), never read by any entry/exit decision.
+const JUDGE_SHADOW_COLS = ['market', 'symbol', 'judge_date', 'direction',
+  'real_score', 'real_take', 'real_contributions', 'real_basis',
+  'shadow_score', 'shadow_take', 'shadow_contributions', 'shadow_basis', 'smc_tags'];
 
 // scalp markets ('crypto_scalp', 'nse_scalp') stay out of the intraday lists unless asked for by name (docs/SCALP.md)
 const isScalp = (m) => String(m || '').endsWith('_scalp');
@@ -35,7 +43,7 @@ const isScalp = (m) => String(m || '').endsWith('_scalp');
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
 
 function createMemoryStore() {
-  const db = { config: {}, trades: [], skips: [], summaries: [], shadows: [] };
+  const db = { config: {}, trades: [], skips: [], summaries: [], shadows: [], judgeShadows: [] };
   let seq = 0;
   const copy = (x) => JSON.parse(JSON.stringify(x));
   return {
@@ -71,6 +79,9 @@ function createMemoryStore() {
     async updateShadow(id, fields) { const row = db.shadows.find((t) => t.id === id); if (row) Object.assign(row, copy(fields)); },
     async openShadows(market) { return copy(db.shadows.filter((t) => t.market === market && t.status === 'open')); },
     async listShadows(limit, market = null) { return copy(db.shadows.filter((x) => (market ? x.market === market : true)).slice(-clampLimit(limit)).reverse()); },
+    // Judge SMC shadow logging (Task Group B): own table, own list - never joined into a trade/skip query.
+    async insertJudgeShadow(s) { const row = { id: ++seq, ...copy(s) }; db.judgeShadows.push(row); return row.id; },
+    async listJudgeShadows(limit, market = null) { return copy(db.judgeShadows.filter((x) => (market ? x.market === market : true)).slice(-clampLimit(limit)).reverse()); },
     _db: db,
   };
 }
@@ -179,6 +190,15 @@ function createPgStore(getPool, log = console.log) {
     },
     openShadows: (market) => q("SELECT * FROM paper_shadows WHERE market = $1 AND status = 'open' ORDER BY id", [market]),
     listShadows: (limit, market = null) => q('SELECT * FROM paper_shadows WHERE ($2::text IS NULL OR market = $2) ORDER BY id DESC LIMIT $1', [clampLimit(limit), market]),
+    // Judge SMC shadow logging (Task Group B, JUDGE_SMC_LIVE): own table (paper_judge_shadows), never
+    // joined into paper_trades/paper_skips/paper_shadows, never read by any entry/exit decision.
+    async insertJudgeShadow(s) {
+      const cols = JUDGE_SHADOW_COLS.filter((c) => s[c] !== undefined);
+      const rows = await q(`INSERT INTO paper_judge_shadows (${cols.join(', ')}) VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING id`,
+        cols.map((c) => toParam(c, s[c])));
+      return rows[0].id;
+    },
+    listJudgeShadows: (limit, market = null) => q('SELECT * FROM paper_judge_shadows WHERE ($2::text IS NULL OR market = $2) ORDER BY id DESC LIMIT $1', [clampLimit(limit), market]),
     listSkips: (limit, market = null) => q("SELECT * FROM paper_skips WHERE (($2::text IS NULL AND market NOT LIKE '%\\_scalp') OR market = $2) ORDER BY id DESC LIMIT $1", [clampLimit(limit), market]),
   };
 }

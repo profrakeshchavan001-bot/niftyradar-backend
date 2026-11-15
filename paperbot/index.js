@@ -295,7 +295,8 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   state.crypto = cryptoSrc;
   state.yahoo = yahoo; // overnight item 3: health.js reads state.yahoo.stats for the real per-source status
   const judgeOn = String(env.PAPER_JUDGE_ON ?? 'true').toLowerCase() !== 'false'; // the judge decides NSE entries (docs/JUDGE.md); PAPER_JUDGE_ON=false switches it off
-  const bot = createBot({ store, nse, crypto: cryptoSrc, log, onConfig: (cfg) => { state.holidays = cfg.nse.holidays; }, judgeOn });
+  const smcShadowOn = String(env.JUDGE_SMC_LIVE ?? 'false').toLowerCase() === 'true'; // Task Group B, SHADOW MODE ONLY, default off: docs/decisions/GROUP-A-MONDAY-READINESS.md item 3
+  const bot = createBot({ store, nse, crypto: cryptoSrc, log, onConfig: (cfg) => { state.holidays = cfg.nse.holidays; }, judgeOn, smcShadowOn });
   const reporter = createReporter({ store, axios, env, log, loadConfig });
   const tz = { timezone: 'Asia/Kolkata' };
   const job = (name, fn) => guarded(name, fn, log);
