@@ -82,6 +82,7 @@ module.exports = {
     cron.schedule('22 */5 * * * *', guarded('trend_smc scan', bot.scan, log), tz);
     cron.schedule('58 * * * * *', guarded('trend_smc monitor', bot.monitor, log), tz);
     shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[trend_smc] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
+    bot.monitor().then((r) => log(`[trend_smc] startup resume: checked ${r.checked}, closed ${r.closed}`)).catch((e) => log(`[trend_smc] startup resume failed: ${e.message}`)); // item 4
     log(`[trend_smc] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/trend-smc-report)`);
   },
   create15mSource,

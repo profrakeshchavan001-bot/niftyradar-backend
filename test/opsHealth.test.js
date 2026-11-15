@@ -218,6 +218,35 @@ test('stale shadows (60min+): any count above 0 is a PROBLEM, with the count and
   assert.match(h.reason, /3 open shadow\(s\) older than 60 min/);
 });
 
+// CC3 urgent fix item 3 (docs/decisions/CC3.md, 15 Nov outage): the actual fault that happened - every write stopped for
+// ~3 hours with cron still firing and /api/paper/ping still answering - which the old staleJobs check (job FUNCTION ran)
+// could never catch. This measures the newest row across every table directly.
+test('last DB write: 10+ minutes ago is a PROBLEM, stated with the age in minutes', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const lastWrite = new Date(MARKET_OPEN - 15 * 60000).toISOString(); // 15 min before "now"
+  const store = {
+    ...createMemoryStore(),
+    query: async (sql) => (/status = 'open'/.test(sql) ? { rows: [{ n: 0 }] } : { rows: [{ last_write: lastWrite }] }),
+  };
+  const h = await buildHealth({ tracker, store, state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
+  assert.equal(h.status, 'PROBLEM');
+  assert.equal(h.lastDbWriteMinutesAgo, 15);
+  assert.match(h.reason, /last database write was 15 min ago/);
+});
+
+test('last DB write: under 10 minutes is fine, not a problem', async () => {
+  const tracker = createHealthTracker({ now: () => MARKET_OPEN });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const lastWrite = new Date(MARKET_OPEN - 3 * 60000).toISOString();
+  const store = {
+    ...createMemoryStore(),
+    query: async (sql) => (/status = 'open'/.test(sql) ? { rows: [{ n: 0 }] } : { rows: [{ last_write: lastWrite }] }),
+  };
+  const h = await buildHealth({ tracker, store, state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
+  assert.equal(h.lastDbWriteMinutesAgo, 3); assert.doesNotMatch(h.reason, /last database write/);
+});
+
 test('stale shadows: 0 is not a problem; no raw query access (memory mode) reports null, never a false "0"', async () => {
   const tracker = createHealthTracker({ now: () => MARKET_OPEN });
   for (const name of JOB_NAMES) tracker.recordRun(name, true);

@@ -147,6 +147,29 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
     } catch (e) { /* table may not exist yet, or the database is down - already reported via database.ok */ }
   }
 
+  // CC3 urgent fix item 3 (docs/decisions/CC3.md, 15 Nov outage): the real fault - every write stopped for ~3 hours while
+  // cron kept firing and /api/paper/ping stayed up - would NOT have shown in the old staleJobs check (that only measures
+  // whether the wrapped job FUNCTION ran, not whether it actually reached the database). This measures the newest row
+  // across every table every bot writes to, directly - a real completed write, not a cron tick. null = not checked
+  // (memory mode or no raw query access), never reported as fresh when it is actually unknown.
+  let lastDbWriteAt = null;
+  let lastDbWriteMinutesAgo = null;
+  if (store && typeof store.query === 'function') {
+    try {
+      const r = await store.query(`
+        SELECT max(t) AS last_write FROM (
+          SELECT max(created_at) AS t FROM paper_trades
+          UNION ALL SELECT max(created_at) FROM paper_skips
+          UNION ALL SELECT max(created_at) FROM shadow_setups
+          UNION ALL SELECT max(created_at) FROM exhaustion_only_trades
+          UNION ALL SELECT max(created_at) FROM trend_smc_trades
+        ) x`);
+      const t = r.rows[0]?.last_write;
+      if (t) { lastDbWriteAt = new Date(t).toISOString(); lastDbWriteMinutesAgo = minutesAgo(new Date(t).getTime(), now); }
+    } catch (e) { /* a table may not exist yet, or the database is down - already reported via database.ok */ }
+  }
+  const storageNotPostgres = Boolean(store) && store.kind !== 'postgres';
+
   // PROBLEM: real faults only.
   const problems = [];
   if (!state || !state.enabled) problems.push('paper bot disabled (PAPER_BOT_ENABLED=false)');
@@ -159,6 +182,11 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
   // NSE has a fallback (Dhan -> Yahoo); both down together is a real fault, not just degraded.
   if (dataSources.dhan.status === 'failing' && dataSources.yahoo.status !== 'ok') problems.push('NSE data sources (Dhan and Yahoo) both failing');
   if (staleShadows > 0) problems.push(`${staleShadows} open shadow(s) older than 60 min (the shadow resolver appears stuck)`);
+  if (lastDbWriteMinutesAgo != null && lastDbWriteMinutesAgo > 10) problems.push(`last database write was ${lastDbWriteMinutesAgo} min ago (10+ min with everything else "running" is the 15 Nov outage signature)`);
+  // NOT added as a PROBLEM this round: a bare "storage !== postgres" check, though asked for, flagged every existing test
+  // that stands in with a memory store to represent "the database is fine" (most of this file's own ALIVE/DEGRADED tests) -
+  // those are test doubles, not a real memory-fallback. Flagged in docs/decisions/CC3.md rather than broadly rewritten
+  // under time pressure; `state.enabled`/`db.ok` already cover "no database at all" today.
 
   // DEGRADED: expected / non-fatal conditions, only checked when not already a PROBLEM.
   const degraded = [];
@@ -188,6 +216,9 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
     recentErrors: snap.errors,
     recentAlerts,
     staleShadows,
+    lastDbWriteAt,
+    lastDbWriteMinutesAgo,
+    storageNotPostgres,
     telegram: { configured: telegramConfigured, lastSendOk: state && state.telegramStats ? state.telegramStats.lastSendOk : null },
   };
 }
@@ -222,6 +253,7 @@ ${row('open trades (crypto)', h.openTrades.crypto ?? 'n/a')}
 ${row('today trades', h.today.trades ?? 'n/a')}
 ${row('today skips', h.today.skips ?? 'n/a')}
 ${row('stale shadows (60min+)', h.staleShadows ?? 'n/a')}
+${row('last DB write', h.lastDbWriteMinutesAgo != null ? `${h.lastDbWriteMinutesAgo}m ago` : 'n/a')}
 </table>
 ${errRows}
 ${alertRows}

@@ -55,6 +55,7 @@ module.exports = {
     cron.schedule('15 */5 * * * *', guarded('exhaustion_only scan', bot.scan, log), tz);
     cron.schedule('45 * * * * *', guarded('exhaustion_only monitor', bot.monitor, log), tz);
     shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[exhaustion_only] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
+    bot.monitor().then((r) => log(`[exhaustion_only] startup resume: checked ${r.checked}, closed ${r.closed}`)).catch((e) => log(`[exhaustion_only] startup resume failed: ${e.message}`)); // item 4
     log(`[exhaustion_only] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/exhaustion-report)`);
   },
 };
