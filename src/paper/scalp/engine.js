@@ -44,14 +44,21 @@ function analyse({ c1raw, c5raw, now, cfg, dayStartMs }) {
   const rawStopPct = (Math.abs(long ? entry - extreme : extreme - entry) + cfg.atr_mult * atr) / entry * 100;
   const stopPct = Math.max(cfg.min_stop_pct, Math.min(rawStopPct, cfg.stop_cap_pct));
 
-  // target: nearest opposite level (5-min swing highs/lows, today's high/low) minus the margin, at most the cap, at least the minimum
+  // target: nearest opposite level (5-min swing highs/lows, today's high/low) minus the margin, at most the cap, at least the minimum.
+  // No fixed-% fallback when no level exists (CC group D crypto-levels audit): a target must come from a real support/resistance
+  // level, order block or swing - never a flat entry x (1 +- cap%) with nothing on the chart behind it, so a missing level is a skip,
+  // the same as scalp_wide below and the no-level case in src/paper/lib/levels.js planTrade().
   const sw = R.swingLevels(c5, 2, 60);
   const today = c5.filter((k) => k.t >= dayStartMs);
-  const above = [...sw.highs, ...(today.length ? [Math.max(...today.map((k) => k.h))] : [])].filter((x) => x > entry * 1.0001);
-  const below = [...sw.lows, ...(today.length ? [Math.min(...today.map((k) => k.l))] : [])].filter((x) => x < entry * 0.9999);
-  const level = long ? (above.length ? Math.min(...above) : null) : (below.length ? Math.max(...below) : null);
-  const levelPct = level == null ? null : Math.abs(level - entry) / entry * 100;
-  const targetPct = levelPct == null ? cfg.target_cap_pct : Math.min(levelPct - cfg.level_margin_pct, cfg.target_cap_pct);
+  const above = [...sw.highs.map((price) => ({ price, type: 'swing high 5m' })), ...(today.length ? [{ price: Math.max(...today.map((k) => k.h)), type: "today's high" }] : [])].filter((l) => l.price > entry * 1.0001);
+  const below = [...sw.lows.map((price) => ({ price, type: 'swing low 5m' })), ...(today.length ? [{ price: Math.min(...today.map((k) => k.l)), type: "today's low" }] : [])].filter((l) => l.price < entry * 0.9999);
+  const cands = long ? above : below;
+  const lvl = cands.length ? cands.reduce((best, l) => ((long ? l.price < best.price : l.price > best.price) ? l : best)) : null;
+  if (!lvl) return { ok: false, extra, reason: `no ${long ? 'resistance' : 'support'} level (5-min swing or today's ${long ? 'high' : 'low'}) in the way; scalp needs one to target` };
+  const level = lvl.price;
+  const levelType = lvl.type;
+  const levelPct = Math.abs(level - entry) / entry * 100;
+  const targetPct = Math.min(levelPct - cfg.level_margin_pct, cfg.target_cap_pct);
   if (targetPct < cfg.target_min_pct) {
     return { ok: false, extra, reason: `only ${r(levelPct, 2)}% of room to the nearest ${long ? 'resistance' : 'support'} ${r(level, 4)}; after leaving ${cfg.level_margin_pct}% the target would be ${r(targetPct, 2)}%, below the ${cfg.target_min_pct}% minimum` };
   }
@@ -74,7 +81,8 @@ function analyse({ c1raw, c5raw, now, cfg, dayStartMs }) {
       direction: agree[0].direction, long, hits: agree, entry, atr, trend5, ctx5, last,
       stopPct: r(stopPct, 4), targetPct: r(targetPct, 4), costPct: r(costs, 4), rr: r(rr, 2), rewardNetPct: r(rewardNet, 4), riskNetPct: r(riskNet, 4),
       stopPrice: r(entry * (1 - sgn0 * stopPct / 100), 6), targetPrice: r(entry * (1 + sgn0 * targetPct / 100), 6),
-      level: level == null ? null : { price: r(level, 6), pct: r(levelPct, 4) },
+      level: { price: r(level, 6), pct: r(levelPct, 4), type: levelType },
+      targetType: levelType, stopType: `pattern ${long ? 'low' : 'high'} + ${cfg.atr_mult} x ATR14(1m)`,
     },
   };
 }
@@ -160,10 +168,13 @@ function analyseWide({ c5raw, c15raw, now, cfg, dayStartMs }) {
   // target: nearest opposite level (5-min swing highs/lows, today's high/low); it must be at least target_min_pct AND 1 x ATR away, whichever is larger
   const sw = R.swingLevels(c5, 2, 60);
   const today = c5.filter((k) => k.t >= dayStartMs);
-  const above = [...sw.highs, ...(today.length ? [Math.max(...today.map((k) => k.h))] : [])].filter((x) => x > entry * 1.0001);
-  const below = [...sw.lows, ...(today.length ? [Math.min(...today.map((k) => k.l))] : [])].filter((x) => x < entry * 0.9999);
-  const level = long ? (above.length ? Math.min(...above) : null) : (below.length ? Math.max(...below) : null);
-  if (level == null) return { ok: false, extra, reason: `no ${long ? 'resistance' : 'support'} level in the way; scalp_wide needs one to target` };
+  const above = [...sw.highs.map((price) => ({ price, type: 'swing high 5m' })), ...(today.length ? [{ price: Math.max(...today.map((k) => k.h)), type: "today's high" }] : [])].filter((l) => l.price > entry * 1.0001);
+  const below = [...sw.lows.map((price) => ({ price, type: 'swing low 5m' })), ...(today.length ? [{ price: Math.min(...today.map((k) => k.l)), type: "today's low" }] : [])].filter((l) => l.price < entry * 0.9999);
+  const cands = long ? above : below;
+  const lvl = cands.length ? cands.reduce((best, l) => ((long ? l.price < best.price : l.price > best.price) ? l : best)) : null;
+  if (!lvl) return { ok: false, extra, reason: `no ${long ? 'resistance' : 'support'} level in the way; scalp_wide needs one to target` };
+  const level = lvl.price;
+  const levelType = lvl.type;
   const levelPct = Math.abs(level - entry) / entry * 100;
   const required = Math.max(cfg.target_min_pct, atrPct);
   if (levelPct < required) {
@@ -187,7 +198,8 @@ function analyseWide({ c5raw, c15raw, now, cfg, dayStartMs }) {
       direction: agree[0].direction, long, hits: agree, entry, atr, trend15, ctx15, last,
       stopPct: r(stopPct, 4), targetPct: r(targetPct, 4), costPct: r(costs, 4), rr: r(rr, 2), rewardNetPct: r(rewardNet, 4), riskNetPct: r(riskNet, 4),
       stopPrice: r(entry * (1 - sgn * stopPct / 100), 6), targetPrice: r(entry * (1 + sgn * targetPct / 100), 6),
-      level: { price: r(level, 6), pct: r(levelPct, 4) },
+      level: { price: r(level, 6), pct: r(levelPct, 4), type: levelType },
+      targetType: levelType, stopType: `pattern ${long ? 'low' : 'high'} + ${cfg.atr_mult} x ATR14(5m)`,
     },
   };
 }

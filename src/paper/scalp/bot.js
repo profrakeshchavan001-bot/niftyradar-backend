@@ -11,19 +11,22 @@ const { recoveryLimit } = require('../lib/recoveryWindow');
 const MARKET = 'crypto_scalp';
 const MARKET_WIDE = 'crypto_wide_scalp'; // scalp_wide: own market key, own virtual balance, independent of scalp and intraday
 
+// Basis text includes the level type in brackets for BOTH target and stop (same convention as exhaustion_only/trend_smc and the
+// Telegram alert format, CC group D crypto-levels audit) - target_price/sl_price are never a fixed % of entry with no level behind
+// them; a missing level is a skip (engine.js), never a fallback to the cap.
 function basisText(plan, symbol) {
   const p = plan.hits.map((h) => `${h.name.replace(/_/g, ' ')} (${h.note})`).join('; ');
-  const lvl = plan.level ? `nearest ${plan.long ? 'resistance' : 'support'} ${plan.level.price} is ${plan.level.pct}% away` : 'no level in the way, target at the cap';
+  const lvl = `nearest ${plan.long ? 'resistance' : 'support'} ${plan.level.price} (${plan.level.type}) is ${plan.level.pct}% away`;
   return `Scalp ${plan.long ? 'LONG' : 'SHORT'} on ${symbol}: the 1-min chart showed ${p}. 5-min trend ${plan.trend5}, price ${plan.ctx5.price} vs VWAP ${plan.ctx5.vwap}. `
-    + `Target +${plan.targetPct}% (${lvl}), stop ${plan.stopPct}% (beyond the pattern candle + 0.5 x ATR), costs ${plan.costPct}% round trip, reward/risk ${plan.rr} after costs. `
+    + `Target ${plan.targetPrice} (${plan.targetType}), stop ${plan.stopPrice} (${plan.stopType}) - ${lvl}, costs ${plan.costPct}% round trip, reward/risk ${plan.rr} after costs. `
     + 'Exits: target, stop, stop moved to breakeven half way, or out after the time stop.';
 }
 
 function basisTextWide(plan, symbol) {
   const p = plan.hits.map((h) => `${h.name.replace(/_/g, ' ')} (${h.note})`).join('; ');
-  const lvl = `nearest ${plan.long ? 'resistance' : 'support'} ${plan.level.price} is ${plan.level.pct}% away`;
+  const lvl = `nearest ${plan.long ? 'resistance' : 'support'} ${plan.level.price} (${plan.level.type}) is ${plan.level.pct}% away`;
   return `Scalp wide ${plan.long ? 'LONG' : 'SHORT'} on ${symbol}: the 5-min chart showed ${p}. 15-min trend ${plan.trend15}, price ${plan.ctx15.price} vs VWAP ${plan.ctx15.vwap}. `
-    + `Target +${plan.targetPct}% (${lvl}), stop ${plan.stopPct}% (beyond the pattern candle + 0.5 x ATR14(5m)), costs ${plan.costPct}% round trip, reward/risk ${plan.rr} after costs. `
+    + `Target ${plan.targetPrice} (${plan.targetType}), stop ${plan.stopPrice} (${plan.stopType}) - ${lvl}, costs ${plan.costPct}% round trip, reward/risk ${plan.rr} after costs. `
     + 'Exits: target, stop, stop moved to breakeven half way, or out after the 45-minute time stop.';
 }
 
@@ -106,7 +109,8 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
         instrument: `${symbol} spot (paper scalp)`, simulated_option: false, price_source: 'binance_public_1m_close', candle_source: 'binance_public_klines_1m_and_5m',
         data_source: 'binance_public', data_delay_sec: Math.round((now() - (plan.last.t + 60000)) / 1000),
         qty: size.qty, entry_price: plan.entry, entry_time: new Date(now()).toISOString(), entry_underlying: plan.entry,
-        sl_price: plan.stopPrice, target_price: plan.targetPrice, max_fav_pct: 0, max_adv_pct: 0, basis: basisText(plan, symbol),
+        sl_price: plan.stopPrice, target_price: plan.targetPrice, target_type: plan.targetType, stop_type: plan.stopType,
+        max_fav_pct: 0, max_adv_pct: 0, basis: basisText(plan, symbol),
       };
       const id = await store.insertTrade(row);
       if (id == null) continue; // restart safety: the DB's own unique (market, symbol, trigger_t) index caught a duplicate of this exact candle
@@ -181,7 +185,8 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
         instrument: `${symbol} spot (paper scalp_wide)`, simulated_option: false, price_source: 'binance_public_5m_close', candle_source: 'binance_public_klines_5m',
         data_source: 'binance_public', data_delay_sec: Math.round((now() - (plan.last.t + 300000)) / 1000),
         qty: size.qty, entry_price: plan.entry, entry_time: new Date(now()).toISOString(), entry_underlying: plan.entry,
-        sl_price: plan.stopPrice, target_price: plan.targetPrice, max_fav_pct: 0, max_adv_pct: 0, basis: basisTextWide(plan, symbol),
+        sl_price: plan.stopPrice, target_price: plan.targetPrice, target_type: plan.targetType, stop_type: plan.stopType,
+        max_fav_pct: 0, max_adv_pct: 0, basis: basisTextWide(plan, symbol),
       };
       const id = await store.insertTrade(row);
       if (id == null) continue; // restart safety: the DB's own unique (market, symbol, trigger_t) index caught a duplicate of this exact candle
