@@ -35,9 +35,17 @@ function firstTwoLines(basis) {
 /**
  * Entry alert text (item 1). `trade` needs: direction, symbol, entry_price, target_price, sl_price,
  * target_type, stop_type, qty, rr (optional), basis, fx_rate/fx_source (optional).
+ *
+ * `nativeInr` (Task Group C, extending coverage to the rupee-denominated bots): true for a bot whose own
+ * entry/target/stop prices and qty are ALREADY in rupees with no separate FX step - the NSE main bot and
+ * nse_scalp (option premium x lot-sized qty; paperbot/bot.js's own P&L calc is `(exit - entry) * qty`, no
+ * cost%/FX multiply, so costPct is passed as 0 for these by the caller - see register.js). false (default,
+ * unchanged) is the original crypto convention: entry/target/stop are in USDT, qty in coins, and a real
+ * rupee figure needs `fxInfo` (the trade's own fx_rate, else `usdInrFallback`, else shown in USD with
+ * "rate n/a" - never an invented rate).
  */
-function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallback } = {}) {
-  const fx = fxInfo(trade, usdInrFallback);
+function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallback, nativeInr = false } = {}) {
+  const fx = nativeInr ? { rate: 1, source: 'native INR (no FX step for this bot)' } : fxInfo(trade, usdInrFallback);
   const target = estimateMove(trade.entry_price, trade.target_price, trade.qty, costPct, fx);
   const stop = estimateMove(trade.entry_price, trade.sl_price, trade.qty, costPct, fx);
   const rr = trade.rr != null ? Number(trade.rr) : (stop.usd > 0 ? Math.round((target.usd / stop.usd) * 100) / 100 : null);

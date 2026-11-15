@@ -59,6 +59,19 @@ test('formatEntry: no fx anywhere -> shows USD and says "rate n/a", never a sile
   assert.match(text, /Stop lagne par ≈ -\$50 \(rate n\/a\)/);
 });
 
+test('formatEntry: nativeInr (Task Group C - NSE bots) shows rupees directly, no FX line, no "rate n/a"', () => {
+  // NSE option premium + lot-sized qty, already in rupees; paperbot/bot.js models no round-trip cost, so costPct: 0.
+  const nse = { direction: 'CALL', symbol: 'RELIANCE', entry_price: 101, target_price: 106, sl_price: 97, target_type: 'order block', stop_type: 'swing low / 1x ATR', qty: 500, basis: 'order block retest' };
+  const text = formatEntry(nse, 'nse', { costPct: 0, nativeInr: true });
+  assert.match(text, /Entry: 101/);
+  assert.match(text, /Target: 106 \(order block\)/);
+  assert.match(text, /Stop: 97 \(swing low \/ 1x ATR\)/);
+  // target: |106-101|*500 = 2500, no cost -> Rs 2,500; stop: |97-101|*500 = 2000 -> Rs 2,000
+  assert.match(text, /Target lagne par ≈ \+₹2,500/);
+  assert.match(text, /Stop lagne par ≈ -₹2,000/);
+  assert.doesNotMatch(text, /\$|rate n\/a/);
+});
+
 test('formatExit: result word, net INR (+/-), time in trade in minutes (hand-checked)', () => {
   const t = { symbol: 'BTCUSDT', exit_reason: 'target', pnl_inr: 4500, entry_time: '2026-11-14T10:00:00Z', exit_time: '2026-11-14T10:37:00Z' };
   const text = formatExit(t, 'intraday');

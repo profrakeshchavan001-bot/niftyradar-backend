@@ -26,7 +26,11 @@ Solves: "trade the top R-factor stocks in demo using candle patterns, log WHY ea
 |---|---|
 | `PAPER_BOT_ENABLED` | default on; `false` switches the whole bot off |
 | `PAPER_DATABASE_URL` | the bot's own Postgres (for example a free Supabase project). The bot never reads `DATABASE_URL` and never writes to the PictoTrade / Neon database. Without it trades live in memory only; the Telegram summary is still sent |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | summaries to Telegram; without them summaries are only stored |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | summaries and trade alerts to Telegram; without them, summaries are only stored and trade alerts never send |
+| `TELEGRAM_TRADE_ALERTS` | `on` sends a Telegram message the moment a trade is TAKEN (entry price/target/stop with the level type in brackets, Rs lost if stop hit, Rs gained if target hit) for every bot: nse, nse_scalp, crypto, crypto_scalp, crypto_wide_scalp, exhaustion_only, trend_smc. Default off (unset = no trade alerts; summaries above are unaffected) |
+| `TELEGRAM_EXIT_ALERTS` | `off` silences the matching exit alert, keeping only the entry one. Default `on` |
+| `TELEGRAM_BOTS` | optional comma list to send trade alerts for only these bots (e.g. `nse,crypto`). Default: every bot above |
+| `USDINR_FALLBACK` | optional USD→INR rate used only when a crypto trade's own stored `fx_rate` is missing, so its Rs estimate can still be shown; without it that one trade's alert shows USD with "rate n/a" rather than a guessed rate. Not used by nse/nse_scalp, whose prices are already in rupees |
 | `PAPER_ADMIN_SECRET` | key for the read-only routes (falls back to `RENEW_SECRET`) |
 
 ## Tables (`sql/paper_bot.sql`, created automatically)
