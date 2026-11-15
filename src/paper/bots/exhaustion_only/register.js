@@ -13,7 +13,8 @@ module.exports = {
   name: 'exhaustion_only',
   schemaSql: path.join(__dirname, 'schema.sql'),
   async register(ctx) {
-    const { app, cron, env, log, store: mainStore, guarded, tz, pool } = ctx;
+    const { app, cron, env, log, store: mainStore, guarded, tz, pool, healthTracker = null, jobRegistry = null } = ctx;
+    const track = (name, fn) => (healthTracker ? healthTracker.wrap(name, fn) : fn);
     const on = env.PAPER_EXHAUSTION_ENABLED !== 'false';
 
     app.get('/api/paper/exhaustion-report', async (req, res) => {
@@ -52,8 +53,11 @@ module.exports = {
     const shadowSchemaReady = pool ? pool.query(fs.readFileSync(path.join(__dirname, '..', '..', 'shadow', 'schema.sql'), 'utf8')).catch((e) => log(`[exhaustion_only] shadow schema failed: ${e.message}`)) : Promise.resolve();
 
     const bot = createExhaustionBot({ store: eStore, crypto, loadCfg: () => loadExhaustionConfig(mainStore), shadowStore, log });
-    cron.schedule('15 */5 * * * *', guarded('exhaustion_only scan', bot.scan, log), tz);
-    cron.schedule('45 * * * * *', guarded('exhaustion_only monitor', bot.monitor, log), tz);
+    const scanFn = guarded('exhaustion_only scan', track('exhaustionScan', bot.scan), log);
+    const monitorFn = guarded('exhaustion_only monitor', track('exhaustionMonitor', bot.monitor), log);
+    cron.schedule('15 */5 * * * *', scanFn, tz);
+    cron.schedule('45 * * * * *', monitorFn, tz);
+    if (jobRegistry) Object.assign(jobRegistry, { exhaustionScan: scanFn, exhaustionMonitor: monitorFn });
     shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[exhaustion_only] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
     bot.monitor().then((r) => log(`[exhaustion_only] startup resume: checked ${r.checked}, closed ${r.closed}`)).catch((e) => log(`[exhaustion_only] startup resume failed: ${e.message}`)); // item 4
     log(`[exhaustion_only] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/exhaustion-report)`);

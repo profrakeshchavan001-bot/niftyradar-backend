@@ -37,7 +37,8 @@ module.exports = {
   name: 'trend_smc',
   schemaSql: path.join(__dirname, 'schema.sql'),
   async register(ctx) {
-    const { app, cron, env, log, store: mainStore, guarded, tz, pool } = ctx;
+    const { app, cron, env, log, store: mainStore, guarded, tz, pool, healthTracker = null, jobRegistry = null } = ctx;
+    const track = (name, fn) => (healthTracker ? healthTracker.wrap(name, fn) : fn);
     const on = env.PAPER_TREND_SMC_ENABLED !== 'false';
 
     app.get('/api/paper/trend-smc-report', async (req, res) => {
@@ -79,8 +80,11 @@ module.exports = {
     const bot = createTrendSmcBot({ store: tStore, crypto, crypto15, loadCfg: () => loadTrendSmcConfig(mainStore), shadowStore, log });
     // Staggered seconds (CC3 round 3 item 2): :22 and :58 so neither ever lands on the same tick as another bot's job
     // (nse scan/monitor also use :20/:50 during market hours; shadowMonitor uses :40 every 5 min).
-    cron.schedule('22 */5 * * * *', guarded('trend_smc scan', bot.scan, log), tz);
-    cron.schedule('58 * * * * *', guarded('trend_smc monitor', bot.monitor, log), tz);
+    const scanFn = guarded('trend_smc scan', track('trendSmcScan', bot.scan), log);
+    const monitorFn = guarded('trend_smc monitor', track('trendSmcMonitor', bot.monitor), log);
+    cron.schedule('22 */5 * * * *', scanFn, tz);
+    cron.schedule('58 * * * * *', monitorFn, tz);
+    if (jobRegistry) Object.assign(jobRegistry, { trendSmcScan: scanFn, trendSmcMonitor: monitorFn });
     shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[trend_smc] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
     bot.monitor().then((r) => log(`[trend_smc] startup resume: checked ${r.checked}, closed ${r.closed}`)).catch((e) => log(`[trend_smc] startup resume failed: ${e.message}`)); // item 4
     log(`[trend_smc] ready (PAPER ONLY, market ${MARKET}; report: /api/paper/trend-smc-report)`);

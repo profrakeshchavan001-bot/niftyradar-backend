@@ -223,6 +223,8 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   });
 
   const healthTracker = defaultTracker(); // shared with the alerts plugin (src/paper/ops/alerts/), if loaded
+  state.healthTracker = healthTracker; // so server.js can expose it on the public, unauthenticated GET /health
+  state.jobRegistry = {}; // name -> the actual guarded+tracked tick function, filled in below and by every bots/ plugin (watchdog target)
   attachHealthRoute(app, { secret, okSecret, tracker: healthTracker, state });
   attachNewsCheckRoute(app, { secret, okSecret, newsScore, eventBlock });
   attachHomeRoute(app, { secret, okSecret, tracker: healthTracker, state });
@@ -276,8 +278,9 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   const jobs = {
     nseScan: job('nse scan', healthTracker.wrap('nseScan', bot.nseScan)), nseMonitor: job('nse monitor', healthTracker.wrap('nseMonitor', bot.nseMonitor)),
     cryptoScan: job('crypto scan', healthTracker.wrap('cryptoScan', bot.cryptoScan)), cryptoMonitor: job('crypto monitor', healthTracker.wrap('cryptoMonitor', bot.cryptoMonitor)),
-    shadowMonitor: job('shadow monitor', bot.shadowMonitor), // CC2 round 2 item 4 - follows rejected setups on paper, never a trade
+    shadowMonitor: job('shadow monitor', healthTracker.wrap('shadowMonitor', bot.shadowMonitor)), // CC2 round 2 item 4 - follows rejected setups on paper, never a trade
   };
+  Object.assign(state.jobRegistry, jobs); // watchdog below re-runs any of these directly if its tracked tick goes stale
   state.ready = true; // the database is only opened when the first job needs it
   require('./configMigrate').migrateStaleConfigDefaults(store, log).catch((e) => log(`[paperbot] config migration failed: ${e.message}`)); // CC3 urgent fix item 3
   log(`[paperbot] ready (PAPER ONLY, storage: ${store.kind}, Telegram: ${env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID ? 'on' : 'off, summaries are only stored'})`);
@@ -294,17 +297,31 @@ function attachPaperBot({ app, cron, axios, deps, env = process.env, log = conso
   // Live price samples for the fallback candle builder (memory only).
   setInterval(() => { try { nse.sample(); } catch (e) { /* sampling must never break the server */ } }, 10000).unref();
 
-  require('../src/paper/scalp').attachScalp({ app, cron, axios, env, log, state, store, crypto: cryptoSrc, secret, okSecret, enabled, guarded, pool: typeof store.query === 'function' ? { query: store.query } : null }); // scalp strategy + /api/paper/scalp-report (docs/SCALP.md)
+  require('../src/paper/scalp').attachScalp({ app, cron, axios, env, log, state, store, crypto: cryptoSrc, secret, okSecret, enabled, guarded, healthTracker, jobRegistry: state.jobRegistry, pool: typeof store.query === 'function' ? { query: store.query } : null }); // scalp strategy + /api/paper/scalp-report (docs/SCALP.md)
   state.replay = require('../src/paper/replay').attachReplay({ app, cron, axios, env, log, secret, okSecret, enabled, guarded, liveStore: store, liveState: state }); // replay engine + /api/paper/replay-report (docs/REPLAY.md); state.replay.getLastRunStatus() for the home page morning card (round 3 item 3)
 
   // Auto-load bots/ops plugins (docs/BOT-INTERFACE.md, src/paper/pluginLoader.js).
   // Fire-and-forget: a plugin failing to load must never stop the bot itself.
   require('../src/paper/pluginLoader').loadPlugins({
-    app, cron, env, log, state, store, guarded, tz,
+    app, cron, env, log, state, store, guarded, tz, healthTracker, jobRegistry: state.jobRegistry,
     pool: typeof store.query === 'function' ? { query: store.query } : null,
     cachedCrypto: cryptoSrc, // already-wrapped shared candle cache, so a bots/ plugin needing Binance candles reuses it instead of making its own
     cached15mCrypto: crypto15mSrc, // same shared cache, 15-minute timeframe (trend_smc) - CC3 round 3 item 3
   }).catch((e) => log(`[paper-plugins] loadPlugins failed: ${e.message}`));
+
+  // Root-cause fix (14 Nov outage, round 2): every job above already catches its own errors and times itself out
+  // (guarded()), but NONE of that helps if a job's cron.schedule() tick itself silently stops firing (a process
+  // asleep on Render's free tier with no inbound traffic, or a bug in node-cron). This watchdog is the backstop:
+  // every 60s it looks at healthTracker (the SAME tracker every job above and every bots/ plugin below records
+  // into) and, for any 24/7 job (not NSE, which is correctly idle outside market hours) that has not ticked in
+  // over 3 minutes, calls that job's own guarded+tracked function directly - so a wedged scheduler self-heals
+  // without waiting for a manual restart. This does NOT replace the keep-alive pinger (README): a process that
+  // is fully asleep runs no JS at all, watchdog included - the pinger keeps the process awake, this watchdog
+  // recovers an awake process whose cron ticks stopped advancing for any other reason.
+  require('../src/paper/ops/watchdog').createWatchdog({
+    tracker: healthTracker, jobRegistry: state.jobRegistry, log,
+    skipNames: ['nseScan', 'nseMonitor', 'nse summary', 'crypto summary', 'morning brief', 'weekly suggestions'],
+  }).start();
 
   cron.schedule('20 */5 9-15 * * 1-5', jobs.nseScan, tz); // 20 s after each 5-min candle closes
   cron.schedule('50 * 9-15 * * 1-5', jobs.nseMonitor, tz); // exits checked every minute

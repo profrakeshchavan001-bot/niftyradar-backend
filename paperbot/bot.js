@@ -15,6 +15,7 @@ const { judge2, tradeFields2 } = require('../src/paper/decision/judge2');
 const { classifyEmaCross } = require('../src/paper/lib/emaCross');
 const { tagSmc } = require('../src/paper/lib/smc');
 const Lib = require('../src/paper/lib/exitSim');
+const { recoveryLimit } = require('../src/paper/lib/recoveryWindow');
 
 // judgeOn: the judge (src/paper/decision/judge.js, docs/JUDGE.md) decides every NSE entry; index.js turns it on unless PAPER_JUDGE_ON=false.
 // judgeHelpers: test seam for { stockSectorView, newsScore, eventBlock }; by default the real modules are used when they exist.
@@ -391,7 +392,8 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
         // deterministic) using the ORIGINAL stop (sl_price), not whatever stop_active currently holds.
         let candles = [];
         try {
-          const raw = await crypto.candles(t.symbol);
+          const limit = recoveryLimit({ oldestEntryMs: Date.parse(t.entry_time), nowMs: now(), intervalMs: FIVE_MIN, defaultLimit: 330 });
+          const raw = await crypto.candles(t.symbol, limit);
           candles = E.closedOnly(raw, FIVE_MIN, now()).filter((k) => k.t + FIVE_MIN > Date.parse(t.entry_time));
         } catch (e) { log(`[paperbot] crypto candles for ${t.symbol} (exit check) failed: ${e.response?.status || e.message}`); }
         if (!candles.length) { if (price) await track(t, E.changePct(t.entry_price, price, short)); continue; }
