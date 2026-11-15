@@ -31,7 +31,7 @@ test('entry alert sent once for a newly opened trade; never resent on the next c
   const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub() });
   await check();
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /BTCUSDT \[intraday\]/);
+  assert.match(sent[0], /\| intraday/);
   await check(); // nothing new happened
   assert.equal(sent.length, 1); // still just the one
   await store.updateTrade(id, {}); // no-op, still open
@@ -67,7 +67,7 @@ test('TELEGRAM_BOTS filters to the named bots only', async () => {
   const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on', TELEGRAM_BOTS: 'scalp' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub() });
   await check();
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /\[scalp\]/);
+  assert.match(sent[0], /\| scalp/);
 });
 
 test('no end-of-day/morning-brief/weekly text is ever sent by this plugin (item 3) - it only ever formats entry/exit', async () => {
@@ -136,7 +136,7 @@ test('NSE main bot ("nse" market) now gets an entry alert too, in native rupees 
   const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub() });
   await check();
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /RELIANCE \[nse\]/);
+  assert.match(sent[0], /\| nse/);
   assert.match(sent[0], /Target: 106 \(fixed %\)/); // NSE exits are not level-based yet (docs/decisions/CC2.md item 4) - honest fallback label
   assert.match(sent[0], /Stop: 97 \(fixed %\)/);
   // target: |106-101|*500 = 2500, no round-trip cost modelled for NSE (paperbot/bot.js has none) -> Rs 2,500
@@ -153,7 +153,7 @@ test('nse_scalp market also gets an entry alert (same shared table, same native-
   const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub() });
   await check();
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /TCS \[nse_scalp\]/);
+  assert.match(sent[0], /\| nse_scalp/);
 });
 
 function fakeOwnTableStore(rows) {
@@ -169,14 +169,14 @@ test('exhaustion_only (own table, no shared paper_trades row) now gets entry + e
   });
   await check();
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /BTCUSDT \[exhaustion_only\]/);
+  assert.match(sent[0], /\| exhaustion_only/);
   assert.match(sent[0], /Target: 102\.897 \(swing high 15m\)/);
   assert.match(sent[0], /Stop: 99\.38 \(pattern low \+ 1xATR15m\)/);
 
   rows[0].status = 'closed'; rows[0].exit_reason = 'target'; rows[0].pnl_inr = 500;
   await check();
   assert.equal(sent.length, 2);
-  assert.match(sent[1], /BTCUSDT \[exhaustion_only\] closed - TARGET hit/);
+  assert.match(sent[1], /EXIT Trade #\d+ \| exhaustion_only\nBTCUSDT closed - TARGET hit/);
 });
 
 test('trend_smc (own table) now gets an entry alert via ctx.trendSmcMemoryStore', async () => {
@@ -188,7 +188,7 @@ test('trend_smc (own table) now gets an entry alert via ctx.trendSmcMemoryStore'
   });
   await check();
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /🔴 SHORT ETHUSDT \[trend_smc\]/);
+  assert.match(sent[0], /Trade #1 \| trend_smc\n🔴 SHORT ETHUSDT/);
   assert.match(sent[0], /Target: 90 \(prev week low\)/);
 });
 
@@ -216,5 +216,5 @@ test('TELEGRAM_BOTS also filters the own-table bots by name', async () => {
   });
   await check();
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /\[exhaustion_only\]/);
+  assert.match(sent[0], /\| exhaustion_only/);
 });
