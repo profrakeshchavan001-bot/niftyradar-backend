@@ -6,6 +6,7 @@ const E = require('../../../paperbot/engine');
 const { istParts, istDayStart } = require('../../../paperbot/time');
 const { loadScalpConfig, loadScalpWideConfig } = require('./config');
 const { analyse, analyseWide, evaluateExit, settle } = require('./engine');
+const { recoveryLimit } = require('../lib/recoveryWindow');
 
 const MARKET = 'crypto_scalp';
 const MARKET_WIDE = 'crypto_wide_scalp'; // scalp_wide: own market key, own virtual balance, independent of scalp and intraday
@@ -123,7 +124,8 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
     let closed = 0;
     for (const t of open) {
       let candles;
-      try { candles = await source1m.candles1m(t.symbol, 40); } catch (e) { log(`[scalp] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const limit = recoveryLimit({ oldestEntryMs: Date.parse(t.entry_time), nowMs: now(), intervalMs: 60000, defaultLimit: 40 });
+      try { candles = await source1m.candles1m(t.symbol, limit); } catch (e) { log(`[scalp] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
       const ev = evaluateExit({ trade: t, candles: E.closedOnly(candles, 60000, now()), nowMs: now(), cfg });
       if (!ev.exit) { if (ev.favPct > (t.max_fav_pct || 0) || ev.advPct < (t.max_adv_pct || 0)) await store.noteTrade(t.id, { max_fav_pct: ev.favPct, max_adv_pct: ev.advPct }); continue; }
       const fx = await crypto.usdtInr(cfg.usdt_inr_fallback);
@@ -197,7 +199,8 @@ function createScalpBot({ store, crypto, source1m, shadowStore, now = Date.now, 
     let closed = 0;
     for (const t of open) {
       let candles;
-      try { candles = await crypto.candles(t.symbol); } catch (e) { log(`[scalp_wide] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const limit = recoveryLimit({ oldestEntryMs: Date.parse(t.entry_time), nowMs: now(), intervalMs: 300000, defaultLimit: 330 });
+      try { candles = await crypto.candles(t.symbol, limit); } catch (e) { log(`[scalp_wide] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
       const ev = evaluateExit({ trade: t, candles: E.closedOnly(candles, 300000, now()), nowMs: now(), cfg });
       if (!ev.exit) { if (ev.favPct > (t.max_fav_pct || 0) || ev.advPct < (t.max_adv_pct || 0)) await store.noteTrade(t.id, { max_fav_pct: ev.favPct, max_adv_pct: ev.advPct }); continue; }
       const fx = await crypto.usdtInr(cfg.usdt_inr_fallback);

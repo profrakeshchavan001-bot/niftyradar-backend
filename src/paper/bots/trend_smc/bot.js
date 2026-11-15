@@ -4,6 +4,7 @@
 const { closedOnly, sizeCrypto } = require('../../../../paperbot/engine');
 const { istParts } = require('../../../../paperbot/time');
 const { decide, evaluateExit, settle } = require('./engine');
+const { recoveryLimit } = require('../../lib/recoveryWindow');
 
 const MARKET = 'crypto_trend_smc';
 const FIVE = 5 * 60000;
@@ -90,7 +91,8 @@ function createTrendSmcBot({ store, crypto, crypto15, loadCfg, shadowStore, now 
     let closed = 0;
     for (const t of open) {
       let c5;
-      try { c5 = await crypto.candles(t.symbol); } catch (e) { log(`[trend_smc] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const limit = recoveryLimit({ oldestEntryMs: Date.parse(t.entry_time), nowMs: now(), intervalMs: FIVE, defaultLimit: 330 });
+      try { c5 = await crypto.candles(t.symbol, limit); } catch (e) { log(`[trend_smc] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
       const ev = evaluateExit({ trade: t, candles: closedOnly(c5, FIVE, now()) });
       if (!ev.exit) { if (ev.action === 'breakeven' && !t.be_moved) await store.updateTrade(t.id, { be_moved: true, sl_price: t.entry_price }); continue; }
       const fx = await crypto.usdtInr(cfg.usdt_inr_fallback);

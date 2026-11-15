@@ -13,7 +13,8 @@ async function ensureShadowSchema(pool, log) {
   try { await pool.query(fs.readFileSync(path.join(__dirname, '..', 'shadow', 'schema.sql'), 'utf8')); } catch (e) { log(`[scalp] shadow schema failed: ${e.message}`); }
 }
 
-function attachScalp({ app, cron, axios, env = process.env, log = console.log, state, store, crypto, secret, okSecret, enabled, guarded, now = Date.now, pool = null }) {
+function attachScalp({ app, cron, axios, env = process.env, log = console.log, state, store, crypto, secret, okSecret, enabled, guarded, now = Date.now, pool = null, healthTracker = null, jobRegistry = null }) {
+  const track = (name, fn) => (healthTracker ? healthTracker.wrap(name, fn) : fn);
   const scalpOn = env.PAPER_SCALP_ENABLED !== 'false';
   // read-only report, registered whether or not the scalp is running (it then shows what is stored)
   app.get('/api/paper/scalp-report', async (req, res) => {
@@ -38,10 +39,15 @@ function attachScalp({ app, cron, axios, env = process.env, log = console.log, s
   const shadowSchemaReady = pool ? ensureShadowSchema(pool, log) : Promise.resolve();
   const bot = createScalpBot({ store, crypto, source1m: createScalpSource({ axios }), shadowStore, now, log });
   const tz = { timezone: 'Asia/Kolkata' };
-  cron.schedule('5 * * * * *', guarded('scalp scan', bot.cryptoScalpScan, log), tz);
-  cron.schedule('35 * * * * *', guarded('scalp monitor', bot.cryptoScalpMonitor, log), tz);
-  cron.schedule('10 */5 * * * *', guarded('scalp_wide scan', bot.cryptoScalpWideScan, log), tz);
-  cron.schedule('40 * * * * *', guarded('scalp_wide monitor', bot.cryptoScalpWideMonitor, log), tz);
+  const scalpScanFn = guarded('scalp scan', track('scalpScan', bot.cryptoScalpScan), log);
+  const scalpMonitorFn = guarded('scalp monitor', track('scalpMonitor', bot.cryptoScalpMonitor), log);
+  const scalpWideScanFn = guarded('scalp_wide scan', track('scalpWideScan', bot.cryptoScalpWideScan), log);
+  const scalpWideMonitorFn = guarded('scalp_wide monitor', track('scalpWideMonitor', bot.cryptoScalpWideMonitor), log);
+  cron.schedule('5 * * * * *', scalpScanFn, tz);
+  cron.schedule('35 * * * * *', scalpMonitorFn, tz);
+  cron.schedule('10 */5 * * * *', scalpWideScanFn, tz);
+  cron.schedule('40 * * * * *', scalpWideMonitorFn, tz);
+  if (jobRegistry) Object.assign(jobRegistry, { scalpScan: scalpScanFn, scalpMonitor: scalpMonitorFn, scalpWideScan: scalpWideScanFn, scalpWideMonitor: scalpWideMonitorFn });
   bot.nseScalpScan(); // logs once why NSE scalp does not run
   shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[scalp] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
   // CC3 urgent fix item 4: resume monitoring of any already-open trade immediately on startup (its own stop/target/time

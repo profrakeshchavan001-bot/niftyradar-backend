@@ -783,7 +783,7 @@ app.get('/api/options/:symbol', async (req, res) => {
 // PAPER-TRADING BOT (demo only, no real orders) - see paperbot/ and
 // docs/PAPER-BOT.md. Switch off with PAPER_BOT_ENABLED=false.
 // ============================================
-require('./paperbot').attachPaperBot({
+const paperState = require('./paperbot').attachPaperBot({
   app, cron, axios,
   deps: {
     queueDhanCall, DHAN_BASE, DHAN_HEADERS, getSecurityId,
@@ -792,6 +792,35 @@ require('./paperbot').attachPaperBot({
     fetchNews: fetchMarketNews,
     universe: NIFTY50_SYMBOLS, // read-only: listed at /api/paper/universe
   },
+});
+
+// Public, unauthenticated keep-alive target (README: point a free UptimeRobot monitor here every 5 min).
+// No secret, no database read - must stay cheap and always answer, even while the paper bot is still starting,
+// so the external pinger never itself looks "down" because of something downstream. Shows the last tick time
+// of every bot's own scan/monitor job (from the SAME health tracker every job records into), so a human glancing
+// at this URL can see which bot, if any, has gone quiet - the actual signal that the 14 Nov outage needed.
+app.get('/health', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const tracker = paperState && paperState.healthTracker;
+  if (!tracker) return res.json({ status: 'STARTING', reason: 'paper bot not ready yet', asOf: new Date().toISOString() });
+  const now = Date.now();
+  const snap = tracker.snapshot();
+  const jobs = {};
+  let staleCount = 0;
+  for (const [name, j] of Object.entries(snap.jobs)) {
+    const minutesAgo = Math.round((now - j.lastRunAt) / 60000);
+    const isNse = /^nse/i.test(name);
+    const stale = minutesAgo > 3 && !isNse; // NSE jobs are correctly idle outside market hours; everything else is 24/7
+    if (stale) staleCount += 1;
+    jobs[name] = { lastRunAt: new Date(j.lastRunAt).toISOString(), minutesAgo, ok: j.ok, stale };
+  }
+  res.json({
+    status: staleCount > 0 ? 'PROBLEM' : 'ALIVE',
+    reason: staleCount > 0 ? `${staleCount} job(s) have not ticked in 3+ minutes` : 'all 24/7 jobs ticking',
+    asOf: new Date(now).toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    jobs,
+  });
 });
 
 // ============================================

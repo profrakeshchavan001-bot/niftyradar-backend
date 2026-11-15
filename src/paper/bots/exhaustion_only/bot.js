@@ -4,6 +4,7 @@
 const { closedOnly, buildContext, sizeCrypto } = require('../../../../paperbot/engine');
 const { istParts, istDayStart } = require('../../../../paperbot/time');
 const { decide, evaluateExit, settle } = require('./engine');
+const { recoveryLimit } = require('../../lib/recoveryWindow');
 
 const MARKET = 'crypto_exhaustion_only';
 const FIVE = 5 * 60000;
@@ -88,7 +89,8 @@ function createExhaustionBot({ store, crypto, loadCfg, shadowStore, now = Date.n
     let closed = 0;
     for (const t of open) {
       let c5;
-      try { c5 = await crypto.candles(t.symbol); } catch (e) { log(`[exhaustion_only] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
+      const limit = recoveryLimit({ oldestEntryMs: Date.parse(t.entry_time), nowMs: now(), intervalMs: FIVE, defaultLimit: 330 });
+      try { c5 = await crypto.candles(t.symbol, limit); } catch (e) { log(`[exhaustion_only] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
       const ev = evaluateExit({ trade: t, candles: closedOnly(c5, FIVE, now()) });
       if (!ev.exit) continue;
       const fx = await crypto.usdtInr(cfg.usdt_inr_fallback);
