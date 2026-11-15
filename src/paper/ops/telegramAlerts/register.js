@@ -1,14 +1,30 @@
 'use strict';
 /**
- * Add-on v2: Telegram trade alerts for crypto bots. Reads newly opened/closed trades from the stores -
- * never called from inside a bot's decision code. Auto-loaded by src/paper/pluginLoader.js.
+ * Add-on v2 + Task Group C: Telegram trade alerts, at the moment a trade is TAKEN (entry) and again on
+ * exit. Reads newly opened/closed trades from the stores on a timer - never called from inside a bot's
+ * decision code. Auto-loaded by src/paper/pluginLoader.js.
  *
- * Covered now: intraday ('crypto'), scalp ('crypto_scalp'), scalp_wide ('crypto_wide_scalp') - all three
- * live in the shared paper_trades table this plugin's ctx.store already points at.
- * NOT covered (honest deferral, logged in docs/decisions/CC4.md): exhaustion_only and trend_smc keep their
- * own tables (src/paper/bots/exhaustion_only/store.js, src/paper/bots/trend_smc/store.js) with no shared
- * reference this plugin can reach without one wiring line in each bot's own register.js - out of scope
- * for this add-on's time budget; never guessed in, no fake alerts for them.
+ * Coverage (Task Group C extends this to every bot that lacked it):
+ *  - shared `paper_trades` table (this plugin's ctx.store / state.store, listTrades(limit, market)):
+ *    crypto   -> 'intraday', crypto_scalp -> 'scalp', crypto_wide_scalp -> 'scalp_wide' (add-on v2, as before)
+ *    nse      -> 'nse', nse_scalp -> 'nse_scalp' (NEW: the main NSE stock bot + the reserved nse_scalp
+ *               market had NO alert at all until now - same table, same listTrades() call, just never wired)
+ *  - own tables, no shared row (NEW, closing the exact gap docs/decisions/CC4.md logged as deferred):
+ *    exhaustion_only, trend_smc - src/paper/bots/<name>/store.js. Reached via ctx.exhaustionMemoryStore /
+ *    ctx.trendSmcMemoryStore, which each bot's own register.js already sets to whichever store it is
+ *    really using (Postgres or memory - the "Memory" in the name is historical, not a guarantee) BEFORE
+ *    this plugin loads (src/paper/pluginLoader.js loads every bots/ plugin before any ops/ plugin). If a
+ *    bot is disabled (PAPER_EXHAUSTION_ENABLED=false / PAPER_TREND_SMC_ENABLED=false) or has not finished
+ *    registering yet, the property is simply absent - logged once, that bot's alerts are skipped, no
+ *    crash, every other bot keeps being checked.
+ *
+ * INR math (format.js): the NSE bots' own prices and qty are already in rupees, with no FX step and no
+ * round-trip-cost % modelled in their own P&L calc (paperbot/bot.js: pnl_inr = (exit - entry) * qty) - so
+ * they are formatted with { nativeInr: true, costPct: 0 }, matching that real booking exactly, not an
+ * invented fee. The crypto-denominated bots (intraday/scalp/scalp_wide and now exhaustion_only/trend_smc,
+ * which use the exact same USDT + fx_rate + 0.23% round-trip-cost convention as the scalp bots'
+ * settle()/costPct()) keep the original { nativeInr: false } path: the trade's own fx_rate, else
+ * USDINR_FALLBACK, else shown in USD with "rate n/a" - never a silently invented rate.
  *
  * Rules followed: polls on a timer (never inside a bot's own code), DB-backed dedupe (never sent twice,
  * even after a redeploy; falls back to an in-memory Set when there is no database, logged once), a
@@ -16,10 +32,25 @@
  * end-of-day/morning-brief/weekly text is ever sent here (item 3), no summaries - only entry/exit.
  */
 const path = require('path');
-const { formatEntry, formatExit } = require('./format');
+const { formatEntry, formatExit, DEFAULT_COST_PCT } = require('./format');
 const { createRateLimiter } = require('./rateLimit');
 
-const BOT_MARKETS = { crypto: 'intraday', crypto_scalp: 'scalp', crypto_wide_scalp: 'scalp_wide' };
+// Shared `paper_trades` table markets. nativeInr/costPct feed formatEntry (see file header above).
+const SHARED_STORE_MARKETS = {
+  crypto: { label: 'intraday', nativeInr: false, costPct: DEFAULT_COST_PCT },
+  crypto_scalp: { label: 'scalp', nativeInr: false, costPct: DEFAULT_COST_PCT },
+  crypto_wide_scalp: { label: 'scalp_wide', nativeInr: false, costPct: DEFAULT_COST_PCT },
+  nse: { label: 'nse', nativeInr: true, costPct: 0 },
+  nse_scalp: { label: 'nse_scalp', nativeInr: true, costPct: 0 },
+};
+
+// Bots with their own table instead of a row in paper_trades - see file header above for how their store
+// is reached on ctx and why it is never missing by the time this plugin's checks actually run.
+const OWN_TABLE_BOTS = {
+  exhaustion_only: { label: 'exhaustion_only', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'exhaustionMemoryStore' },
+  trend_smc: { label: 'trend_smc', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'trendSmcMemoryStore' },
+};
+
 const POLL_MS = 20000;
 
 async function sendTelegram(axios, token, chat, text, log) {
@@ -32,14 +63,15 @@ async function sendTelegram(axios, token, chat, text, log) {
   }
 }
 
-function register({ env, log, pool, state, axios = require('axios'), cron, now = Date.now }) {
+function register(ctx) {
+  const { env, log, pool, state, axios = require('axios'), cron, now = Date.now } = ctx;
   const tradeAlertsOn = String(env.TELEGRAM_TRADE_ALERTS || '').toLowerCase() === 'on';
   const exitAlertsOn = String(env.TELEGRAM_EXIT_ALERTS ?? 'on').toLowerCase() !== 'off';
   const token = env.TELEGRAM_BOT_TOKEN;
   const chat = env.TELEGRAM_CHAT_ID;
   const configured = Boolean(token && chat);
   const wantedBots = env.TELEGRAM_BOTS ? env.TELEGRAM_BOTS.split(',').map((s) => s.trim()) : null;
-  const markets = Object.keys(BOT_MARKETS).filter((m) => !wantedBots || wantedBots.includes(BOT_MARKETS[m]) || wantedBots.includes(m));
+  const wanted = (key, label) => !wantedBots || wantedBots.includes(key) || wantedBots.includes(label);
 
   state.telegramStats = state.telegramStats || { configured, lastSendOk: null, lastSendAt: null };
   if (!configured || !tradeAlertsOn) {
@@ -50,6 +82,7 @@ function register({ env, log, pool, state, axios = require('axios'), cron, now =
   const memoryDedupe = new Set(); // bot:tradeId:event - used only when there is no database (logged once below)
   if (!pool) log('[telegram-alerts] no database pool: dedupe is in-memory only, not safe across a redeploy');
   const rateLimiter = createRateLimiter({ now });
+  const warnedMissingStore = new Set(); // own-table bot label -> logged once, not every 20s poll
 
   async function alreadySent(bot, tradeId, event) {
     if (pool) {
@@ -70,16 +103,35 @@ function register({ env, log, pool, state, axios = require('axios'), cron, now =
     state.telegramStats.lastSendAt = now();
   }
 
+  // Built fresh on every check() (not captured once at register() time) so an own-table bot that
+  // registers its store a little later, or never (disabled), is picked up or skipped correctly either way.
+  function buildSources() {
+    const sources = [];
+    for (const [market, cfg] of Object.entries(SHARED_STORE_MARKETS)) {
+      if (!wanted(market, cfg.label)) continue;
+      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, fetch: () => state.store.listTrades(50, market) });
+    }
+    for (const [bot, cfg] of Object.entries(OWN_TABLE_BOTS)) {
+      if (!wanted(bot, cfg.label)) continue;
+      const store = ctx[cfg.ctxKey];
+      if (!store) {
+        if (!warnedMissingStore.has(cfg.label)) { log(`[telegram-alerts] ${cfg.label} has no store yet (disabled, or not registered) - its alerts are skipped`); warnedMissingStore.add(cfg.label); }
+        continue;
+      }
+      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, fetch: () => store.listTrades(50) });
+    }
+    return sources;
+  }
+
   async function check() {
-    for (const market of markets) {
-      const botLabel = BOT_MARKETS[market];
+    for (const src of buildSources()) {
       let rows;
-      try { rows = await state.store.listTrades(50, market); } catch (e) { log(`[telegram-alerts] could not read ${market} trades: ${e.message}`); continue; }
+      try { rows = await src.fetch(); } catch (e) { log(`[telegram-alerts] could not read ${src.label} trades: ${e.message}`); continue; }
       for (const t of rows) {
         try {
-          if (!(await alreadySent(botLabel, t.id, 'entry'))) await deliver(formatEntry(t, botLabel, { usdInrFallback: env.USDINR_FALLBACK }));
-          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(botLabel, t.id, 'exit'))) await deliver(formatExit(t, botLabel));
-        } catch (e) { log(`[telegram-alerts] trade ${t.id} (${market}) failed: ${e.message}`); } // one bad row must never stop the others
+          if (!(await alreadySent(src.label, t.id, 'entry'))) await deliver(formatEntry(t, src.label, { costPct: src.costPct, usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr }));
+          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(src.label, t.id, 'exit'))) await deliver(formatExit(t, src.label));
+        } catch (e) { log(`[telegram-alerts] trade ${t.id} (${src.label}) failed: ${e.message}`); } // one bad row must never stop the others
       }
     }
   }
@@ -88,4 +140,4 @@ function register({ env, log, pool, state, axios = require('axios'), cron, now =
   return { check };
 }
 
-module.exports = { name: 'telegram-alerts', schemaSql: path.join(__dirname, 'schema.sql'), register, BOT_MARKETS, POLL_MS };
+module.exports = { name: 'telegram-alerts', schemaSql: path.join(__dirname, 'schema.sql'), register, SHARED_STORE_MARKETS, OWN_TABLE_BOTS, POLL_MS };
