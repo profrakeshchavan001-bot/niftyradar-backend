@@ -42,10 +42,22 @@ const isScalp = (m) => String(m || '').endsWith('_scalp');
 
 const clampLimit = (n, max = 500) => Math.min(Math.max(parseInt(n, 10) || 50, 1), max);
 
+// Root-cause fix (CC overnight, cryptoScan /api/paper/health bug): plain `JSON.parse(JSON.stringify(x))`
+// throws the cryptic `"undefined" is not valid JSON` whenever `x` is undefined - `JSON.stringify(undefined)`
+// returns the JS value `undefined` (not the string "undefined"), and `JSON.parse(undefined)` then fails to
+// parse that. This clone helper is used everywhere a store hands back its own in-memory data (so callers
+// can freely mutate what they get without corrupting the store); it now checks for `undefined` FIRST and
+// throws a clear, diagnosable error naming which store and call produced it, instead of letting the native
+// JSON error - which says nothing about where the undefined value came from - escape to the caller.
+function safeClone(x, context = 'store') {
+  if (x === undefined) throw new Error(`${context}: tried to clone undefined (expected an object or array back) - whatever fetched this returned nothing`);
+  return JSON.parse(JSON.stringify(x));
+}
+
 function createMemoryStore() {
   const db = { config: {}, trades: [], skips: [], summaries: [], shadows: [], judgeShadows: [] };
   let seq = 0;
-  const copy = (x) => JSON.parse(JSON.stringify(x));
+  const copy = (x) => safeClone(x, 'memoryStore');
   return {
     kind: 'memory',
     async init() {},
@@ -209,7 +221,7 @@ function createPgStore(getPool, log = console.log) {
 // best / worst % of an open trade stays in memory until the trade closes.
 // Steady state with no trade event = zero queries.
 function createCachedStore(inner, { now = Date.now, configTtlMs = 600000 } = {}) {
-  const copy = (x) => JSON.parse(JSON.stringify(x));
+  const copy = (x) => safeClone(x, 'cachedStore');
   const open = new Map(); // market -> rows
   let day = new Map(); // `${market}|${date}` -> rows
   let cfg = null;
@@ -229,11 +241,27 @@ function createCachedStore(inner, { now = Date.now, configTtlMs = 600000 } = {})
       if (!open.has(market)) open.set(market, await inner.openTrades(market));
       return copy(open.get(market));
     },
+    // Root-cause fix (cryptoScan /api/paper/health bug: "undefined" is not valid JSON): cryptoScan and
+    // nseScan both call this with the SAME IST date but different markets, and their cron ticks can
+    // genuinely overlap (nseScan every 5 min during market hours, cryptoScan every 5 min 24/7, no
+    // overlap guard between DIFFERENT job names - only guarded() within the SAME job name). The old code
+    // reassigned the whole `day` Map to prune stale dates (`day = new Map([...])`), wrote the freshly
+    // fetched rows into THAT map reference, then read them back out via `day.get(key)` AFTER its own
+    // `await` - by which point a concurrent call for the other market could have reassigned `day` again
+    // (to prune for ITS OWN read), orphaning the first call's write. Whichever call's own DB read was
+    // slower then read back `undefined` from the newer map and crashed in `copy()`.
+    // Fixed two ways, either one alone would have been enough: (1) prune in place (`day.delete`), so the
+    // `day` binding itself is never swapped out and no concurrent call can ever orphan another's write;
+    // (2) never read the value back out of the map after the await - return what was just fetched
+    // directly, so even a cache this method does not fully control (e.g. cleared from elsewhere) cannot
+    // hand back undefined here.
     async tradesForDay(market, date) {
       const key = `${market}|${date}`;
       if (!day.has(key)) {
-        day = new Map([...day].filter(([k]) => k.endsWith(`|${date}`))); // drop older days
-        day.set(key, await inner.tradesForDay(market, date));
+        for (const k of [...day.keys()]) if (!k.endsWith(`|${date}`)) day.delete(k); // drop older days, in place
+        const rows = await inner.tradesForDay(market, date);
+        day.set(key, rows);
+        return copy(rows); // the value just fetched, never re-read out of the (possibly since-mutated) map
       }
       return copy(day.get(key));
     },
@@ -255,4 +283,4 @@ function createCachedStore(inner, { now = Date.now, configTtlMs = 600000 } = {})
   };
 }
 
-module.exports = { createMemoryStore, createPgStore, createCachedStore, clampLimit };
+module.exports = { createMemoryStore, createPgStore, createCachedStore, clampLimit, safeClone };
