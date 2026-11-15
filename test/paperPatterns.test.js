@@ -59,6 +59,46 @@ test('exhaustion reversal down: rise, small green, red close below its low', () 
   assert.equal(r.direction, 'down');
 });
 
+// NSE-only variant (docs/PAPER-BOT.md, paperbot/bot.js analyse() with `variant: 'nse'`): the owner's rule
+// needs a SECOND confirming candle before entry fires - the first green candle closing above the small
+// candle's high is only the start of the reversal, not itself a signal.
+const confirm1 = [100.6, 101.3, 100.5, 101.25]; // first green: closes 101.25, above the small candle's high 101.2 - not a signal by itself
+test('exhaustion reversal (NSE, confirmed): fall, small red, first green above its high (no signal yet), second green above the first green\'s high (signal)', () => {
+  assert.equal(P.exhaustionReversalConfirmed(mk([...fall, smallRed, confirm1]), { vwap: 104 }), null, 'only one green candle so far: not yet confirmed');
+  const r = P.exhaustionReversalConfirmed(mk([...fall, smallRed, confirm1, [101.25, 102, 101.2, 101.8]]), { vwap: 104 });
+  assert.equal(r.name, 'exhaustion_reversal');
+  assert.equal(r.direction, 'up');
+  assert.equal(r.kind, 'reversal');
+  assert.deepEqual(r.candles.map((k) => [k.o, k.h, k.l, k.c]), [[101, 101.2, 100.2, 100.5], [100.6, 101.3, 100.5, 101.25], [101.25, 102, 101.2, 101.8]]);
+  assert.match(r.note, /confirmed by a second green close/);
+});
+
+test('exhaustion reversal (NSE, confirmed): no signal when the second candle does not confirm', () => {
+  // second candle is green but closes AT the first green's high, not above it
+  assert.equal(P.exhaustionReversalConfirmed(mk([...fall, smallRed, confirm1, [101.25, 101.3, 101.2, 101.3]]), { vwap: 104 }), null);
+  // second candle is red (the reversal stalled)
+  assert.equal(P.exhaustionReversalConfirmed(mk([...fall, smallRed, confirm1, [101.25, 101.3, 100.9, 101]]), { vwap: 104 }), null);
+  // the original single-candle rule still fires on exactly this shape (unchanged, still used by every crypto bot)
+  assert.equal(P.exhaustionReversal(mk([...fall, smallRed, confirm1]), { vwap: 104 }).direction, 'up');
+});
+
+test('exhaustion reversal (NSE, confirmed) down: mirror of the up case', () => {
+  const rise = [[100, 102.2, 99.8, 102], [102, 104.2, 101.8, 104], [104, 104.2, 102.8, 103], [103, 105.2, 102.8, 105], [105, 107.2, 104.8, 107], [107, 109.2, 106.8, 109]];
+  const small = [109, 109.8, 108.8, 109.5];
+  const firstRed = [109.4, 109.45, 108.6, 108.7]; // closes 108.7, below the small candle's low 108.8 - not a signal by itself
+  assert.equal(P.exhaustionReversalConfirmed(mk([...rise, small, firstRed]), { vwap: 105 }), null, 'only one red candle so far');
+  const r = P.exhaustionReversalConfirmed(mk([...rise, small, firstRed, [108.7, 108.75, 108, 108.2]]), { vwap: 105 });
+  assert.equal(r.direction, 'down');
+});
+
+test('detectPatterns: variant "nse" uses the confirmed rule, the default variant (every other caller) does not', () => {
+  const twoGreens = mk([...fall, smallRed, confirm1, [101.25, 102, 101.2, 101.8]]);
+  const oneGreen = mk([...fall, smallRed, confirm1]);
+  assert.ok(P.detectPatterns(twoGreens, { vwap: 104 }, {}, 'nse').some((p) => p.name === 'exhaustion_reversal'));
+  assert.ok(!P.detectPatterns(oneGreen, { vwap: 104 }, {}, 'nse').some((p) => p.name === 'exhaustion_reversal'), 'nse: one green candle is not enough');
+  assert.ok(P.detectPatterns(oneGreen, { vwap: 104 }).some((p) => p.name === 'exhaustion_reversal'), 'default variant (crypto): the single-candle rule still fires, unchanged');
+});
+
 test('engulfing: bullish and bearish', () => {
   assert.equal(P.engulfing(mk([[100, 100.2, 98.8, 99], [98.9, 100.6, 98.8, 100.5]])).name, 'bullish_engulfing');
   assert.equal(P.engulfing(mk([[99, 100.2, 98.8, 100], [100.1, 100.2, 98.4, 98.5]])).name, 'bearish_engulfing');

@@ -221,8 +221,9 @@ test('bot on Yahoo candles: trade is marked data_source "yahoo_delayed" with the
   assert.equal(trades.length, 1);
   const t = trades[0];
   assert.deepEqual([t.symbol, t.direction, t.data_source, t.candle_source], ['TESTSTK', 'CALL', 'yahoo_delayed', 'yahoo_chart_5m']);
-  // scan runs at 11:05:20; the latest closed candle ended at 11:05:00 -> 20 s
-  assert.equal(t.entry_time, new Date(ist(11, 5, 20)).toISOString());
+  // entry is on the SECOND confirming green candle (the owner's rule, docs/PAPER-BOT.md): scan runs
+  // at 11:10:20; the latest closed candle ended at 11:10:00 -> 20 s
+  assert.equal(t.entry_time, new Date(ist(11, 10, 20)).toISOString());
   assert.equal(t.data_delay_sec, 20);
   assert.equal(t.r_factor, 3); // same real R factor as on Dhan candles (test/paperReplay.test.js)
   assert.match(t.score_source, /^r_factor_v2/);
@@ -240,8 +241,9 @@ test('end to end on a 15-minute-late Yahoo feed: R factor, pattern, entry, SL / 
   const trades = h.store._db.trades;
   assert.equal(trades.length, 1);
   const t = trades[0];
-  // the signal candle closed at 11:05; Yahoo shows it from 11:20; the scan at 11:20:20 takes it: 920 s late
-  assert.equal(t.entry_time, new Date(ist(11, 20, 20)).toISOString());
+  // the signal candle (the SECOND confirming green candle) closed at 11:10; Yahoo shows it from
+  // 11:25; the scan at 11:25:20 takes it: 920 s late
+  assert.equal(t.entry_time, new Date(ist(11, 25, 20)).toISOString());
   assert.deepEqual([t.symbol, t.direction, t.data_source, t.data_delay_sec], ['TESTSTK', 'CALL', 'yahoo_delayed', 920]);
   assert.ok(t.patterns.includes('exhaustion_reversal'));
   assert.equal(t.r_factor, 3); // same R factor as on live candles
@@ -252,9 +254,10 @@ test('end to end on a 15-minute-late Yahoo feed: R factor, pattern, entry, SL / 
   assert.ok(Math.abs(t.sl_price - 11.685) <= 0.0051);
   assert.equal(t.target_price, 13.53);
   assert.match(t.basis, /Data: free Yahoo feed, about 15 min behind the market\./);
-  // forced exit 15:15: Yahoo then shows the 15:00 candle, 47 candles after the signal: stock 492 + 47 x 0.02 = 492.94,
-  // option 12.3 + 0.5 x 0.94 = 12.77, P&L 0.47 x 3000 = 1410
-  assert.deepEqual([t.status, t.exit_reason, t.exit_underlying, t.exit_price, t.pnl_inr], ['closed', 'time_exit_15:15', 492.94, 12.77, 1410]);
+  // forced exit 15:15: Yahoo then shows the 15:00 candle, 46 candles after the signal (one fewer
+  // than before - the reversal now takes 3 candles, not 2): stock 492 + 46 x 0.02 = 492.92,
+  // option 12.3 + 0.5 x 0.92 = 12.76, P&L 0.46 x 3000 = 1380
+  assert.deepEqual([t.status, t.exit_reason, t.exit_underlying, t.exit_price, t.pnl_inr], ['closed', 'time_exit_15:15', 492.92, 12.76, 1380]);
   assert.equal(t.exit_time, new Date(ist(15, 15, 50)).toISOString());
 });
 

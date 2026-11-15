@@ -90,7 +90,10 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
     if (now() - (last.t + FIVE_MIN) > maxAgeMs(feed.dataSource, cfg)) { await skip(market, symbol, 'no fresh candle (market closed or data feed stale)', { r_factor: score, ...src }); return null; }
     const c15 = feed.c15 ? E.closedOnly(feed.c15, 3 * FIVE_MIN, cutoffOf(feed)) : null;
     const ctx = E.buildContext(c5, istDayStart(now()), c15);
-    const patterns = P.detectPatterns(c5, ctx, cfg.patternOpt);
+    // NSE gets the owner's stricter, two-candle-confirmed exhaustion reversal (patterns.js
+    // exhaustionReversalConfirmed, docs/PAPER-BOT.md); crypto is unchanged (the single-candle rule
+    // every crypto bot - scalp, scalp_wide, exhaustion_only - already documents and relies on).
+    const patterns = P.detectPatterns(c5, ctx, cfg.patternOpt, market === 'nse' ? 'nse' : 'default');
     if (!patterns.length) return null; // no setup, nothing to log
     const names = patterns.map((p) => p.name);
     const decision = E.decideEntry(patterns, ctx);

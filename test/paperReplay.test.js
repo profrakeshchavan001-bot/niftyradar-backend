@@ -57,8 +57,9 @@ function nseHarness({ optionLtp, news = [], feedStopsAt = Infinity }) {
 const ist = (h, m, s = 0) => Date.UTC(2026, 10, 13, h - 5, m - 30, s);
 
 test('replay NSE: exhaustion reversal -> CALL at the real option price -> target exit', async () => {
-  // option price script: 20 at entry (11:05:20), then 20.6, 21.4, 22.1
-  const optionLtp = (t) => (t < ist(11, 6) ? 20 : t < ist(11, 7) ? 20.6 : t < ist(11, 8) ? 21.4 : 22.1);
+  // option price script: 20 at entry (11:10:20, one candle later than before - the owner's rule now
+  // needs a SECOND confirming green candle, docs/PAPER-BOT.md), then 20.6, 21.4, 22.1
+  const optionLtp = (t) => (t < ist(11, 11) ? 20 : t < ist(11, 12) ? 20.6 : t < ist(11, 13) ? 21.4 : 22.1);
   const h = nseHarness({ optionLtp });
   await h.runSession();
   const trades = h.store._db.trades;
@@ -82,10 +83,10 @@ test('replay NSE: exhaustion reversal -> CALL at the real option price -> target
   assert.match(t.score_source, /^r_factor_v2/);
   assert.equal(t.simulated_option, false);
   assert.equal(t.instrument, 'TESTSTK 2026-11-26 490 CE');
-  assert.equal(t.entry_time, new Date(ist(11, 5, 20)).toISOString());
-  // trigger candles saved with their numbers: small red, then the green candle
+  assert.equal(t.entry_time, new Date(ist(11, 10, 20)).toISOString());
+  // trigger candles saved with their numbers: small red, the first green (not itself a signal), then the second green that confirms entry
   const trig = t.trigger_candles.find((g) => g.pattern === 'exhaustion_reversal');
-  assert.deepEqual(trig.candles.map((k) => [k.o, k.h, k.l, k.c]), [[491, 491.2, 490.4, 490.6], [490.6, 492.2, 490.5, 492]]);
+  assert.deepEqual(trig.candles.map((k) => [k.o, k.h, k.l, k.c]), [[491, 491.2, 490.4, 490.6], [490.6, 491.5, 490.5, 491.4], [491.4, 492.1, 491.3, 492]]);
   assert.equal(t.trend_state.vwapSide, 'down');
   assert.match(t.basis, /Bought a CALL on TESTSTK because it was in the top R-factor list/);
   assert.match(t.basis, /reversal trade against the trend/);
@@ -97,7 +98,7 @@ test('replay NSE: exhaustion reversal -> CALL at the real option price -> target
   assert.equal(t.exit_reason, 'target');
   assert.equal(t.exit_price, 22.1);
   assert.equal(t.pnl_inr, 4200);
-  assert.equal(t.exit_time, new Date(ist(11, 8, 50)).toISOString());
+  assert.equal(t.exit_time, new Date(ist(11, 13, 50)).toISOString());
   assert.equal(t.max_fav_pct, 10.5);
   // ranking: only liquid stocks with valid candles are ranked (THIN is illiquid, AAA-DDD have no candles)
   assert.ok(h.logs.some((l) => /NSE rank: 1 ranked, 1 below the liquidity floor, 4 without valid candles; top: TESTSTK R 3/.test(l)));
@@ -116,11 +117,12 @@ test('replay NSE: no option price -> simulated (flagged) -> forced exit at 15:15
   // premium = 2.5% of 492 = 12.3; lot value 12.3 x 500 = 6150; 40,000 / 6150 = 6 lots = 3000 qty
   assert.equal(t.entry_price, 12.3);
   assert.equal(t.qty, 3000);
-  // by 15:15 fifty more candles closed, +0.02 each: stock 493; option 12.3 + 0.5 x 1 = 12.8 (+4.07%, below target)
+  // by 15:15 forty-nine more candles closed (one fewer than before - the reversal now takes 3
+  // candles, not 2), +0.02 each: stock 492 + 49 x 0.02 = 492.98; option 12.3 + 0.5 x 0.98 = 12.79 (below target)
   assert.equal(t.exit_reason, 'time_exit_15:15');
-  assert.equal(t.exit_underlying, 493);
-  assert.equal(t.exit_price, 12.8);
-  assert.equal(t.pnl_inr, 1500); // 0.5 x 3000
+  assert.equal(t.exit_underlying, 492.98);
+  assert.equal(t.exit_price, 12.79);
+  assert.equal(t.pnl_inr, 1470); // (12.79 - 12.3) x 3000
   assert.equal(t.exit_time, new Date(ist(15, 15, 50)).toISOString());
 });
 
@@ -148,22 +150,22 @@ test('replay NSE: max trades per day is respected', async () => {
 });
 
 test('wake after sleep: stale data is refused, missed candles are not replayed, current candle is traded once', async () => {
-  // 1) feed stopped at the trigger candle (closed 11:05); the bot wakes at 11:20: data is 3 candles old -> nothing
+  // 1) feed stopped before the trigger candle (closed 11:10); the bot wakes at 11:25: data is 3 candles old -> nothing
   const stale = nseHarness({ optionLtp: () => 20, feedStopsAt: ist(11, 0) });
-  stale.clock.t = ist(11, 20, 20);
+  stale.clock.t = ist(11, 25, 20);
   await stale.bot.nseScan();
   assert.equal(stale.store._db.trades.length, 0);
   assert.ok(stale.logs.some((l) => /0 ranked, 1 below the liquidity floor, 5 without valid candles/.test(l)));
-  // 2) live feed, the bot wakes at 11:20 having slept through the 11:05 signal: that old candle is not traded
+  // 2) live feed, the bot wakes at 11:25 having slept through the 11:10 signal: that old candle is not traded
   const late = nseHarness({ optionLtp: () => 20 });
-  late.clock.t = ist(11, 20, 20);
+  late.clock.t = ist(11, 25, 20);
   await late.bot.nseScan();
   assert.equal(late.store._db.trades.length, 0);
   // 3) the bot wakes right on the signal candle: traded, and a second run on the same candle adds nothing
   const onTime = nseHarness({ optionLtp: () => 20 });
-  onTime.clock.t = ist(11, 5, 20);
+  onTime.clock.t = ist(11, 10, 20);
   await onTime.bot.nseScan();
-  onTime.clock.t = ist(11, 6, 5);
+  onTime.clock.t = ist(11, 11, 5);
   await onTime.bot.nseScan();
   assert.equal(onTime.store._db.trades.length, 1);
 });

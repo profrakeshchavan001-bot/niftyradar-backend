@@ -243,13 +243,50 @@ function fvgRetest(c, opt = {}) {
   return null;
 }
 
+// --- NSE-only variant: the owner's rule, with a second-candle confirmation ---
+// Same downtrend + small-body red candle as exhaustionReversal() above, but the entry/signal
+// does NOT fire on the first green candle closing above the small candle's high. It waits one
+// more candle: that first green candle is only the (unsignalled) start of the reversal, and the
+// ACTUAL entry is confirmed only when a SECOND green candle follows, closing above the first
+// green candle's high. Mirror for a rising move (two reds confirm a short). This is additive -
+// exhaustionReversal() itself is unchanged and still used as-is by every crypto bot (scalp,
+// scalp_wide, exhaustion_only, the shared DETECTORS list below) - this stricter, two-candle
+// variant is used only for the NSE path (paperbot/bot.js's analyse(), `variant: 'nse'`).
+function exhaustionReversalConfirmed(c, ctx = {}, opt = {}) {
+  const lookback = opt.lookback || 6;
+  const minTrend = opt.minTrend || 4;
+  const smallRatio = opt.smallBodyRatio || 0.5;
+  if (c.length < lookback + 3 || ctx.vwap == null) return null;
+  const last = c[c.length - 1]; // the SECOND green/red candle - this is where entry is signalled
+  const confirm1 = c[c.length - 2]; // the FIRST green/red candle - closed beyond the small candle, but not itself a signal
+  const small = c[c.length - 3]; // the small reversal candle
+  const prior = c.slice(-(lookback + 3), -3);
+  const avgBody = avg(prior.map(body));
+  if (!(avgBody > 0) || body(small) > smallRatio * avgBody) return null;
+  const reds = prior.filter(isRed).length;
+  const greens = prior.filter(isGreen).length;
+  if (reds >= minTrend && isRed(small) && small.c < ctx.vwap && isGreen(confirm1) && confirm1.c > small.h && isGreen(last) && last.c > confirm1.h) {
+    return hit('exhaustion_reversal', 'up', 'reversal', [small, confirm1, last],
+      `${reds} of last ${lookback} candles red, small red body ${round(body(small))} (avg ${round(avgBody)}), first green close ${confirm1.c} above its high ${small.h}, confirmed by a second green close ${last.c} above ${confirm1.h}`);
+  }
+  if (greens >= minTrend && isGreen(small) && small.c > ctx.vwap && isRed(confirm1) && confirm1.c < small.l && isRed(last) && last.c < confirm1.l) {
+    return hit('exhaustion_reversal', 'down', 'reversal', [small, confirm1, last],
+      `${greens} of last ${lookback} candles green, small green body ${round(body(small))} (avg ${round(avgBody)}), first red close ${confirm1.c} below its low ${small.l}, confirmed by a second red close ${last.c} below ${confirm1.l}`);
+  }
+  return null;
+}
+
 const DETECTORS = [exhaustionReversal, engulfing, hammer, shootingStar, star, insideBarBreakout, liquiditySweep, orderBlock, fvgRetest];
+// NSE variant: exactly the same list, with the two-candle-confirmed exhaustion reversal instead of the single-candle one.
+const DETECTORS_NSE = [exhaustionReversalConfirmed, engulfing, hammer, shootingStar, star, insideBarBreakout, liquiditySweep, orderBlock, fvgRetest];
 
 // Runs every detector on the closed candles. `ctx.vwap` is needed for the
 // exhaustion reversal. Returns a list (possibly empty) of pattern hits.
-function detectPatterns(candles, ctx = {}, opt = {}) {
+// `variant`: 'default' (every existing caller, unchanged) or 'nse' (paperbot/bot.js's NSE
+// analyse() only) - picks which exhaustion-reversal rule runs, see exhaustionReversalConfirmed().
+function detectPatterns(candles, ctx = {}, opt = {}, variant = 'default') {
   const out = [];
-  for (const fn of DETECTORS) {
+  for (const fn of (variant === 'nse' ? DETECTORS_NSE : DETECTORS)) {
     const r = fn(candles, ctx, opt);
     if (r) out.push(r);
   }
@@ -258,7 +295,7 @@ function detectPatterns(candles, ctx = {}, opt = {}) {
 
 module.exports = {
   ema, vwap, atr, trendOf, detectPatterns,
-  exhaustionReversal, engulfing, hammer, shootingStar, star, insideBarBreakout,
+  exhaustionReversal, exhaustionReversalConfirmed, engulfing, hammer, shootingStar, star, insideBarBreakout,
   liquiditySweep, orderBlock, fvgRetest,
   isGreen, isRed, body, range, avg, round,
 };
