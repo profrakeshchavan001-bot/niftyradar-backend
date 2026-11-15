@@ -799,6 +799,11 @@ const paperState = require('./paperbot').attachPaperBot({
 // so the external pinger never itself looks "down" because of something downstream. Shows the last tick time
 // of every bot's own scan/monitor job (from the SAME health tracker every job records into), so a human glancing
 // at this URL can see which bot, if any, has gone quiet - the actual signal that the 14 Nov outage needed.
+// Strips anything that looks like a credential (a URL with a user:pass@ or a bearer/key-looking token) before an
+// error message ever reaches this public, unauthenticated route - belt-and-braces on top of every error message
+// in this codebase already being a plain Postgres/Binance error with no secret in it.
+const redactError = (msg) => String(msg || '').replace(/\/\/[^/\s]+:[^/\s]+@/g, '//<redacted>@').slice(0, 120);
+
 app.get('/health', (req, res) => {
   res.set('Cache-Control', 'no-store');
   const tracker = paperState && paperState.healthTracker;
@@ -807,18 +812,30 @@ app.get('/health', (req, res) => {
   const snap = tracker.snapshot();
   const jobs = {};
   let staleCount = 0;
+  let failingCount = 0;
+  let lastError = null; // the most recent failing job's own error, first 120 chars, no secrets
   for (const [name, j] of Object.entries(snap.jobs)) {
     const minutesAgo = Math.round((now - j.lastRunAt) / 60000);
     const isNse = /^nse/i.test(name);
     const stale = minutesAgo > 3 && !isNse; // NSE jobs are correctly idle outside market hours; everything else is 24/7
     if (stale) staleCount += 1;
-    jobs[name] = { lastRunAt: new Date(j.lastRunAt).toISOString(), minutesAgo, ok: j.ok, stale };
+    // A job "counts as ok" only if its LAST run finished without error (createHealthTracker.recordRun already
+    // only ever stores the last run's own ok/error per job, never an older success masking a newer failure).
+    if (j.ok === false) { failingCount += 1; lastError = { job: name, message: redactError(j.error) }; }
+    jobs[name] = { lastRunAt: new Date(j.lastRunAt).toISOString(), minutesAgo, ok: j.ok, stale, lastError: j.ok === false ? redactError(j.error) : null };
   }
+  const schemaErr = paperState && paperState.store && typeof paperState.store.schemaError === 'function' ? paperState.store.schemaError() : null;
+  const status = staleCount > 0 ? 'PROBLEM' : (failingCount > 0 || schemaErr) ? 'DEGRADED' : 'ALIVE';
+  const reasons = [];
+  if (staleCount > 0) reasons.push(`${staleCount} job(s) have not ticked in 3+ minutes`);
+  if (failingCount > 0) reasons.push(`${failingCount} job(s) failed on their last run`);
+  if (schemaErr) reasons.push('schema setup failed at boot (jobs still run against the existing schema)');
   res.json({
-    status: staleCount > 0 ? 'PROBLEM' : 'ALIVE',
-    reason: staleCount > 0 ? `${staleCount} job(s) have not ticked in 3+ minutes` : 'all 24/7 jobs ticking',
+    status,
+    reason: reasons.length ? reasons.join('; ') : 'all 24/7 jobs ticking, no job failing',
     asOf: new Date(now).toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
+    lastError,
     jobs,
   });
 });

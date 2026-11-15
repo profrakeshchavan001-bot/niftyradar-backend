@@ -341,7 +341,7 @@ test('wiring: scan every minute and monitor every minute; the report is behind t
 
 test('wiring: the paper_trades market CHECK constraint allows crypto_wide_scalp (a real Postgres would otherwise reject every scalp_wide insert)', () => {
   const sql = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'sql', 'paper_bot.sql'), 'utf8');
-  const checks = [...sql.matchAll(/paper_trades_market_check CHECK \(market IN \(([^)]+)\)\)/g)];
+  const checks = [...sql.matchAll(/paper_trades_market_check\s+CHECK \(market IN \(([^)]+)\)\)/g)];
   assert.ok(checks.length >= 1, 'the constraint must exist');
   const last = checks[checks.length - 1][1]; // the LAST ALTER wins (DROP + ADD is run top to bottom on every migrate)
   assert.match(last, /'crypto_wide_scalp'/);

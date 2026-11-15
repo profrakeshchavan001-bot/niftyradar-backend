@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS paper_config (
 
 CREATE TABLE IF NOT EXISTS paper_trades (
   id               bigserial PRIMARY KEY,
-  market           text NOT NULL CHECK (market IN ('nse', 'crypto')),
+  market           text NOT NULL CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp', 'crypto_wide_scalp')),
   symbol           text NOT NULL,
   trade_date       date NOT NULL,               -- IST date of the entry
   status           text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
@@ -112,13 +112,26 @@ ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS net_pnl_usdt   numeric;  -- af
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS cost_usdt      numeric;  -- fees + slippage
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS gross_pnl_inr  numeric;
 ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS be_moved       boolean;  -- the stop was moved to breakeven
-ALTER TABLE paper_trades DROP CONSTRAINT IF EXISTS paper_trades_market_check;
-ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp'));
 
--- scalp_wide (docs/SCALP.md "Scalp wide"): a second, slower crypto variant, own market key so it is excluded from the intraday report, the daily
--- summaries and the judge the same way 'crypto_scalp' already is (both end in '_scalp'; src/paper/scalp/bot.js and paperbot/store.js rely on that).
+-- Root-cause fix (15 Nov outage round 3, docs/decisions/CC... write-up): this used to be TWO separate
+-- DROP + ADD CONSTRAINT steps, one per market value added historically ('nse_scalp'/'crypto_scalp' here,
+-- then 'crypto_wide_scalp' further below). Postgres validates an ADD CONSTRAINT against every EXISTING row
+-- immediately, even though the very next statement in this same file replaced it with a wider list - so once
+-- any row actually used a later market value (e.g. 'crypto_wide_scalp'), this file re-validating itself on a
+-- later run (the bot's own store re-runs this whole file whenever the previous run failed, see
+-- paperbot/store.js) hit the FIRST, narrower ADD CONSTRAINT and aborted the script before ever reaching the
+-- correct, wider one further down - leaving every job's every write failing with "check constraint ... is
+-- violated by some row", forever, until this file itself was fixed.
+--
+-- Fix: exactly ONE statement, built from the single, superset list of every market value this bot has ever
+-- used ('src/paper/lib/paperTradeMarkets.js' is the one JS-side source of truth for that same list - keep
+-- both in sync, test/paperTradeMarkets.test.js checks it). ADD CONSTRAINT ... NOT VALID skips checking
+-- existing rows at add-time (it is enforced for every new insert/update from now on, which is all that ever
+-- mattered - the application code is the only writer and already only ever uses these values), so this can
+-- never again fail on data already in the table, however it got there.
 ALTER TABLE paper_trades DROP CONSTRAINT IF EXISTS paper_trades_market_check;
-ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp', 'crypto_wide_scalp'));
+ALTER TABLE paper_trades ADD CONSTRAINT paper_trades_market_check
+  CHECK (market IN ('nse', 'crypto', 'nse_scalp', 'crypto_scalp', 'crypto_wide_scalp')) NOT VALID;
 
 -- EMA crossover confirmation (CC2 item 5, src/paper/lib/emaCross.js): 'fresh_with' / 'fresh_against' /
 -- 'confirmed_with' / 'confirmed_against' / 'mixed' / 'unknown'. Informational only - never changes entry/exit.

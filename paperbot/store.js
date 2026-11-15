@@ -90,25 +90,39 @@ function fromRow(row) {
 
 const toParam = (col, v) => (v !== undefined && v !== null && JSON_COLS.has(col) ? JSON.stringify(v) : v === undefined ? null : v);
 
-// `getPool` is called on first use only (lazy connect). The tables are created
-// on that first connect (sql/paper_bot.sql is idempotent); a failed attempt is
-// tried again on the next query.
-function createPgStore(getPool) {
+// `getPool` is called on first use only (lazy connect). The tables are created on that first connect
+// (sql/paper_bot.sql is idempotent).
+//
+// Root-cause fix (15 Nov outage round 3): schema setup used to retry on EVERY single query forever whenever it
+// had failed once (`ready = null` on catch, re-thrown) - so once the migration file itself could fail against
+// existing data (see sql/paper_bot.sql's history), every store call from every job hit the exact same failure,
+// forever, with no real query ever getting a chance to run. Schema setup now runs (at most) once: a failure is
+// logged and remembered, never retried, and - critically - never blocks the real query that triggered it. The
+// tables this file creates/alters almost always already exist from an earlier successful run; a real query
+// failing on its own merits (a genuinely missing column, a bad connection) still surfaces its own real error,
+// exactly as before.
+function createPgStore(getPool, log = console.log) {
   let conn = null;
-  let ready = null;
+  let schemaAttempted = false;
+  let schemaError = null;
   const db = () => { if (!conn) conn = typeof getPool === 'function' ? getPool() : getPool; return conn; };
-  const ensure = () => {
-    if (!ready) {
-      ready = db().query(fs.readFileSync(path.join(__dirname, '..', 'sql', 'paper_bot.sql'), 'utf8')).catch((e) => { ready = null; throw e; });
+  const ensure = async () => {
+    if (schemaAttempted) return;
+    schemaAttempted = true;
+    try {
+      await db().query(fs.readFileSync(path.join(__dirname, '..', 'sql', 'paper_bot.sql'), 'utf8'));
+    } catch (e) {
+      schemaError = e;
+      log(`[paperbot] schema setup failed (logged, not retried; jobs continue - tables likely already exist from an earlier run): ${e.message}`);
     }
-    return ready;
   };
   const pool = { query: async (text, params) => { await ensure(); return db().query(text, params); } };
   const q = async (text, params) => (await pool.query(text, params)).rows.map(fromRow);
   return {
     kind: 'postgres',
     query: pool.query, // raw access for a plugin's own idempotent schema.sql (src/paper/pluginLoader.js); nothing existing uses this
-    init: ensure,
+    init: ensure, // call once at boot (paperbot/index.js); safe to call again, a no-op once schemaAttempted is true
+    schemaError: () => schemaError, // last schema-setup error, if any - surfaced read-only on GET /health
     async noteTrade(id, fields) { return this.updateTrade(id, fields); },
     async getConfig() {
       const rows = await q('SELECT key, value FROM paper_config');
@@ -184,6 +198,7 @@ function createCachedStore(inner, { now = Date.now, configTtlMs = 600000 } = {})
     ...inner,
     kind: inner.kind,
     init: () => inner.init(),
+    schemaError: () => (typeof inner.schemaError === 'function' ? inner.schemaError() : null),
     async getConfig() {
       if (!cfg || now() - cfg.at > configTtlMs) cfg = { value: await inner.getConfig(), at: now() };
       return copy(cfg.value);

@@ -64,7 +64,9 @@ function buildStore(env, log) {
     pool.on('error', (e) => log(`[paperbot] database error: ${e.message}`));
     return pool;
   };
-  return createCachedStore(createPgStore(makePool));
+  const store = createCachedStore(createPgStore(makePool, log));
+  store.init().catch((e) => log(`[paperbot] schema setup failed at boot (continuing): ${e.message}`)); // runs once, never blocks startup or any job
+  return store;
 }
 
 // Rules as stored, laid over the defaults. Reads only (the report routes must not write).
