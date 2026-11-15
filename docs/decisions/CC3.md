@@ -226,3 +226,66 @@ severity tier as a stale job or a down data source.
 both run by hand against a local Postgres 16 (not just asserted in the test suite): the upsert correctly replaces an existing
 row's value, and the count query correctly found 1 row inserted 90 minutes in the past. Not verified against live Binance or the
 real Supabase database - fixtures and a local throwaway Postgres only, as every round this session.
+
+# CC3 URGENT (15 Nov, ~00:30 UTC): the ~3-hour total write stall
+
+## Root cause: no Postgres statement_timeout, pool max 2
+
+A query that stalls mid-flight (a dropped TCP connection to Supabase, a frozen pooler) had NO timeout at all -
+`connectionTimeoutMillis` in `pgOptions()` only bounds ESTABLISHING a new connection, never a query already running on
+one. With the pool capped at 2 connections and 5+ bots sharing it, two such stalls at once exhaust the pool completely:
+every other job's write then queues forever, with no error anywhere - exactly "every table stops at once, cron still
+fires, `/api/paper/ping` still answers" (ping and most of health do not touch the DB at all).
+
+**Reproduced by hand** on a local Postgres 16: `pool.query('SELECT pg_sleep(30)')` x2 (pool max 2, no timeout) leaves a
+3rd, completely ordinary query pending indefinitely - confirmed it was STILL pending 5 seconds later with no sign of
+resolving. Adding `statement_timeout: 10000, query_timeout: 10000` to the pool options: both `pg_sleep(30)` calls are
+killed at ~10.0s ("canceling statement due to statement timeout" / "Query read timeout"), the connections are returned,
+and the 3rd query succeeds immediately after. This is the actual fix, not a guess - `paperbot/index.js` `pgOptions()`.
+
+**Also found and fixed while reproducing, real but secondary:**
+- `src/paper/scalp/index.js`'s shadow-schema creation was a bare, un-awaited fire-and-forget; the very first shadow
+  backfill (and potentially the first scan tick) could race it and fail with `relation "shadow_setups" does not exist`
+  - reproduced locally, now fixed the same way `exhaustion_only`/`trend_smc` already did it (round-3 urgent fix): the
+  backfill now `.then()`s off the schema promise instead of firing blind.
+- A second, more minor race remains between concurrent `CREATE TABLE IF NOT EXISTS` statements from different plugins
+  loading in parallel (a known Postgres gotcha - `IF NOT EXISTS` is not fully race-proof under true concurrency); seen
+  once as a harmless, already-caught-and-logged "duplicate key value violates... pg_type_typname_nsp_index" on
+  `exhaustion_only`'s own schema apply. Not chased further tonight - it is already non-fatal (the table the OTHER
+  concurrent creator made is still there and used correctly) and genuinely minor next to the real fix above.
+
+## What to check on Render logs (for the owner)
+
+Grep the Render logs around 14 Nov 21:25-21:35 UTC for `ECONNRESET`, `Connection terminated`, a Postgres/Supabase
+connection error, or several merges landing in quick succession (each merge restarts the live process, and several
+landed in that exact window - #49, #50, #51, this session's earlier #52). If the logs show nothing explicit at all for
+that window either, that itself is consistent with this root cause: a stalled query produces no error of its own, only
+silence, until something else (a restart) clears it.
+
+## Fixes (items 2-4)
+
+- `pgOptions()`: `statement_timeout`/`query_timeout` 10s (the real fix, above).
+- `guarded()`: every job now races against `maxMs` (25s default) - a hang anywhere else is abandoned and logged, never
+  silently wedging that job's own guard shut; `busy` additionally self-clears after `maxBusyMs` (75s) as a second,
+  independent safety net; the timeout's own internal timer is explicitly `clearTimeout`'d on the normal/fast path so it
+  never lingers.
+- Startup resume (item 4): every bot (`scalp`, `scalp_wide`, `exhaustion_only`, `trend_smc`) now runs its own `monitor()`
+  once immediately at startup (not waiting for the next cron tick), so a trade left open across a restart/outage - the
+  stuck `crypto_wide_scalp` ETHUSDT row - is checked against real candle history right away. Combined with the
+  statement_timeout fix, this is what actually closes it on the next deploy; not verified live (no route to Binance or
+  Render from this sandbox).
+- `/api/paper/health`: `lastDbWriteMinutesAgo` - the newest row across `paper_trades`, `paper_skips`, `shadow_setups`,
+  `exhaustion_only_trades`, `trend_smc_trades` in one query - PROBLEM at 10+ minutes. This is the check that would have
+  caught the actual outage directly, not inferred from a cron tick having merely fired.
+- **Not added, though asked for:** a flat "storage !== postgres -> PROBLEM". Every existing ALIVE/DEGRADED test in
+  `test/opsHealth.test.js` (and `paperReplaySafety.test.js`'s `shouldSkipAutoRun`) stands a plain memory store in as "the
+  database is fine" - adding this check turned every one of those into a false PROBLEM. `state.enabled`/`db.ok` already
+  cover "no database configured at all" today; rewriting that whole test baseline to tell a real memory *fallback* apart
+  from a memory store used as a *test double* was judged too large a change to make safely in this pass. Flagged, not
+  silently dropped.
+
+**VERIFY:** `node --test test/*.test.js` - 471 passing, 0 failing. The full fix stack (statement_timeout, the schema-race
+fix, startup resume, backfill) booted end to end against a fresh local Postgres with the real `attachPaperBot()` wiring
+and a deliberately-failing axios (simulating Binance being unreachable, as it is from this sandbox): no race errors, no
+hangs, every bot's startup resume and backfill ran and logged `checked 0, closed 0` / `0/0` correctly on the empty
+database. Not verified against live Binance, live Render, or the real Supabase database.

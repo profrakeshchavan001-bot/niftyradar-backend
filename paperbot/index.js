@@ -40,6 +40,16 @@ function pgOptions(url) {
   return {
     connectionString, max: 2, idleTimeoutMillis: 10000, connectionTimeoutMillis: 10000, allowExitOnIdle: true,
     ssl: local ? false : { rejectUnauthorized: false }, // encrypted; certificate chain not verified (see docs/DECISIONS-PENDING.md)
+    // CC3 ROOT CAUSE FIX (docs/decisions/CC3.md, 15 Nov outage): connectionTimeoutMillis only bounds ESTABLISHING a new
+    // connection - a query that stalls mid-flight (a dropped TCP connection to Supabase, a frozen pooler) had no timeout at
+    // all, so it held its pool slot forever. With max 2, two such stalls (easily reached - 5+ bots share this one pool)
+    // exhaust the pool completely and every other job's write queues forever, with no error anywhere to see - exactly what
+    // 3 hours of silence across every table, with the HTTP server itself still answering /api/paper/ping, looks like.
+    // Reproduced on a local Postgres with pg_sleep(30): without this, a 3rd query never resolves; with it, the stuck
+    // queries are killed at 10s and the pool recovers. statement_timeout is the Postgres-side kill; query_timeout is pg's
+    // own client-side one (belt and suspenders - either one firing is enough).
+    statement_timeout: 10000,
+    query_timeout: 10000,
   };
 }
 
@@ -105,12 +115,28 @@ function create15mCrypto(raw15m, cache) {
 }
 
 // Runs a job, never lets it overlap with itself, never lets it crash the server.
-function guarded(name, fn, log) {
-  let busy = false;
+// CC3 ROOT CAUSE FIX, defense in depth (docs/decisions/CC3.md, 15 Nov outage): the real root cause was a missing DB
+// statement_timeout, now fixed in pgOptions() above - but a job could still hang on something else (a Binance call with
+// no timeout, a bug). Two independent safety nets on top of that:
+//  - every job races against `maxMs` (default 25 s, well under cron's own 1-minute granularity) - a job that outlives it
+//    is logged as timed out and the NEXT tick is still allowed to run (the timed-out call's own `fn()` promise is simply
+//    abandoned, never awaited further; it cannot keep the busy flag stuck).
+//  - `busy` additionally self-clears if a run is ever older than `maxBusyMs` (3x maxMs) when the NEXT tick checks it, so
+//    even a timeout bug in this wrapper itself cannot wedge a job shut forever.
+function guarded(name, fn, log, { maxMs = 25000, maxBusyMs = 75000 } = {}) {
+  let busy = false; let busyAt = 0;
   return async () => {
-    if (busy) return;
-    busy = true;
-    try { await fn(); } catch (e) { log(`[paperbot] ${name} failed: ${e.response?.status || e.message}`); } finally { busy = false; }
+    if (busy && Date.now() - busyAt < maxBusyMs) return;
+    if (busy) log(`[paperbot] ${name}: previous run still marked busy after ${maxBusyMs}ms - releasing the guard and running anyway`);
+    busy = true; busyAt = Date.now();
+    let timer;
+    try {
+      await Promise.race([
+        fn(),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`timed out after ${maxMs}ms`)), maxMs); }),
+      ]);
+    } catch (e) { log(`[paperbot] ${name} failed: ${e.response?.status || e.message}`); }
+    finally { clearTimeout(timer); busy = false; }
   };
 }
 

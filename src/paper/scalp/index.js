@@ -31,7 +31,11 @@ function attachScalp({ app, cron, axios, env = process.env, log = console.log, s
   });
   if (!scalpOn) { log('[scalp] disabled (PAPER_SCALP_ENABLED=false)'); return { enabled: false }; }
   const shadowStore = pool ? createPgShadowStore(pool) : createMemoryShadowStore();
-  if (pool) ensureShadowSchema(pool, log); // fire-and-forget, same as every other idempotic schema here (schema.sql is additive and safe to race)
+  // CC3 urgent fix (docs/decisions/CC3.md): this was a bare fire-and-forget with no wait anywhere - reproduced locally, the
+  // very first backfill (and the first scan tick, if it lands before this finishes) could race the schema and fail with
+  // "relation shadow_setups does not exist". Crons are scheduled immediately regardless (none fire for several seconds,
+  // real cron-second offsets below), but the one-time backfill now waits for the schema to actually be there first.
+  const shadowSchemaReady = pool ? ensureShadowSchema(pool, log) : Promise.resolve();
   const bot = createScalpBot({ store, crypto, source1m: createScalpSource({ axios }), shadowStore, now, log });
   const tz = { timezone: 'Asia/Kolkata' };
   cron.schedule('5 * * * * *', guarded('scalp scan', bot.cryptoScalpScan, log), tz);
@@ -39,7 +43,12 @@ function attachScalp({ app, cron, axios, env = process.env, log = console.log, s
   cron.schedule('10 */5 * * * *', guarded('scalp_wide scan', bot.cryptoScalpWideScan, log), tz);
   cron.schedule('40 * * * * *', guarded('scalp_wide monitor', bot.cryptoScalpWideMonitor, log), tz);
   bot.nseScalpScan(); // logs once why NSE scalp does not run
-  bot.backfillShadows().catch((e) => log(`[scalp] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2, fire-and-forget at startup
+  shadowSchemaReady.then(() => bot.backfillShadows()).catch((e) => log(`[scalp] shadow backfill failed: ${e.message}`)); // CC3 urgent fix item 2
+  // CC3 urgent fix item 4: resume monitoring of any already-open trade immediately on startup (its own stop/target/time
+  // rule against real candle history), not wait for the next cron tick - this is what actually closes a trade left open
+  // across a restart/outage (e.g. the stuck crypto_wide_scalp ETHUSDT row from the 15 Nov outage).
+  bot.cryptoScalpMonitor().then((r) => log(`[scalp] startup resume: checked ${r.checked}, closed ${r.closed}`)).catch((e) => log(`[scalp] startup resume failed: ${e.message}`));
+  bot.cryptoScalpWideMonitor().then((r) => log(`[scalp_wide] startup resume: checked ${r.checked}, closed ${r.closed}`)).catch((e) => log(`[scalp_wide] startup resume failed: ${e.message}`));
   log('[scalp] ready (PAPER ONLY, crypto 1-minute scalps + 5-minute scalp_wide; report: /api/paper/scalp-report)');
   return { enabled: true, bot };
 }
