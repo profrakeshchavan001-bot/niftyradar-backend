@@ -53,9 +53,32 @@ async function closedTradesByBot(ctx) {
     intraday_mirror = pool ? (await pool.query("SELECT * FROM intraday_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
       : (ctx.intradayMirrorMemoryStore ? await ctx.intradayMirrorMemoryStore.closedTrades() : []);
   } catch (e) { /* table not there yet - treat as no trades */ }
+  // mcx_gold / mcx_crude (this task, src/paper/bots/mcx_gold, mcx_crude) + their mirrors: own tables, same
+  // "not there yet = empty row, never an error" rule.
+  let mcx_gold = [];
+  try {
+    mcx_gold = pool ? (await pool.query("SELECT * FROM mcx_gold_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.mcxGoldMemoryStore ? await ctx.mcxGoldMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
+  let mcx_crude = [];
+  try {
+    mcx_crude = pool ? (await pool.query("SELECT * FROM mcx_crude_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.mcxCrudeMemoryStore ? await ctx.mcxCrudeMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
+  let mcx_gold_mirror = [];
+  try {
+    mcx_gold_mirror = pool ? (await pool.query("SELECT * FROM mcx_gold_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.mcxGoldMirrorMemoryStore ? await ctx.mcxGoldMirrorMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
+  let mcx_crude_mirror = [];
+  try {
+    mcx_crude_mirror = pool ? (await pool.query("SELECT * FROM mcx_crude_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.mcxCrudeMirrorMemoryStore ? await ctx.mcxCrudeMirrorMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
   return {
     intraday, scalp, scalp_wide, exhaustion_only, trend_smc,
     exhaustion_only_mirror, trend_smc_mirror, scalp_mirror, scalp_wide_mirror, intraday_mirror,
+    mcx_gold, mcx_crude, mcx_gold_mirror, mcx_crude_mirror,
   };
 }
 

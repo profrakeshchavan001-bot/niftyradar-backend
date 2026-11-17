@@ -47,4 +47,15 @@ function nseJobWindow(ms) {
   return { open: true, reason: '' };
 }
 
-module.exports = { istParts, toMinutes, istDayStart, nseSession, nseJobWindow, IST_OFFSET_MS };
+// MCX commodity session (gold/crude futures, non-agri): Mon-Fri 09:00-23:30 IST, not on a listed MCX
+// holiday. Same shape and convention as nseSession() above, just a different window and its own holiday
+// list (MCX holidays are not identical to NSE's - each bot passes its own cfg.holidays).
+function mcxSession(ms, holidays = []) {
+  const p = istParts(ms);
+  if (p.dow === 0 || p.dow === 6) return { open: false, reason: 'weekend' };
+  if (holidays.includes(p.date)) return { open: false, reason: 'MCX holiday' };
+  if (p.minutes < 540 || p.minutes > 1410) return { open: false, reason: 'outside 09:00-23:30 IST MCX session' };
+  return { open: true, reason: '' };
+}
+
+module.exports = { istParts, toMinutes, istDayStart, nseSession, nseJobWindow, mcxSession, IST_OFFSET_MS };

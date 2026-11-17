@@ -27,6 +27,9 @@ const { loadTrendSmcConfig, TREND_SMC_DEFAULTS } = require('../src/paper/bots/tr
 const { settle: settleScalp } = require('../src/paper/scalp/engine');
 const { loadScalpConfig, loadScalpWideConfig, SCALP_DEFAULTS, SCALP_WIDE_DEFAULTS } = require('../src/paper/scalp/config');
 const { MARKET: SCALP_MARKET, MARKET_WIDE: SCALP_WIDE_MARKET } = require('../src/paper/scalp/bot');
+const { createPgMcxStore } = require('../src/paper/lib/mcxStore');
+const { loadMcxGoldConfig, MCX_GOLD_DEFAULTS } = require('../src/paper/bots/mcx_gold/config');
+const { loadMcxCrudeConfig, MCX_CRUDE_DEFAULTS } = require('../src/paper/bots/mcx_crude/config');
 const { createPgMirrorStore } = require('../src/paper/lib/mirrorStore');
 const { createMirrorBot } = require('../src/paper/lib/mirrorBot');
 const { computeBotStats } = require('../src/paper/bots/leaderboard/stats');
@@ -48,6 +51,8 @@ const REPORT_PATH = path.join(__dirname, '..', 'docs', 'MIRROR-BACKFILL-REPORT.m
 function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
   const exhaustionStore = createPgExhaustionStore(pool);
   const trendSmcStore = createPgTrendSmcStore(pool);
+  const mcxGoldStore = createPgMcxStore(pool, 'mcx_gold_trades');
+  const mcxCrudeStore = createPgMcxStore(pool, 'mcx_crude_trades');
   return [
     {
       // intraday (the main crypto bot, paperbot/bot.js's cryptoScan/cryptoMonitor): no own table, reads
@@ -82,6 +87,20 @@ function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
       settle: settleScalp, loadCfg: () => loadScalpWideConfig(mainStore),
       capitalTotal: SCALP_WIDE_DEFAULTS.capital_usdt, usdInrFallback,
     },
+    // mcx_gold / mcx_crude (this task): own tables (src/paper/bots/mcx_gold, mcx_crude), reuse the same
+    // scalp_wide settle() (src/paper/scalp/engine.js) their own bot.js uses. nativeInr: true - their
+    // prices/qty are already INR (the proxy source converts before the bot ever sees a candle, fx_rate
+    // always 1), so computeCapitalState must not apply a second USD->INR conversion (see sideSummary below).
+    {
+      bot: 'mcx_gold', mirrorLabel: 'mcx_gold-MIRROR', mirrorTable: 'mcx_gold_mirror_trades',
+      originalStore: mcxGoldStore, settle: settleScalp, loadCfg: () => loadMcxGoldConfig(mainStore),
+      capitalTotal: MCX_GOLD_DEFAULTS.capital_inr, usdInrFallback, nativeInr: true,
+    },
+    {
+      bot: 'mcx_crude', mirrorLabel: 'mcx_crude-MIRROR', mirrorTable: 'mcx_crude_mirror_trades',
+      originalStore: mcxCrudeStore, settle: settleScalp, loadCfg: () => loadMcxCrudeConfig(mainStore),
+      capitalTotal: MCX_CRUDE_DEFAULTS.capital_inr, usdInrFallback, nativeInr: true,
+    },
   ];
 }
 
@@ -90,10 +109,10 @@ function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
 // currently-open trades) + `capitalTotal` feed computeCapitalState() for the "capital used" (locked)
 // figure (Task: add capital to this report) - capitalTotalInr/capitalUsedInr are null, never 0 or
 // guessed, when there is no capitalTotal or no USDINR_FALLBACK rate to express it in rupees with.
-function sideSummary(closed, open = [], { capitalTotal, usdInrFallback } = {}) {
+function sideSummary(closed, open = [], { capitalTotal, usdInrFallback, nativeInr = false } = {}) {
   const s = computeBotStats(closed, 1); // 1, not the usual 20-trade floor: a backfill wants every number, ranked or not
-  const fx = usdInrFallback ? { rate: Number(usdInrFallback) } : null;
-  const capital = computeCapitalState({ capitalTotal, closedTrades: [], openTrades: open, nativeInr: false, usdInrFallback, fx });
+  const fx = nativeInr ? { rate: 1 } : (usdInrFallback ? { rate: Number(usdInrFallback) } : null);
+  const capital = computeCapitalState({ capitalTotal, closedTrades: [], openTrades: open, nativeInr, usdInrFallback, fx });
   return {
     trades: s.trades, netPnlInr: s.netPnlInr, grossPnlInr: s.grossPnlInr, feesInr: s.costsInr, winRatePct: s.winRatePct,
     capitalTotalInr: capital ? capital.totalInr : null,
@@ -109,7 +128,7 @@ async function runJob(job) {
     job.originalStore.closedTrades(), mirrorStore.closedTrades(),
     job.originalStore.allOpenTrades(), mirrorStore.allOpenTrades(),
   ]);
-  const sideOpts = { capitalTotal: job.capitalTotal, usdInrFallback: job.usdInrFallback };
+  const sideOpts = { capitalTotal: job.capitalTotal, usdInrFallback: job.usdInrFallback, nativeInr: job.nativeInr };
   return {
     bot: job.bot, mirrorLabel: job.mirrorLabel, opened, closedThisRun: closed,
     original: sideSummary(originalClosed, originalOpen, sideOpts), mirror: sideSummary(mirrorClosed, mirrorOpen, sideOpts),
