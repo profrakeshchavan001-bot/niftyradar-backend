@@ -33,4 +33,18 @@ function nseSession(ms, holidays = []) {
   return { open: true, reason: '' };
 }
 
-module.exports = { istParts, toMinutes, istDayStart, nseSession, IST_OFFSET_MS };
+// Buffered NSE job window: Mon-Fri 09:00-15:45 IST (the 15-min buffer either side of the real
+// 09:15-15:30 session, for open/close handling), weekday/time only - deliberately NOT holiday-aware.
+// This is the cheap, database-free gate nseScan/nseMonitor check FIRST, before loadConfig() even
+// reads the holiday list, so a weekend or an overnight tick costs nothing beyond a clock read (root
+// cause of the Neon compute waste: every cron tick used to hit the database before checking the time).
+// The real market-open decision (session.open, including holidays) still happens inside nseScan via
+// nseSession() once cfg.nse.holidays is loaded; this window is only ever wider, never narrower.
+function nseJobWindow(ms) {
+  const p = istParts(ms);
+  if (p.dow === 0 || p.dow === 6) return { open: false, reason: 'weekend' };
+  if (p.minutes < 540 || p.minutes > 945) return { open: false, reason: 'outside 09:00-15:45 IST job window' };
+  return { open: true, reason: '' };
+}
+
+module.exports = { istParts, toMinutes, istDayStart, nseSession, nseJobWindow, IST_OFFSET_MS };

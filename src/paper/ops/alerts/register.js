@@ -12,16 +12,27 @@
  * header) - only per-JOB failures are tracked. The alert below fires on 3 consecutive job failures, which
  * is related but not the same thing; real per-source alerting needs the same follow-up hook into
  * paperbot/sources.js / paperbot/yahoo.js that health.js's dataSources section is waiting on.
+ *
+ * Root-cause fix (night/weekend false alerts): nseScan/nseMonitor are CORRECTLY idle outside NSE market
+ * hours (paperbot/time.js's nseSession - same gate src/paper/ops/health.js already uses for ALIVE vs
+ * DEGRADED). Before this fix, `check()` judged every job's staleness the same way regardless of the
+ * time of day, so it paged "nseScan/nseMonitor has not scanned in 15+ minutes" every night and every
+ * weekend. Now an NSE job's staleness is only even looked at while the market is open; outside that
+ * window nothing is raised and nothing is sent, for that job, full stop. Crypto jobs are unaffected -
+ * no session gate, 24x7 as before.
  */
 const path = require('path');
-const { defaultTracker, JOB_NAMES, STALE_MS } = require('../health');
+const { defaultTracker, JOB_NAMES, NSE_JOBS, STALE_MS } = require('../health');
+const { nseSession } = require('../../../../paperbot/time');
 
 const CONSEC_FAIL_THRESHOLD = 3;
 const DEDUPE_MS = 15 * 60 * 1000; // never store/send the same alert more than once per 15 min
 
 // `tracker` defaults to the shared singleton (same one GET /api/paper/health and /home read); tests pass
 // their own createHealthTracker() instance instead so they never interfere with each other.
-function register({ cron, env, log, pool, tracker = defaultTracker() }) {
+// `state` is the mutable paperbot state object (holds state.holidays, kept current by onConfig in
+// paperbot/index.js); optional so a caller/test with no NSE holidays to report can omit it entirely.
+function register({ cron, env, log, pool, tracker = defaultTracker(), state }) {
   const lastRaised = new Map(); // "kind:subject" -> ms, in-memory guard (works even without a database)
 
   async function raise(kind, subject, message, now) {
@@ -43,7 +54,11 @@ function register({ cron, env, log, pool, tracker = defaultTracker() }) {
 
   async function check(now = Date.now()) {
     const snap = tracker.snapshot();
+    const session = nseSession(now, (state && state.holidays) || []);
     for (const name of JOB_NAMES) {
+      // NSE closed (night, weekend, or a listed holiday): nseScan/nseMonitor are expected to be idle,
+      // not stuck - send nothing for them. Crypto jobs (not in NSE_JOBS) are never gated: 24x7.
+      if (NSE_JOBS.includes(name) && !session.open) continue;
       const j = snap.jobs[name];
       const staleFor = j ? now - j.lastRunAt : null;
       if (j == null || staleFor > STALE_MS) await raise('stale_job', name, `${name} has not scanned in 15+ minutes${j ? ` (last scan ${Math.round(staleFor / 60000)}m ago)` : ' (never scanned)'}`, now);
