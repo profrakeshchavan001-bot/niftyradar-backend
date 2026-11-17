@@ -47,6 +47,7 @@ const { DEFAULTS: PAPERBOT_DEFAULTS } = require('../../../../paperbot/config');
 const { SCALP_DEFAULTS, SCALP_WIDE_DEFAULTS } = require('../../scalp/config');
 const { EXHAUSTION_ONLY_DEFAULTS } = require('../../bots/exhaustion_only/config');
 const { TREND_SMC_DEFAULTS } = require('../../bots/trend_smc/config');
+const { CCY_WIDE_DEFAULTS } = require('../../lib/currencyConfig');
 // mcx_gold/mcx_crude (this task): own tables, own capital_inr (already INR - no FX step), priced from a
 // PROXY feed (src/paper/lib/yahooFutures.js) - see each bot's own register.js for that caveat.
 const { MCX_GOLD_DEFAULTS } = require('../../bots/mcx_gold/config');
@@ -84,6 +85,19 @@ const OWN_TABLE_BOTS = {
   // intraday-MIRROR (new, this task): mirrors ONLY the 'crypto' market (see src/paper/bots/intraday_mirror/
   // register.js) - same capitalTotal as the intraday bot it mirrors.
   intraday_mirror: { label: 'intraday-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'intradayMirrorMemoryStore', capitalTotal: PAPERBOT_DEFAULTS.crypto.capital_usdt },
+  // ccy_* (new, this task): NSE currency futures USDINR/EURINR/GBPINR/JPYINR, src/paper/bots/ccy_*/ +
+  // their _mirror siblings. Already rupees-native (src/paper/lib/currencyEngine.js's settleInr(), no fx
+  // step) - same { nativeInr: true, costPct: 0 } convention as the nse/nse_scalp rows above, not the
+  // crypto one. capitalTotal is each pair's own CCY_WIDE_DEFAULTS.capital_inr
+  // (src/paper/lib/currencyConfig.js) - all four pairs share the same default capital today.
+  ccy_usdinr: { label: 'ccy_usdinr', nativeInr: true, costPct: 0, ctxKey: 'ccyUsdinrMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  ccy_eurinr: { label: 'ccy_eurinr', nativeInr: true, costPct: 0, ctxKey: 'ccyEurinrMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  ccy_gbpinr: { label: 'ccy_gbpinr', nativeInr: true, costPct: 0, ctxKey: 'ccyGbpinrMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  ccy_jpyinr: { label: 'ccy_jpyinr', nativeInr: true, costPct: 0, ctxKey: 'ccyJpyinrMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  ccy_usdinr_mirror: { label: 'ccy_usdinr-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'ccyUsdinrMirrorMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  ccy_eurinr_mirror: { label: 'ccy_eurinr-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'ccyEurinrMirrorMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  ccy_gbpinr_mirror: { label: 'ccy_gbpinr-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'ccyGbpinrMirrorMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  ccy_jpyinr_mirror: { label: 'ccy_jpyinr-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'ccyJpyinrMirrorMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
   // mcx_gold / mcx_crude (this task, src/paper/bots/mcx_gold, mcx_crude): own table, nativeInr: true -
   // their prices are already converted to INR before anything stores them (the proxy source converts
   // USD -> INR before the bot ever sees a candle; settle() always runs with fxRate 1), same convention
