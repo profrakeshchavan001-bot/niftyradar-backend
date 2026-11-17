@@ -5,7 +5,7 @@
 // a weekend) so nseSession's own day-of-week/holiday checks stay out of the way.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { istParts, istDayStart, nseSession } = require('../paperbot/time');
+const { istParts, istDayStart, nseSession, nseJobWindow } = require('../paperbot/time');
 
 const utc = (h, m = 0, s = 0, day = 16) => Date.UTC(2026, 10, day, h, m, s);
 
@@ -68,4 +68,40 @@ test('nseSession: a listed holiday closes the market even at 09:15 IST on a week
   const t = utc(3, 45, 0); // Monday 16 Nov 2026, 09:15 IST
   assert.deepEqual([nseSession(t, ['2026-11-16']).open, nseSession(t, ['2026-11-16']).reason], [false, 'NSE holiday']);
   assert.equal(nseSession(t, ['2026-11-24']).open, true); // a different holiday date does not affect this day
+});
+
+// nseJobWindow: the buffered 09:00-15:45 IST window nseScan/nseMonitor check BEFORE touching the
+// database (root cause of the Neon compute waste - see paperbot/time.js and paperbot/bot.js). It is
+// deliberately wider than nseSession and deliberately NOT holiday-aware (see its own header comment).
+test('nseJobWindow: 09:00 IST open, 08:59 IST closed (the 15-minute pre-open buffer)', () => {
+  const open = utc(3, 30, 0); // 09:00 IST
+  assert.equal(nseJobWindow(open).open, true);
+  assert.equal(nseJobWindow(open - 1000).open, false); // 08:59:59 IST
+});
+
+test('nseJobWindow: 15:45 IST still open (the whole minute), 15:46 IST closed (the 15-minute post-close buffer)', () => {
+  const t = utc(10, 15, 0); // 15:45 IST
+  assert.equal(nseJobWindow(t).open, true);
+  assert.equal(nseJobWindow(t + 59000).open, true); // 15:45:59 IST
+  assert.equal(nseJobWindow(t + 60000).open, false); // 15:46:00 IST
+});
+
+test('nseJobWindow: wider than nseSession on both edges (09:05 and 15:40 IST are job-window-open, session-closed)', () => {
+  const preOpen = utc(3, 35, 0); // 09:05 IST: before the 09:15 session open
+  const postClose = utc(10, 10, 0); // 15:40 IST: after the 15:30 session close
+  assert.deepEqual([nseJobWindow(preOpen).open, nseSession(preOpen).open], [true, false]);
+  assert.deepEqual([nseJobWindow(postClose).open, nseSession(postClose).open], [true, false]);
+});
+
+test('nseJobWindow: Saturday and Sunday are closed at every hour, even 09:00-15:45', () => {
+  const satOpenHour = Date.UTC(2026, 10, 14, 3, 30, 0); // Sat 14 Nov 2026, 09:00 IST
+  const sunOpenHour = Date.UTC(2026, 10, 15, 3, 30, 0); // Sun 15 Nov 2026, 09:00 IST
+  assert.deepEqual([nseJobWindow(satOpenHour).open, nseJobWindow(satOpenHour).reason], [false, 'weekend']);
+  assert.deepEqual([nseJobWindow(sunOpenHour).open, nseJobWindow(sunOpenHour).reason], [false, 'weekend']);
+});
+
+test('nseJobWindow: NOT holiday-aware by itself (a listed NSE holiday still reads open; nseScan still checks nseSession for that)', () => {
+  const t = utc(3, 45, 0); // Monday 16 Nov 2026, 09:15 IST, pretend-listed as a holiday below
+  assert.equal(nseJobWindow(t).open, true);
+  assert.equal(nseSession(t, ['2026-11-16']).open, false); // the real holiday gate, checked separately inside nseScan
 });

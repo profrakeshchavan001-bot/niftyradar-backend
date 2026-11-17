@@ -9,7 +9,7 @@ const R = require('./rfactor');
 const L = require('./cryptoLevels');
 const { loadConfig } = require('./config');
 const { newsCheck, FIVE_MIN } = require('./sources');
-const { istParts, toMinutes, istDayStart, nseSession } = require('./time');
+const { istParts, toMinutes, istDayStart, nseSession, nseJobWindow } = require('./time');
 const { createJudge, loadJudgeConfig, tradeFields } = require('../src/paper/decision/judge');
 const { judge2, tradeFields2 } = require('../src/paper/decision/judge2');
 const { createShadowJudge } = require('../src/paper/decision/judgeSmcShadow');
@@ -168,6 +168,11 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
 
   // ---------------- NSE ----------------
   async function nseScan() {
+    // Root-cause fix: skip BEFORE the database read on a weekend/overnight tick (the buffered job
+    // window, wider than the real session) - the Neon compute the old code spent on loadConfig() just
+    // to find out the market was shut, every 5 minutes, all night and all weekend.
+    const jobWindow = nseJobWindow(now());
+    if (!jobWindow.open) return { ran: false, reason: jobWindow.reason };
     const cfg = await loadConfig(store);
     onConfig(cfg);
     const n = { ...cfg.nse, patternOpt: cfg.patterns };
@@ -276,6 +281,9 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
   }
 
   async function nseMonitor() {
+    // Same root-cause fix as nseScan: no database read at all outside the buffered job window.
+    const jobWindow = nseJobWindow(now());
+    if (!jobWindow.open) return { checked: 0, ran: false, reason: jobWindow.reason };
     const open = await store.openTrades('nse');
     if (!open.length) return { checked: 0 };
     const cfg = await loadConfig(store);

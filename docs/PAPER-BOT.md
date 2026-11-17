@@ -16,6 +16,16 @@ Solves: "trade the top R-factor stocks in demo using candle patterns, log WHY ea
 | 23:55 daily | Crypto summary |
 | Sunday 10:00 | Weekly suggestions report (nothing is applied) |
 
+NSE scan and exit-check cron ticks still fire on their own 9-15 hour range, but both functions return
+immediately - no config load, no database read, no candle/quote fetch - outside the buffered
+**09:00-15:45 IST** job window (`paperbot/time.js`'s `nseJobWindow`, Mon-Fri only, weekend always
+closed). That buffer exists only for open/close handling around the real 09:15-15:30 session; the
+actual NSE-holiday check still happens inside `nseScan` via `nseSession` once the holiday list is
+loaded. The "has not scanned in 15+ minutes" alert (`src/paper/ops/alerts/register.js`) is gated the
+same way the overnight health page already was: nothing is raised or sent for nseScan/nseMonitor while
+the market is closed (night, weekend, or a listed holiday); crypto's jobs are never gated, 24x7 as
+before.
+
 ## Patterns
 
 `exhaustion_reversal` (may trade against the trend), `bullish_engulfing`, `bearish_engulfing`, `hammer`, `shooting_star`, `morning_star`, `evening_star`, `inside_bar_breakout`, `liquidity_sweep`, `order_block`, `fvg_retest`. Exact rules are in the comments of `paperbot/patterns.js`.
