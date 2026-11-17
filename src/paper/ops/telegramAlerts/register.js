@@ -23,8 +23,10 @@
  * they are formatted with { nativeInr: true, costPct: 0 }, matching that real booking exactly, not an
  * invented fee. The crypto-denominated bots (intraday/scalp/scalp_wide and now exhaustion_only/trend_smc,
  * which use the exact same USDT + fx_rate + 0.23% round-trip-cost convention as the scalp bots'
- * settle()/costPct()) keep the original { nativeInr: false } path: the trade's own fx_rate, else
- * USDINR_FALLBACK, else shown in USD with "rate n/a" - never a silently invented rate.
+ * settle()/costPct()) keep the original { nativeInr: false } path, now (Task 1 fix) with a live/fallback
+ * rate resolved once per source per poll tick (see resolveLiveRate below): the trade's own fx_rate, else
+ * that live/fallback rate, else USDINR_FALLBACK, else a hard-coded default - never shown in USD with
+ * "rate n/a" any more, and never a silently invented rate either (every tier is a real, configured number).
  *
  * Rules followed: polls on a timer (never inside a bot's own code), DB-backed dedupe (never sent twice,
  * even after a redeploy; falls back to an in-memory Set when there is no database, logged once), a
@@ -111,6 +113,44 @@ const OWN_TABLE_BOTS = {
 
 const POLL_MS = 20000;
 
+// Task 1 root-cause fix: an entry alert for a crypto-denominated bot used to show "$X (rate n/a)" because
+// a trade's own fx_rate is set ONLY at exit time (paperbot/bot.js's closeTrade) and USDINR_FALLBACK is
+// usually unset. `ctx.cachedCrypto` is the SAME shared, cached Binance+CoinGecko source every src/paper/
+// bots/ plugin already gets (threaded from paperbot/index.js's attachPaperBot -> pluginLoader.loadPlugins),
+// and its `usdtInr(fallback)` is the EXACT SAME live-rate call cryptoMonitor() already makes before every
+// real exit (paperbot/bot.js) - reused here verbatim, never a second rate source. It never throws (its own
+// try/catch already falls back to `fallback` and logs once there - paperbot/sources.js), so the try/catch
+// below only guards a missing/mis-shaped ctx.cachedCrypto itself.
+//
+// Resolved ONCE PER SOURCE PER POLL TICK (called from check(), outside the per-trade loop below) - never
+// once per trade - and logged at most once ever per bot label when a fallback tier had to be used, the
+// same "log once, not spammy" pattern as `warnedMissingStore` below. `warnedFxFallback` is created fresh
+// inside register(ctx) (like `warnedMissingStore`), never at module scope - a module-level Set would keep
+// state across unrelated register() calls (e.g. in tests, or a hot-reload) and under-log for good.
+function resolveLiveRate(cachedCrypto, env, log, botLabel, warnedFxFallback) {
+  if (!cachedCrypto || typeof cachedCrypto.usdtInr !== 'function') {
+    if (!warnedFxFallback.has(botLabel)) { log(`[telegram-alerts] ${botLabel}: no shared crypto source on ctx - entry/capital-line fx falls back to USDINR_FALLBACK/default only`); warnedFxFallback.add(botLabel); }
+    return Promise.resolve(null);
+  }
+  const envFallback = Number(env.USDINR_FALLBACK);
+  // priority (c) env USDINR_FALLBACK > (d) the bot's own usdt_inr_fallback default (88) - usdtInr() falls
+  // back to WHATEVER is passed here if CoinGecko itself cannot be reached, so this one call already covers
+  // tiers (b)/(c)/(d) of format.js's fxInfo in the normal case; fxInfo's own (c)/(d) tiers are then only a
+  // backstop for when ctx.cachedCrypto is absent entirely (see the branch above).
+  const fallback = envFallback > 0 ? envFallback : PAPERBOT_DEFAULTS.crypto.usdt_inr_fallback;
+  return cachedCrypto.usdtInr(fallback).then((fx) => {
+    if (!fx || !(Number(fx.rate) > 0)) return null;
+    if (fx.source !== 'coingecko' && !warnedFxFallback.has(botLabel)) {
+      log(`[telegram-alerts] ${botLabel}: live USDT/INR rate unavailable - entry/capital-line fx uses the fallback rate ${fx.rate} (source: ${fx.source})`);
+      warnedFxFallback.add(botLabel);
+    }
+    return { rate: Number(fx.rate), source: fx.source };
+  }).catch((e) => {
+    if (!warnedFxFallback.has(botLabel)) { log(`[telegram-alerts] ${botLabel}: live fx rate fetch failed (${e.message}) - entry/capital-line fx falls back to USDINR_FALLBACK/default`); warnedFxFallback.add(botLabel); }
+    return null;
+  });
+}
+
 async function sendTelegram(axios, token, chat, text, log) {
   try {
     await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, { chat_id: chat, text: text.slice(0, 4000) }, { timeout: 5000 });
@@ -122,7 +162,7 @@ async function sendTelegram(axios, token, chat, text, log) {
 }
 
 function register(ctx) {
-  const { env, log, pool, state, axios = require('axios'), cron, now = Date.now } = ctx;
+  const { env, log, pool, state, axios = require('axios'), cron, now = Date.now, cachedCrypto } = ctx;
   const tradeAlertsOn = String(env.TELEGRAM_TRADE_ALERTS || '').toLowerCase() === 'on';
   const exitAlertsOn = String(env.TELEGRAM_EXIT_ALERTS ?? 'on').toLowerCase() !== 'off';
   const token = env.TELEGRAM_BOT_TOKEN;
@@ -141,6 +181,7 @@ function register(ctx) {
   if (!pool) log('[telegram-alerts] no database pool: dedupe is in-memory only, not safe across a redeploy');
   const rateLimiter = createRateLimiter({ now });
   const warnedMissingStore = new Set(); // own-table bot label -> logged once, not every 20s poll
+  const warnedFxFallback = new Set(); // bot label -> already logged that entry/capital-line fx is using a non-live fallback (Task 1)
 
   async function alreadySent(bot, tradeId, event) {
     if (pool) {
@@ -206,10 +247,15 @@ function register(ctx) {
       // formatter then shows no capital line rather than a wrong one - capitalLine requires a real total).
       let closedTrades = []; let openTrades = [];
       try { [closedTrades, openTrades] = await Promise.all([src.closedFetch(), src.openFetch()]); } catch (e) { log(`[telegram-alerts] could not read ${src.label}'s own book for the capital line: ${e.message}`); }
+      // Task 1: one live/fallback USDT-INR rate per source per tick (never per trade - see resolveLiveRate
+      // above) - only crypto-denominated bots (nativeInr: false) need one; nse/nse_scalp/ccy_*/mcx_* are
+      // already rupees-native and ignore `liveRate` entirely (formatEntry/formatExit/capitalLine all pass
+      // `{ rate: 1 }` themselves for those).
+      const liveRate = src.nativeInr ? null : await resolveLiveRate(cachedCrypto, env, log, src.label, warnedFxFallback);
       for (const t of rows) {
         try {
-          if (!(await alreadySent(src.label, t.id, 'entry'))) await deliver(formatEntry(t, src.label, { costPct: src.costPct, usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal, closedTrades, openTrades }));
-          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(src.label, t.id, 'exit'))) await deliver(formatExit(t, src.label, { usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal, closedTrades, openTrades }));
+          if (!(await alreadySent(src.label, t.id, 'entry'))) await deliver(formatEntry(t, src.label, { costPct: src.costPct, usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal, closedTrades, openTrades, liveRate }));
+          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(src.label, t.id, 'exit'))) await deliver(formatExit(t, src.label, { usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal, closedTrades, openTrades, liveRate }));
         } catch (e) { log(`[telegram-alerts] trade ${t.id} (${src.label}) failed: ${e.message}`); } // one bad row must never stop the others
       }
     }
