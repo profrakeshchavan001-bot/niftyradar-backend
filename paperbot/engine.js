@@ -131,6 +131,30 @@ function evaluateExit({ entry, current, targetPct, stopPct, short = false, force
 
 const candleText = (k) => `O ${k.o} H ${k.h} L ${k.l} C ${k.c}`;
 
+// Gross/net P&L of a closed INTRADAY (the main crypto bot, "intraday" in telegramAlerts/register.js and
+// docs/BOTS.md) trade, in USDT and in rupees - pulled out of paperbot/bot.js's cryptoMonitor/closeTrade so
+// that a MIRROR bot (src/paper/bots/intraday_mirror/, src/paper/lib/mirror.js's buildMirrorExitPatch) has
+// a settle({ trade, exitPrice, cfg, fxRate }) to call for the intraday bot, matching every other bot's
+// shape (src/paper/scalp/engine.js's settle(), src/paper/bots/exhaustion_only/engine.js's settle()).
+// NEVER called by paperbot/bot.js itself - cryptoMonitor/closeTrade keep doing this arithmetic inline,
+// completely unchanged (CLAUDE.md: no trading-logic change). The real intraday bot applies NO fee or
+// slippage model (unlike scalp's settle(), which deducts cfg.fee_pct_per_side/cfg.slippage_pct) - this is
+// the EXACT booking paperbot/bot.js's cryptoMonitor already does:
+//   pnlUsdt = (exitPrice - entry) * qty * (short ? -1 : 1); pnl_inr = pnlUsdt * fx.rate
+// `cfg` is accepted only for shape parity with every other bot's settle() signature; it is not read here
+// because intraday has no cost model to apply.
+function settle({ trade, exitPrice, cfg, fxRate }) {
+  const short = trade.direction === 'SHORT';
+  const gross = (exitPrice - trade.entry_price) * trade.qty * (short ? -1 : 1);
+  return {
+    gross_pnl_usdt: P.round(gross, 6),
+    cost_usdt: 0,
+    net_pnl_usdt: P.round(gross, 6),
+    gross_pnl_inr: P.round(gross * fxRate, 2),
+    pnl_inr: P.round(gross * fxRate, 2),
+  };
+}
+
 // One plain-English sentence saying why the trade was taken.
 function basisSentence({ market, symbol, score, direction, patterns, ctx, news, simulated }) {
   const what = market === 'nse' ? (direction === 'up' ? 'Bought a CALL' : 'Bought a PUT') : (direction === 'up' ? 'Went LONG' : 'Went SHORT');
@@ -143,5 +167,5 @@ function basisSentence({ market, symbol, score, direction, patterns, ctx, news, 
 
 module.exports = {
   median, momentumScore, closedOnly, aggregate, buildContext, decideEntry,
-  sizeNse, sizeCrypto, simOptionPrice, changePct, evaluateExit, basisSentence, candleText,
+  sizeNse, sizeCrypto, simOptionPrice, changePct, evaluateExit, basisSentence, candleText, settle,
 };
