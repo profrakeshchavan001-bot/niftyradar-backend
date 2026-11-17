@@ -16,6 +16,8 @@ const fs = require('fs');
 const path = require('path');
 
 const { createPgStore } = require('../paperbot/store');
+const { settle: settleIntraday } = require('../paperbot/engine');
+const { loadConfig } = require('../paperbot/config');
 const { createPgExhaustionStore } = require('../src/paper/bots/exhaustion_only/store');
 const { settle: settleExhaustion } = require('../src/paper/bots/exhaustion_only/engine');
 const { loadExhaustionConfig } = require('../src/paper/bots/exhaustion_only/config');
@@ -38,6 +40,16 @@ function buildJobs({ mainStore, pool }) {
   const exhaustionStore = createPgExhaustionStore(pool);
   const trendSmcStore = createPgTrendSmcStore(pool);
   return [
+    {
+      // intraday (the main crypto bot, paperbot/bot.js's cryptoScan/cryptoMonitor): no own table, reads
+      // the shared paper_trades filtered to the 'crypto' market only, same shape as the scalp/scalp_wide
+      // jobs below. settle() is paperbot/engine.js's new export (added for this mirror - see its own
+      // comment); loadCfg mirrors what paperbot/bot.js's cryptoScan/cryptoMonitor themselves read
+      // ((await loadConfig(mainStore)).crypto), not re-invented here.
+      bot: 'intraday', mirrorLabel: 'intraday-MIRROR', mirrorTable: 'intraday_mirror_trades',
+      originalStore: { allOpenTrades: () => mainStore.openTrades('crypto'), closedTrades: () => mainStore.closedTrades('crypto') },
+      settle: settleIntraday, loadCfg: async () => (await loadConfig(mainStore)).crypto,
+    },
     {
       bot: 'exhaustion_only', mirrorLabel: 'exhaustion_only-MIRROR', mirrorTable: 'exhaustion_only_mirror_trades',
       originalStore: exhaustionStore, settle: settleExhaustion, loadCfg: () => loadExhaustionConfig(mainStore),
@@ -120,6 +132,7 @@ async function main() {
   const generatedAt = new Date().toISOString();
   if (!url) {
     const md = toMarkdown([
+      { bot: 'intraday', mirrorLabel: 'intraday-MIRROR', opened: 0, closedThisRun: 0, original: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null }, mirror: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null } },
       { bot: 'exhaustion_only', mirrorLabel: 'exhaustion_only-MIRROR', opened: 0, closedThisRun: 0, original: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null }, mirror: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null } },
       { bot: 'trend_smc', mirrorLabel: 'trend_smc-MIRROR', opened: 0, closedThisRun: 0, original: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null }, mirror: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null } },
       { bot: 'scalp', mirrorLabel: 'scalp-MIRROR', opened: 0, closedThisRun: 0, original: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null }, mirror: { trades: 0, netPnlInr: 0, grossPnlInr: 0, feesInr: 0, winRatePct: null } },

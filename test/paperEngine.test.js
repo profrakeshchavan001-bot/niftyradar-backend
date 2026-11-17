@@ -187,3 +187,31 @@ test('invariant: for a BUY, target > entry > stop; for a SELL, target < entry < 
   const sell = L.legacyLevels({ entry: 100, short: true, targetPct: 2, stopPct: 1 });
   assert.ok(sell.target < 100 && 100 < sell.stop, `expected target(${sell.target}) < entry(100) < stop(${sell.stop})`);
 });
+
+// settle() (added for src/paper/bots/intraday_mirror/, docs/BOTS.md "Mirror bots"): the EXACT booking
+// paperbot/bot.js's cryptoMonitor already does inline (pnlUsdt = (exitPrice - entry) * qty *
+// (short ? -1 : 1); pnl_inr = pnlUsdt * fx.rate) - no fee/slippage model, since the real intraday bot
+// applies none. Hand-worked, not copied from the function's own output.
+test('settle (intraday): LONG, price rises - gross/net USDT and INR match cryptoMonitor\'s own formula by hand', () => {
+  // gross = (106 - 100) * 2 * 1 = 12 USDT; pnl_inr = 12 * 88 = 1056
+  const trade = { direction: 'LONG', entry_price: 100, qty: 2 };
+  assert.deepEqual(E.settle({ trade, exitPrice: 106, cfg: {}, fxRate: 88 }), {
+    gross_pnl_usdt: 12, cost_usdt: 0, net_pnl_usdt: 12, gross_pnl_inr: 1056, pnl_inr: 1056,
+  });
+});
+
+test('settle (intraday): SHORT, price falls in its favour - sign flips correctly, hand-worked', () => {
+  // SHORT: gross = (190 - 200) * 1.5 * (-1) = 15 USDT (a profit, price fell); pnl_inr = 15 * 90 = 1350
+  const trade = { direction: 'SHORT', entry_price: 200, qty: 1.5 };
+  assert.deepEqual(E.settle({ trade, exitPrice: 190, cfg: {}, fxRate: 90 }), {
+    gross_pnl_usdt: 15, cost_usdt: 0, net_pnl_usdt: 15, gross_pnl_inr: 1350, pnl_inr: 1350,
+  });
+});
+
+test('settle (intraday): SHORT, price rises against it - a loss, hand-worked', () => {
+  // SHORT: gross = (110 - 100) * 1 * (-1) = -10 USDT (a loss, price rose); pnl_inr = -10 * 88 = -880
+  const trade = { direction: 'SHORT', entry_price: 100, qty: 1 };
+  assert.deepEqual(E.settle({ trade, exitPrice: 110, cfg: {}, fxRate: 88 }), {
+    gross_pnl_usdt: -10, cost_usdt: 0, net_pnl_usdt: -10, gross_pnl_inr: -880, pnl_inr: -880,
+  });
+});

@@ -46,9 +46,16 @@ async function closedTradesByBot(ctx) {
     scalp_wide_mirror = pool ? (await pool.query("SELECT * FROM scalp_wide_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
       : (ctx.scalpWideMirrorMemoryStore ? await ctx.scalpWideMirrorMemoryStore.closedTrades() : []);
   } catch (e) { /* table not there yet - treat as no trades */ }
+  // intraday-MIRROR (new, this task): own table, mirrors ONLY the 'crypto' market of `intraday` above
+  // (src/paper/bots/intraday_mirror/register.js) - same "not there yet = empty row, never an error" rule.
+  let intraday_mirror = [];
+  try {
+    intraday_mirror = pool ? (await pool.query("SELECT * FROM intraday_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.intradayMirrorMemoryStore ? await ctx.intradayMirrorMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
   return {
     intraday, scalp, scalp_wide, exhaustion_only, trend_smc,
-    exhaustion_only_mirror, trend_smc_mirror, scalp_mirror, scalp_wide_mirror,
+    exhaustion_only_mirror, trend_smc_mirror, scalp_mirror, scalp_wide_mirror, intraday_mirror,
   };
 }
 

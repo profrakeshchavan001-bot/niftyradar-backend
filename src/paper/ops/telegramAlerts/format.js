@@ -45,6 +45,41 @@ function firstTwoLines(basis) {
 }
 
 /**
+ * Capital line (every bot/mirror, entry AND exit): total demo capital configured for this bot, how much
+ * of it THIS trade uses (entry_price x qty - already each trade's own fields, nothing invented), in
+ * rupees and as a % of the total, and what is "left". `capitalTotal` is the bot's own config capital
+ * (e.g. DEFAULTS.crypto.capital_usdt / DEFAULTS.nse.capital_inr in paperbot/config.js, or each bot's own
+ * *_DEFAULTS.capital_usdt - see telegramAlerts/register.js) - this pure formatter never invents one, so
+ * passing no `capitalTotal` simply omits the line (used by every existing test/call site that predates
+ * this feature).
+ *
+ * "Left" = capitalTotal minus only THIS trade's own capital used, not capitalTotal minus every other
+ * currently-open trade of the same bot - this formatter has no store access to read a bot's other open
+ * positions, so a true running balance is not available here. That is a per-trade view, not a live
+ * balance, and the line says so plainly rather than imply a number it cannot back up.
+ */
+function capitalLine(trade, { capitalTotal, nativeInr = false, usdInrFallback } = {}) {
+  const total = Number(capitalTotal);
+  const qty = Number(trade.qty);
+  const entry = Number(trade.entry_price);
+  if (!(total > 0) || !Number.isFinite(qty) || !Number.isFinite(entry)) return null;
+  const usedNative = entry * qty;
+  const pct = Math.round((usedNative / total) * 1000) / 10;
+  if (nativeInr) {
+    const left = Math.round(total - usedNative);
+    return `Capital: ₹${Math.round(total).toLocaleString('en-IN')} total | this trade ₹${Math.round(usedNative).toLocaleString('en-IN')} (${pct}%) | ₹${left.toLocaleString('en-IN')} left (per-trade view)`;
+  }
+  const fx = fxInfo(trade, usdInrFallback);
+  if (!fx) {
+    const left = Math.round((total - usedNative) * 100) / 100;
+    return `Capital: $${total} total | this trade $${Math.round(usedNative * 100) / 100} (${pct}%) | $${left} left (rate n/a, per-trade view)`;
+  }
+  const totalInr = Math.round(total * fx.rate);
+  const usedInr = Math.round(usedNative * fx.rate);
+  return `Capital: ₹${totalInr.toLocaleString('en-IN')} total | this trade ₹${usedInr.toLocaleString('en-IN')} (${pct}%) | ₹${(totalInr - usedInr).toLocaleString('en-IN')} left (per-trade view)`;
+}
+
+/**
  * Entry alert text (item 1). `trade` needs: direction, symbol, entry_price, target_price, sl_price,
  * target_type, stop_type, qty, rr (optional), basis, fx_rate/fx_source (optional).
  *
@@ -56,13 +91,13 @@ function firstTwoLines(basis) {
  * rupee figure needs `fxInfo` (the trade's own fx_rate, else `usdInrFallback`, else shown in USD with
  * "rate n/a" - never an invented rate).
  */
-function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallback, nativeInr = false } = {}) {
+function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallback, nativeInr = false, capitalTotal } = {}) {
   const fx = nativeInr ? { rate: 1, source: 'native INR (no FX step for this bot)' } : fxInfo(trade, usdInrFallback);
   const target = estimateMove(trade.entry_price, trade.target_price, trade.qty, costPct, fx);
   const stop = estimateMove(trade.entry_price, trade.sl_price, trade.qty, costPct, fx);
   const rr = trade.rr != null ? Number(trade.rr) : (stop.usd > 0 ? Math.round((target.usd / stop.usd) * 100) / 100 : null);
   const money = (m, sign) => (fx ? `${sign}₹${m.inr.toLocaleString('en-IN')}` : `${sign}$${m.usd} (rate n/a)`);
-  return [
+  const lines = [
     `${tradeTag(trade)} | ${botLabel}`,
     `${emojiDir(trade.direction)} ${trade.symbol}`,
     `Entry time: ${istTime(trade.entry_time)}`,
@@ -72,24 +107,29 @@ function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallba
     `Target lagne par ≈ ${money(target, '+')}`,
     `Stop lagne par ≈ ${money(stop, '-')}`,
     `Reward:Risk ${rr != null && Number.isFinite(rr) ? rr.toFixed(2) : 'n/a'}`,
-    '',
-    `Kyu: ${firstTwoLines(trade.basis)}`,
-  ].join('\n');
+  ];
+  const capLine = capitalLine(trade, { capitalTotal, nativeInr, usdInrFallback });
+  if (capLine) lines.push(capLine);
+  lines.push('', `Kyu: ${firstTwoLines(trade.basis)}`);
+  return lines.join('\n');
 }
 
-/** Exit alert text (item 2): result, net INR, time in trade. */
-function formatExit(trade, botLabel) {
+/** Exit alert text (item 2): result, net INR, time in trade, and (Task: capital line) the same capital line as the entry. */
+function formatExit(trade, botLabel, { usdInrFallback, nativeInr = false, capitalTotal } = {}) {
   const minutes = trade.entry_time && trade.exit_time ? Math.round((new Date(trade.exit_time).getTime() - new Date(trade.entry_time).getTime()) / 60000) : null;
   const net = trade.pnl_inr != null ? Number(trade.pnl_inr) : null;
   const resultWord = { target: 'TARGET hit', stop: 'STOP hit', breakeven: 'breakeven' }[trade.exit_reason] || (trade.exit_reason || 'closed');
-  return [
+  const lines = [
     `EXIT ${tradeTag(trade)} | ${botLabel}`,
     `${trade.symbol} closed - ${resultWord}`,
     `Entry time: ${istTime(trade.entry_time)}`,
     `Exit time: ${istTime(trade.exit_time)}`,
     net != null ? `Net: ${net >= 0 ? '+' : '-'}₹${Math.abs(Math.round(net)).toLocaleString('en-IN')}` : 'Net: n/a',
     minutes != null ? `Time in trade: ${minutes} min` : null,
-  ].filter(Boolean).join('\n');
+  ];
+  const capLine = capitalLine(trade, { capitalTotal, nativeInr, usdInrFallback });
+  if (capLine) lines.push(capLine);
+  return lines.filter(Boolean).join('\n');
 }
 
-module.exports = { istTime, formatEntry, formatExit, estimateMove, fxInfo, firstTwoLines, DEFAULT_COST_PCT };
+module.exports = { istTime, formatEntry, formatExit, estimateMove, fxInfo, firstTwoLines, capitalLine, DEFAULT_COST_PCT };

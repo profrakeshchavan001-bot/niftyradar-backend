@@ -113,7 +113,7 @@ changes any bot's rules or weights.** Three read-only sections, all built purely
    best slices have in common. Reads `paper_shadows` (if that table exists) only to report its row count; its absence never fails
    the route.
 
-## Mirror bots (`src/paper/bots/<bot>_mirror/`, plugins): `exhaustion_only-MIRROR`, `trend_smc-MIRROR`, `scalp-MIRROR`, `scalp_wide-MIRROR`
+## Mirror bots (`src/paper/bots/<bot>_mirror/`, plugins): `exhaustion_only-MIRROR`, `trend_smc-MIRROR`, `scalp-MIRROR`, `scalp_wide-MIRROR`, `intraday-MIRROR`
 
 For every trade an original bot takes, its mirror opens the **exact opposite** trade: same entry price/time and qty, same
 fee/slippage model, but direction flipped (LONG becomes SHORT and back) and target/stop **swapped** - the mirror's target is the
@@ -130,6 +130,16 @@ Telegram alerts (`src/paper/ops/telegramAlerts/`) use the exact same `formatEntr
 label suffixed `-MIRROR` so the two sides are visually distinguishable in the same channel. The leaderboard and mix report
 (above) list every mirror bot right alongside the original it shadows.
 
+`intraday-MIRROR` (`src/paper/bots/intraday_mirror/`) mirrors the main crypto bot ("intraday" - `paperbot/bot.js`'s
+`cryptoScan`/`cryptoMonitor`) exactly the way `scalp-MIRROR` mirrors `scalp`: by reading the SHARED `paper_trades` table the
+original already writes to, filtered to the `crypto` market only (never `nse`, `crypto_scalp` or `crypto_wide_scalp` - those
+already have their own mirrors), into its own `intraday_mirror_trades` table. Unlike every other original bot, intraday had no
+exported `settle({ trade, exitPrice, cfg, fxRate })` of its own (the booking math lived inline in `paperbot/bot.js`'s
+`closeTrade`/`cryptoMonitor`); `paperbot/engine.js` now exports one, matching that exact arithmetic (no fee/slippage model - the
+real intraday bot applies none) - `paperbot/bot.js` itself is unchanged and never calls it. Switch: `PAPER_INTRADAY_MIRROR_ENABLED`
+(default on, follows `PAPER_BOT_ENABLED` - the only switch the crypto loop itself has). Report: `GET
+/api/paper/intraday-mirror-report?key=<PAPER_ADMIN_SECRET>`.
+
 A one-off backfill (`node scripts/mirrorBackfill.js`, or `npm run report:mirror-backfill`; needs `PAPER_DATABASE_URL`) replays
 **every** historical closed trade of every original bot into its mirror - no sampling - by calling the exact same `sync()` the
 live mirror bots schedule, and writes a per-bot comparison (trades, net INR, win rate, fees, original vs mirror) to
@@ -139,7 +149,7 @@ given - so the committed `docs/MIRROR-BACKFILL-REPORT.md` only ever shows 0/n-a 
 **The real backfill now runs itself, on the production server** (`src/paper/ops/mirrorBackfillReport/`, auto-loaded by
 `src/paper/pluginLoader.js`): the first time the deployed server boots with `PAPER_DATABASE_URL` configured, it reuses the exact
 same `buildJobs()`/`runJob()` as the script above - no re-implementation - to replay every closed trade of every bot
-(`exhaustion_only`, `trend_smc`, `scalp`, `scalp_wide`) into its mirror, then sends a per-bot summary (trade count, original vs
+(`intraday`, `exhaustion_only`, `trend_smc`, `scalp`, `scalp_wide`) into its mirror, then sends a per-bot summary (trade count, original vs
 mirror net INR P&L, win rate, fees impact - "no trades yet" for a bot with none) plus a "best bot" line (highest combined
 original+mirror net P&L) to Telegram, using the same `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` the trade alerts already use (split
 across 2-3 messages if the full report would exceed Telegram's ~4096-character limit). This runs **at most once, ever**: it
@@ -152,9 +162,24 @@ refuses a second concurrent call (`429`) so two overlapping manual calls can nev
 ## Report
 
 `exhaustion_only`: `GET /api/paper/exhaustion-report?key=<PAPER_ADMIN_SECRET>`. `trend_smc`: `GET /api/paper/trend-smc-report`. Scalp and
-scalp_wide share `GET /api/paper/scalp-report` (tabs **Scalp**, **Scalp wide**, **Intraday**). Across every bot: `GET
+scalp_wide share `GET /api/paper/scalp-report` (tabs **Scalp**, **Scalp wide**, **Intraday**). `intraday-MIRROR`: `GET
+/api/paper/intraday-mirror-report?key=<PAPER_ADMIN_SECRET>` (same shape as `scalp-mirror-report`, above). Across every bot: `GET
 /api/paper/bots-report` (leaderboard, above) and `GET /api/paper/mix-report` (suggestions only, above). Manual re-run of the
 production mirror backfill (above): `GET /api/paper/mirror-backfill-report?key=<PAPER_ADMIN_SECRET>`.
+
+## Telegram alerts: capital line
+
+Every trade alert (`src/paper/ops/telegramAlerts/format.js`'s `formatEntry`/`formatExit`, every bot and every `-MIRROR`, entry
+AND exit) carries one line showing that bot's total demo capital, how much of it THIS trade uses (in rupees and as a % of the
+total - `entry_price x qty`, already each trade's own fields, converted via the same `fxInfo()`/`USDINR_FALLBACK` the rest of
+the message already uses), and what is left. "Left" is the total minus only this one trade's own capital used, not a live
+running balance across every other open trade of the same bot (the formatter is pure and has no store access) - the line says
+"per-trade view" so it is never mistaken for a live balance. Capital totals come from each bot's own existing config, never an
+invented number: `paperbot/config.js`'s `DEFAULTS.nse.capital_inr` (nse) / `DEFAULTS.crypto.capital_usdt` (intraday),
+`SCALP_DEFAULTS`/`SCALP_WIDE_DEFAULTS`/`EXHAUSTION_ONLY_DEFAULTS`/`TREND_SMC_DEFAULTS`'s own `capital_usdt` for scalp/scalp_wide/
+exhaustion_only/trend_smc. `nse_scalp` has no capital config of its own in this repo - it is shown against the main `nse` pool
+as a documented assumption. Every `-MIRROR` bot shows the SAME total as the original it mirrors (no mirror-specific capital
+config exists). The line is omitted (not shown as 0 or guessed) when a caller does not pass `capitalTotal`.
 
 ## Not attempted
 

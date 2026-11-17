@@ -34,30 +34,52 @@
 const path = require('path');
 const { formatEntry, formatExit, DEFAULT_COST_PCT } = require('./format');
 const { createRateLimiter } = require('./rateLimit');
+// Capital line (Task: capital line on every trade alert): each bot's own already-configured demo
+// capital, read from the SAME *_DEFAULTS/DEFAULTS objects every bot's own config.js already exports -
+// never a new/invented number. nse/nse_scalp: paperbot/config.js DEFAULTS.nse.capital_inr. crypto/intraday
+// and every crypto-denominated bot: each bot's own capital_usdt (DEFAULTS.crypto for intraday,
+// SCALP_DEFAULTS/SCALP_WIDE_DEFAULTS for scalp/scalp_wide, EXHAUSTION_ONLY_DEFAULTS/TREND_SMC_DEFAULTS for
+// exhaustion_only/trend_smc - each already has its own capital_usdt: 1000, confirmed in their own
+// config.js). A MIRROR bot uses the SAME capitalTotal as the original it mirrors (no mirror-specific
+// capital config exists anywhere in this repo today) - logged in the PR notes as the explicit assumption
+// the task's own "if none are defined, take a safe default and note it" rule asks for.
+const { DEFAULTS: PAPERBOT_DEFAULTS } = require('../../../../paperbot/config');
+const { SCALP_DEFAULTS, SCALP_WIDE_DEFAULTS } = require('../../scalp/config');
+const { EXHAUSTION_ONLY_DEFAULTS } = require('../../bots/exhaustion_only/config');
+const { TREND_SMC_DEFAULTS } = require('../../bots/trend_smc/config');
 
-// Shared `paper_trades` table markets. nativeInr/costPct feed formatEntry (see file header above).
+// nse_scalp has no capital config of its own anywhere in the repo (paperbot/config.js's DEFAULTS has no
+// nse_scalp section) - ASSUMED DEFAULT: it shares the main nse capital pool (DEFAULTS.nse.capital_inr),
+// logged here and noted in the PR description, per the task's "no config found -> safe default, log it,
+// note it" rule.
+const NSE_SCALP_CAPITAL_INR = PAPERBOT_DEFAULTS.nse.capital_inr;
+
+// Shared `paper_trades` table markets. nativeInr/costPct/capitalTotal feed formatEntry/formatExit (see file header above).
 const SHARED_STORE_MARKETS = {
-  crypto: { label: 'intraday', nativeInr: false, costPct: DEFAULT_COST_PCT },
-  crypto_scalp: { label: 'scalp', nativeInr: false, costPct: DEFAULT_COST_PCT },
-  crypto_wide_scalp: { label: 'scalp_wide', nativeInr: false, costPct: DEFAULT_COST_PCT },
-  nse: { label: 'nse', nativeInr: true, costPct: 0 },
-  nse_scalp: { label: 'nse_scalp', nativeInr: true, costPct: 0 },
+  crypto: { label: 'intraday', nativeInr: false, costPct: DEFAULT_COST_PCT, capitalTotal: PAPERBOT_DEFAULTS.crypto.capital_usdt },
+  crypto_scalp: { label: 'scalp', nativeInr: false, costPct: DEFAULT_COST_PCT, capitalTotal: SCALP_DEFAULTS.capital_usdt },
+  crypto_wide_scalp: { label: 'scalp_wide', nativeInr: false, costPct: DEFAULT_COST_PCT, capitalTotal: SCALP_WIDE_DEFAULTS.capital_usdt },
+  nse: { label: 'nse', nativeInr: true, costPct: 0, capitalTotal: PAPERBOT_DEFAULTS.nse.capital_inr },
+  nse_scalp: { label: 'nse_scalp', nativeInr: true, costPct: 0, capitalTotal: NSE_SCALP_CAPITAL_INR },
 };
 
 // Bots with their own table instead of a row in paper_trades - see file header above for how their store
 // is reached on ctx and why it is never missing by the time this plugin's checks actually run.
 const OWN_TABLE_BOTS = {
-  exhaustion_only: { label: 'exhaustion_only', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'exhaustionMemoryStore' },
-  trend_smc: { label: 'trend_smc', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'trendSmcMemoryStore' },
+  exhaustion_only: { label: 'exhaustion_only', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'exhaustionMemoryStore', capitalTotal: EXHAUSTION_ONLY_DEFAULTS.capital_usdt },
+  trend_smc: { label: 'trend_smc', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'trendSmcMemoryStore', capitalTotal: TREND_SMC_DEFAULTS.capital_usdt },
   // MIRROR bots (docs/BOTS.md "Mirror bots"): own table, own ctx key (set by each <bot>_mirror/register.js,
   // which the loader always runs after its original - the folder name sorts after it), same INR/cost
   // convention as the bot they mirror. Label carries the "-MIRROR" suffix so formatEntry/formatExit (same
   // exact message format, unchanged) are visibly distinguishable from the original's own alerts in the
-  // same Telegram channel.
-  exhaustion_only_mirror: { label: 'exhaustion_only-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'exhaustionMirrorMemoryStore' },
-  trend_smc_mirror: { label: 'trend_smc-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'trendSmcMirrorMemoryStore' },
-  scalp_mirror: { label: 'scalp-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpMirrorMemoryStore' },
-  scalp_wide_mirror: { label: 'scalp_wide-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpWideMirrorMemoryStore' },
+  // same Telegram channel. capitalTotal is the SAME total as the original bot (see file header above).
+  exhaustion_only_mirror: { label: 'exhaustion_only-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'exhaustionMirrorMemoryStore', capitalTotal: EXHAUSTION_ONLY_DEFAULTS.capital_usdt },
+  trend_smc_mirror: { label: 'trend_smc-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'trendSmcMirrorMemoryStore', capitalTotal: TREND_SMC_DEFAULTS.capital_usdt },
+  scalp_mirror: { label: 'scalp-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpMirrorMemoryStore', capitalTotal: SCALP_DEFAULTS.capital_usdt },
+  scalp_wide_mirror: { label: 'scalp_wide-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpWideMirrorMemoryStore', capitalTotal: SCALP_WIDE_DEFAULTS.capital_usdt },
+  // intraday-MIRROR (new, this task): mirrors ONLY the 'crypto' market (see src/paper/bots/intraday_mirror/
+  // register.js) - same capitalTotal as the intraday bot it mirrors.
+  intraday_mirror: { label: 'intraday-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'intradayMirrorMemoryStore', capitalTotal: PAPERBOT_DEFAULTS.crypto.capital_usdt },
 };
 
 const POLL_MS = 20000;
@@ -118,7 +140,7 @@ function register(ctx) {
     const sources = [];
     for (const [market, cfg] of Object.entries(SHARED_STORE_MARKETS)) {
       if (!wanted(market, cfg.label)) continue;
-      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, fetch: () => state.store.listTrades(50, market) });
+      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, capitalTotal: cfg.capitalTotal, fetch: () => state.store.listTrades(50, market) });
     }
     for (const [bot, cfg] of Object.entries(OWN_TABLE_BOTS)) {
       if (!wanted(bot, cfg.label)) continue;
@@ -127,7 +149,7 @@ function register(ctx) {
         if (!warnedMissingStore.has(cfg.label)) { log(`[telegram-alerts] ${cfg.label} has no store yet (disabled, or not registered) - its alerts are skipped`); warnedMissingStore.add(cfg.label); }
         continue;
       }
-      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, fetch: () => store.listTrades(50) });
+      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, capitalTotal: cfg.capitalTotal, fetch: () => store.listTrades(50) });
     }
     return sources;
   }
@@ -138,8 +160,8 @@ function register(ctx) {
       try { rows = await src.fetch(); } catch (e) { log(`[telegram-alerts] could not read ${src.label} trades: ${e.message}`); continue; }
       for (const t of rows) {
         try {
-          if (!(await alreadySent(src.label, t.id, 'entry'))) await deliver(formatEntry(t, src.label, { costPct: src.costPct, usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr }));
-          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(src.label, t.id, 'exit'))) await deliver(formatExit(t, src.label));
+          if (!(await alreadySent(src.label, t.id, 'entry'))) await deliver(formatEntry(t, src.label, { costPct: src.costPct, usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal }));
+          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(src.label, t.id, 'exit'))) await deliver(formatExit(t, src.label, { usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal }));
         } catch (e) { log(`[telegram-alerts] trade ${t.id} (${src.label}) failed: ${e.message}`); } // one bad row must never stop the others
       }
     }

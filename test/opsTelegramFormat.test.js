@@ -3,7 +3,7 @@
 // Every number is hand-worked in the comment right above its assertion - never copied from the function's output.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatEntry, formatExit, estimateMove, fxInfo } = require('../src/paper/ops/telegramAlerts/format');
+const { formatEntry, formatExit, estimateMove, fxInfo, capitalLine } = require('../src/paper/ops/telegramAlerts/format');
 
 const LONG = { direction: 'LONG', symbol: 'BTCUSDT', entry_price: 100, target_price: 110, sl_price: 95, target_type: 'swing high 1h', stop_type: 'pattern low + 1xATR', qty: 10, basis: 'order_block retest.\n15m trend up, VWAP reclaim.\nextra line never shown.', fx_rate: 90, fx_source: 'coingecko' };
 
@@ -84,4 +84,53 @@ test('formatExit: a loss shows a minus sign; stop/breakeven/other exit reasons w
   assert.match(formatExit({ symbol: 'X', exit_reason: 'stop', pnl_inr: -1200 }, 'scalp'), /Net: -₹1,200/);
   assert.match(formatExit({ symbol: 'X', exit_reason: 'stop', pnl_inr: -1200 }, 'scalp'), /STOP hit/);
   assert.match(formatExit({ symbol: 'X', exit_reason: 'breakeven', pnl_inr: 0 }, 'scalp'), /breakeven/);
+});
+
+// ---- Capital line (Task: capital line on every trade alert, entry AND exit). Every number hand-worked
+// in the comment right above its assertion - never copied from the function's own output.
+
+test('capitalLine: nativeInr (NSE) - total/used/left in rupees, % of total, hand-checked', () => {
+  // used = 101 * 500 = 50,500; pct = 50500/100000*100 = 50.5%; left = 100000 - 50500 = 49,500
+  const t = { entry_price: 101, qty: 500 };
+  assert.equal(capitalLine(t, { capitalTotal: 100000, nativeInr: true }), 'Capital: ₹1,00,000 total | this trade ₹50,500 (50.5%) | ₹49,500 left (per-trade view)');
+});
+
+test('capitalLine: crypto with a real fx rate - converts total AND used to rupees, hand-checked', () => {
+  // used = 100 * 2 = 200 USDT; pct = 200/1000*100 = 20%; total INR = 1000*90 = 90,000; used INR = 200*90 = 18,000; left = 72,000
+  const t = { entry_price: 100, qty: 2, fx_rate: 90, fx_source: 'coingecko' };
+  assert.equal(capitalLine(t, { capitalTotal: 1000, nativeInr: false }), 'Capital: ₹90,000 total | this trade ₹18,000 (20%) | ₹72,000 left (per-trade view)');
+});
+
+test('capitalLine: crypto with NO fx anywhere - shows USD and says "rate n/a", never an invented rate', () => {
+  // used = 100 * 2 = 200 USDT; pct = 20%; left = 1000 - 200 = 800
+  const t = { entry_price: 100, qty: 2, fx_rate: null };
+  assert.equal(capitalLine(t, { capitalTotal: 1000, nativeInr: false }), 'Capital: $1000 total | this trade $200 (20%) | $800 left (rate n/a, per-trade view)');
+});
+
+test('capitalLine: no capitalTotal passed -> null, never a guessed number', () => {
+  assert.equal(capitalLine({ entry_price: 100, qty: 2 }, {}), null);
+  assert.equal(capitalLine({ entry_price: 100, qty: 2 }, { capitalTotal: 0 }), null);
+  assert.equal(capitalLine({ entry_price: 100, qty: 2 }), null); // opts entirely omitted
+});
+
+test('formatEntry: capital line appears right after Reward:Risk, before the blank line and Kyu, only when capitalTotal is passed', () => {
+  const withCap = formatEntry(LONG, 'intraday', { costPct: 0, capitalTotal: 1000 }).split('\n');
+  // used = 100*10 = 1000 USDT = 100% of capitalTotal -> total INR = 1000*90 = 90,000; used INR = 1000*90 = 90,000; left = 0
+  assert.equal(withCap[9], 'Capital: ₹90,000 total | this trade ₹90,000 (100%) | ₹0 left (per-trade view)');
+  assert.equal(withCap[10], ''); // the blank separator before Kyu is still there, just shifted down one line
+  assert.equal(withCap[11], 'Kyu: order_block retest. 15m trend up, VWAP reclaim.');
+
+  // without capitalTotal, the layout is byte-for-byte the same as before this feature (no new blank line, no stray text)
+  const withoutCap = formatEntry(LONG, 'intraday', { costPct: 0 });
+  assert.ok(!withoutCap.includes('Capital:'));
+});
+
+test('formatExit: capital line appears as the last line, only when capitalTotal is passed', () => {
+  const t = { symbol: 'BTCUSDT', exit_reason: 'target', pnl_inr: 4500, entry_time: '2026-11-14T10:00:00Z', exit_time: '2026-11-14T10:37:00Z', entry_price: 100, qty: 2 };
+  const withCap = formatExit(t, 'intraday', { capitalTotal: 1000, nativeInr: false, usdInrFallback: 90 });
+  // used = 100*2 = 200 USDT; pct = 20%; total INR = 1000*90 = 90,000; used INR = 18,000; left = 72,000
+  assert.match(withCap, /Capital: ₹90,000 total \| this trade ₹18,000 \(20%\) \| ₹72,000 left \(per-trade view\)$/);
+
+  const withoutCap = formatExit(t, 'intraday');
+  assert.ok(!withoutCap.includes('Capital:'));
 });
