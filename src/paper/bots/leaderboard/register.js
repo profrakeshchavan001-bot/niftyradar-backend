@@ -53,9 +53,27 @@ async function closedTradesByBot(ctx) {
     intraday_mirror = pool ? (await pool.query("SELECT * FROM intraday_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
       : (ctx.intradayMirrorMemoryStore ? await ctx.intradayMirrorMemoryStore.closedTrades() : []);
   } catch (e) { /* table not there yet - treat as no trades */ }
+  // ccy_* (new, this task): NSE currency futures USDINR/EURINR/GBPINR/JPYINR, own tables
+  // (src/paper/bots/ccy_*/schema.sql) + their _mirror siblings - same "not there yet = empty row, never
+  // an error" rule as every bot above.
+  const ccyPairs = ['usdinr', 'eurinr', 'gbpinr', 'jpyinr'];
+  const ccy = {};
+  for (const pair of ccyPairs) {
+    const ctxKey = `ccy${pair[0].toUpperCase()}${pair.slice(1)}MemoryStore`;
+    const mirrorCtxKey = `ccy${pair[0].toUpperCase()}${pair.slice(1)}MirrorMemoryStore`;
+    try {
+      ccy[`ccy_${pair}`] = pool ? (await pool.query(`SELECT * FROM ccy_${pair}_trades WHERE status = 'closed' ORDER BY id`)).rows
+        : (ctx[ctxKey] ? await ctx[ctxKey].closedTrades() : []);
+    } catch (e) { ccy[`ccy_${pair}`] = []; }
+    try {
+      ccy[`ccy_${pair}_mirror`] = pool ? (await pool.query(`SELECT * FROM ccy_${pair}_mirror_trades WHERE status = 'closed' ORDER BY id`)).rows
+        : (ctx[mirrorCtxKey] ? await ctx[mirrorCtxKey].closedTrades() : []);
+    } catch (e) { ccy[`ccy_${pair}_mirror`] = []; }
+  }
   return {
     intraday, scalp, scalp_wide, exhaustion_only, trend_smc,
     exhaustion_only_mirror, trend_smc_mirror, scalp_mirror, scalp_wide_mirror, intraday_mirror,
+    ...ccy,
   };
 }
 

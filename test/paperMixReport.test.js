@@ -110,6 +110,9 @@ test('wiring: JSON carries scoreboard (every known bot) and a mixCandidate shape
   assert.deepEqual(Object.keys(d.scoreboard).sort(), [
     'exhaustion_only', 'intraday', 'scalp', 'scalp_wide', 'trend_smc',
     'exhaustion_only_mirror', 'trend_smc_mirror', 'scalp_mirror', 'scalp_wide_mirror', 'intraday_mirror',
+    // ccy_* (new, this task): NSE currency futures USDINR/EURINR/GBPINR/JPYINR + their mirrors.
+    'ccy_usdinr', 'ccy_eurinr', 'ccy_gbpinr', 'ccy_jpyinr',
+    'ccy_usdinr_mirror', 'ccy_eurinr_mirror', 'ccy_gbpinr_mirror', 'ccy_jpyinr_mirror',
   ].sort());
   assert.ok('avgRFactor' in d.scoreboard.scalp); assert.ok('tradesPerDay' in d.scoreboard.scalp);
   assert.ok(Array.isArray(d.mixCandidate.description));
