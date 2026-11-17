@@ -3,22 +3,12 @@
  * Daily Telegram report (05:00 IST): data gathering only, no text, no Telegram. Reuses the exact same
  * stores every other report/leaderboard already reads - nothing new added to any bot's schema.
  *
- * UNLIKE src/paper/bots/leaderboard/register.js's closedTradesByBot() (which queries the "own table"
- * bots with a raw pool.query and never casts the result), every row read here for an own-table bot goes
- * through castNumericColumns (src/paper/lib/numericCast.js): node-pg returns NUMERIC/DECIMAL columns as
- * STRINGS, and this report's INR totals must be real numbers, not string concatenation or NaN (the same
- * bug docs/BOTS.md says was fixed for the five mirror stores' OWN report routes - this file applies the
- * same fix to this report's own reads instead of trusting the leaderboard's un-cast path).
+ * Every row read here for an own-table bot goes through castNumericColumns (src/paper/lib/numericCast.js,
+ * same shared TRADE_NUMERIC_COLUMNS list src/paper/bots/leaderboard/register.js's queryClosed() and
+ * src/paper/lib/mcxStore.js use): node-pg returns NUMERIC/DECIMAL columns as STRINGS, and this report's
+ * INR totals must be real numbers, not string concatenation or NaN.
  */
 const { castNumericColumns } = require('../../lib/numericCast');
-
-// Superset of every numeric column across every own-table bot's schema.sql (exhaustion_only, trend_smc,
-// the five mirror tables, ccy_*, mcx_*) - castNumericColumns skips a column that is not present on a
-// given row, so one shared list is safe for every table.
-const NUMERIC_COLS = [
-  'entry_price', 'exit_price', 'sl_price', 'target_price', 'qty', 'rr', 'r_factor',
-  'gross_pnl_usdt', 'cost_usdt', 'net_pnl_usdt', 'gross_pnl_inr', 'pnl_inr', 'net_pnl_inr', 'cost_inr', 'fx_rate',
-];
 
 // Bot (table name is `${bot}_trades`) -> the ctx key its own register.js sets for the no-pool
 // (memory/test) fallback - the exact same keys src/paper/bots/leaderboard/register.js's
@@ -51,7 +41,7 @@ async function ownTableRows(ctx, bot, status) {
   if (pool) {
     try {
       const { rows } = await pool.query(`SELECT * FROM ${bot}_trades WHERE status = $1 ORDER BY id`, [status]);
-      return rows.map((r) => castNumericColumns(r, NUMERIC_COLS));
+      return rows.map((r) => castNumericColumns(r));
     } catch (e) { return []; } // table not there yet (bot disabled / fresh database) - empty, never an error
   }
   const store = ctx[OWN_TABLE_BOTS[bot]];
@@ -83,4 +73,4 @@ async function tradesByBot(ctx, status) {
 const closedTradesByBot = (ctx) => tradesByBot(ctx, 'closed');
 const openTradesByBot = (ctx) => tradesByBot(ctx, 'open');
 
-module.exports = { closedTradesByBot, openTradesByBot, MIRROR_OF, NUMERIC_COLS, OWN_TABLE_BOTS };
+module.exports = { closedTradesByBot, openTradesByBot, MIRROR_OF, OWN_TABLE_BOTS };
