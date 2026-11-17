@@ -84,7 +84,8 @@ including that bot's own breakeven/time-stop rules.
 
 ## Leaderboard (`src/paper/bots/leaderboard/`, a plugin): `GET /api/paper/bots-report` (+ `&format=json`)
 
-One read-only leaderboard across **every** bot (intraday, scalp, scalp_wide, exhaustion_only, trend_smc): trades, win rate, net INR
+One read-only leaderboard across **every** bot (intraday, scalp, scalp_wide, exhaustion_only, trend_smc, and each one's own
+`-MIRROR` bot, below): trades, win rate, net INR
 after costs, average win, average loss, max drawdown (largest peak-to-trough drop of the bot's own cumulative net P&L, in the order
 trades closed), average time in trade, and cost as a % of gross. A bot under 20 closed trades is shown but marked "too few trades, no
 conclusion" and left out of the ranked list. **A bot losing after costs is flagged plainly** (`lossAfterCosts`), never hidden. A daily
@@ -111,6 +112,28 @@ changes any bot's rules or weights.** Three read-only sections, all built purely
    filter, threshold or bot, and builds/wires no new engine** - it only describes, in the report's text, what the existing bots'
    best slices have in common. Reads `paper_shadows` (if that table exists) only to report its row count; its absence never fails
    the route.
+
+## Mirror bots (`src/paper/bots/<bot>_mirror/`, plugins): `exhaustion_only-MIRROR`, `trend_smc-MIRROR`, `scalp-MIRROR`, `scalp_wide-MIRROR`
+
+For every trade an original bot takes, its mirror opens the **exact opposite** trade: same entry price/time and qty, same
+fee/slippage model, but direction flipped (LONG becomes SHORT and back) and target/stop **swapped** - the mirror's target is the
+original's own stop price, and the mirror's stop is the original's own target price. Because both sides are watching the same two
+price barriers, the mirror always closes at the exact same exit price/time as the original, just on the opposite side of it (the
+original's "stop hit" is the mirror's "target hit", and vice versa). P&L is always computed by the ORIGINAL bot's own
+`settle({ trade, exitPrice, cfg, fxRate })` with the mirror's inverted direction - never a `pnl * -1` sign-flip - so the cost model
+(fees + slippage) is identical on both sides and a mirror pays its own costs rather than simply negating the original's net.
+
+Each mirror has its **own table, own trade ids, own virtual balance** - never a shared row or balance with the original it shadows
+(`src/paper/lib/mirrorStore.js`). The original bot's own code, store and schedule are completely untouched: a mirror plugin only
+*reads* the original's store (`src/paper/lib/mirrorBot.js`'s `sync()`, run on its own cron tick) and writes only to its own table.
+Telegram alerts (`src/paper/ops/telegramAlerts/`) use the exact same `formatEntry`/`formatExit` as every other bot, with the bot
+label suffixed `-MIRROR` so the two sides are visually distinguishable in the same channel. The leaderboard and mix report
+(above) list every mirror bot right alongside the original it shadows.
+
+A one-off backfill (`node scripts/mirrorBackfill.js`, or `npm run report:mirror-backfill`; needs `PAPER_DATABASE_URL`) replays
+**every** historical closed trade of every original bot into its mirror - no sampling - by calling the exact same `sync()` the
+live mirror bots schedule, and writes a per-bot comparison (trades, net INR, win rate, fees, original vs mirror) to
+`docs/MIRROR-BACKFILL-REPORT.md`.
 
 ## Report
 

@@ -23,7 +23,33 @@ async function closedTradesByBot(ctx) {
     trend_smc = pool ? (await pool.query("SELECT * FROM trend_smc_trades WHERE status = 'closed' ORDER BY id")).rows
       : (ctx.trendSmcMemoryStore ? await ctx.trendSmcMemoryStore.closedTrades() : []);
   } catch (e) { /* trend_smc may not exist yet at all (docs/decisions/CC3.md) - an empty leaderboard row, not an error */ }
-  return { intraday, scalp, scalp_wide, exhaustion_only, trend_smc };
+  // MIRROR bots (docs/BOTS.md "Mirror bots"): own tables, read the same way, same "not there yet = empty
+  // row, never an error" rule - so the leaderboard (and mix, which reuses this function) show the mirrors
+  // right alongside the originals they shadow.
+  let exhaustion_only_mirror = [];
+  try {
+    exhaustion_only_mirror = pool ? (await pool.query("SELECT * FROM exhaustion_only_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.exhaustionMirrorMemoryStore ? await ctx.exhaustionMirrorMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
+  let trend_smc_mirror = [];
+  try {
+    trend_smc_mirror = pool ? (await pool.query("SELECT * FROM trend_smc_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.trendSmcMirrorMemoryStore ? await ctx.trendSmcMirrorMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
+  let scalp_mirror = [];
+  try {
+    scalp_mirror = pool ? (await pool.query("SELECT * FROM scalp_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.scalpMirrorMemoryStore ? await ctx.scalpMirrorMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
+  let scalp_wide_mirror = [];
+  try {
+    scalp_wide_mirror = pool ? (await pool.query("SELECT * FROM scalp_wide_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
+      : (ctx.scalpWideMirrorMemoryStore ? await ctx.scalpWideMirrorMemoryStore.closedTrades() : []);
+  } catch (e) { /* table not there yet - treat as no trades */ }
+  return {
+    intraday, scalp, scalp_wide, exhaustion_only, trend_smc,
+    exhaustion_only_mirror, trend_smc_mirror, scalp_mirror, scalp_wide_mirror,
+  };
 }
 
 function basisOf(t) { return t.basis || null; }

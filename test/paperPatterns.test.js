@@ -186,3 +186,19 @@ test('detectPatterns: flat identical candles fire nothing', () => {
   const flat = mk(Array.from({ length: 30 }, () => [100, 100.5, 99.5, 100.2]));
   assert.deepEqual(P.detectPatterns(flat, { vwap: 100 }), []);
 });
+
+// --- Candle-colour invariant (root-cause audit: "every paper bot always reports a loss"). isGreen/isRed
+// gate every reversal/pattern direction in the codebase (exhaustionReversal, engulfing, etc.) - an
+// inverted colour here would silently flip every bot's BUY/SELL decision. Checked directly against the
+// plain close-vs-open definition, both ways, plus the doji edge case (neither).
+test('invariant: isGreen is true only when close > open, isRed only when close < open; a doji (close === open) is neither', () => {
+  const up = { o: 100, h: 101, l: 99, c: 101 }; // bullish candle
+  const down = { o: 101, h: 102, l: 99, c: 99 }; // bearish candle
+  const doji = { o: 100, h: 101, l: 99, c: 100 };
+  assert.equal(P.isGreen(up), true);
+  assert.equal(P.isRed(up), false);
+  assert.equal(P.isGreen(down), false);
+  assert.equal(P.isRed(down), true);
+  assert.equal(P.isGreen(doji), false);
+  assert.equal(P.isRed(doji), false);
+});

@@ -146,3 +146,44 @@ test('config: table values override defaults, defaults fill the gaps', () => {
   assert.equal(cfg.nse.max_trades_per_day, 5);
   assert.equal(cfg.crypto.target_pct, 2);
 });
+
+// --- Direction/PnL-sign invariants (root-cause audit: "every paper bot always reports a loss"). These
+// pin down changePct()/evaluateExit(), which every crypto exit ultimately reads from, against the two
+// invariants the brief requires: for a BUY, profit is positive when price RISES; for a SELL/SHORT,
+// profit is positive when price FALLS. Hand-verified, not copied from the function's own output.
+test('changePct: BUY (short=false) is positive when price rises, negative when it falls', () => {
+  assert.equal(E.changePct(100, 110, false), 10); // +10% favourable
+  assert.equal(E.changePct(100, 90, false), -10); // -10% adverse
+});
+
+test('changePct: SELL/SHORT (short=true) flips the sign - positive when price FALLS, negative when it rises', () => {
+  assert.equal(E.changePct(100, 90, true), 10); // price fell 10%: a 10% PROFIT for a short
+  assert.equal(E.changePct(100, 110, true), -10); // price rose 10%: a 10% LOSS for a short
+});
+
+test('evaluateExit: a BUY exits "target" only once price has risen to the target, never on a fall', () => {
+  const long = (current) => E.evaluateExit({ entry: 100, current, targetPct: 5, stopPct: 5, short: false });
+  assert.deepEqual(long(105).reason, 'target'); // +5%: target hit
+  assert.deepEqual(long(95).reason, 'stop'); // -5%: stop hit, never mistaken for a target
+  assert.equal(long(102).exit, false); // +2%: neither yet
+});
+
+test('evaluateExit: a SELL/SHORT exits "target" only once price has FALLEN to the target - the mirror of the BUY case', () => {
+  const short = (current) => E.evaluateExit({ entry: 100, current, targetPct: 5, stopPct: 5, short: true });
+  assert.deepEqual(short(95).reason, 'target'); // price fell 5%: a short's target
+  assert.deepEqual(short(105).reason, 'stop'); // price rose 5%: a short's stop
+  assert.equal(short(98).exit, false);
+});
+
+// For every bot built on target/stop LEVELS rather than a fixed %, the brief's invariant is about the
+// LEVELS themselves, not just the pct math above: a BUY's target must sit above the entry and its stop
+// below; a SELL's target must sit below the entry and its stop above. paperbot/cryptoLevels.js's
+// legacyLevels() is the simplest level-building function shared by every crypto bot's cost model
+// (src/paper/*/engine.js all import the same planTrade()/legacyLevels() family) - proven here directly.
+test('invariant: for a BUY, target > entry > stop; for a SELL, target < entry < stop (paperbot/cryptoLevels.js legacyLevels)', () => {
+  const L = require('../paperbot/cryptoLevels');
+  const buy = L.legacyLevels({ entry: 100, short: false, targetPct: 2, stopPct: 1 });
+  assert.ok(buy.target > 100 && 100 > buy.stop, `expected target(${buy.target}) > entry(100) > stop(${buy.stop})`);
+  const sell = L.legacyLevels({ entry: 100, short: true, targetPct: 2, stopPct: 1 });
+  assert.ok(sell.target < 100 && 100 < sell.stop, `expected target(${sell.target}) < entry(100) < stop(${sell.stop})`);
+});
