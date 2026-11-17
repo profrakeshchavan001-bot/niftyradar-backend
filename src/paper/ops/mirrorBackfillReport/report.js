@@ -14,6 +14,7 @@ const TELEGRAM_MESSAGE_LIMIT = 4096;
 
 const inr = (v) => (v == null ? 'n/a' : `${v < 0 ? '-' : '+'}₹${Math.abs(Math.round(v)).toLocaleString('en-IN')}`);
 const pct = (v) => (v == null ? 'n/a' : `${v}%`);
+const inrPlain = (v) => (v == null ? 'n/a' : `₹${Math.round(v).toLocaleString('en-IN')}`); // a plain amount, never signed (capital, not P&L)
 
 /**
  * One bot's block of text. A bot with ZERO trades on both sides (original and mirror) reads "no trades
@@ -21,6 +22,11 @@ const pct = (v) => (v == null ? 'n/a' : `${v}%`);
  * closed a single trade. A bot with trades on only one side (should not normally happen - sync() mirrors
  * every original trade - but is handled the same safe way by computeBotStats, which already turns an
  * empty array into trades: 0, winRatePct: null, netPnlInr: 0, never NaN) still prints its real numbers.
+ *
+ * Capital (Task: add capital to this report - it never showed any before): each side's currently-locked
+ * capital (open trades' own entry_price x qty, each converted via its own fx_rate) against that bot's own
+ * configured total (scripts/mirrorBackfill.js's sideSummary()/computeCapitalState()) - "n/a" rather than
+ * 0 when there is no USDINR_FALLBACK rate to express it in rupees with, never a guessed number.
  */
 function botBlock(row) {
   const { bot, mirrorLabel, original, mirror } = row;
@@ -33,6 +39,7 @@ function botBlock(row) {
     `PnL: original ${inr(original.netPnlInr)}, mirror ${inr(mirror.netPnlInr)}`,
     `Win rate: original ${pct(original.winRatePct)}, mirror ${pct(mirror.winRatePct)}`,
     `Fees: original ${inr(original.feesInr)}, mirror ${inr(mirror.feesInr)}`,
+    `Capital used: original ${inrPlain(original.capitalUsedInr)} of ${inrPlain(original.capitalTotalInr)}, mirror ${inrPlain(mirror.capitalUsedInr)} of ${inrPlain(mirror.capitalTotalInr)}`,
   ].join('\n');
 }
 
@@ -94,4 +101,4 @@ function buildTelegramMessages(rows, { generatedAt } = {}, limit = TELEGRAM_MESS
   return packIntoMessages(buildReportBlocks(rows, { generatedAt }), limit);
 }
 
-module.exports = { botBlock, bestBotLine, buildReportBlocks, packIntoMessages, buildTelegramMessages, TELEGRAM_MESSAGE_LIMIT, inr, pct };
+module.exports = { botBlock, bestBotLine, buildReportBlocks, packIntoMessages, buildTelegramMessages, TELEGRAM_MESSAGE_LIMIT, inr, pct, inrPlain };

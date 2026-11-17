@@ -45,38 +45,87 @@ function firstTwoLines(basis) {
 }
 
 /**
+ * Live running capital state for one bot's own book, at the moment an alert fires (replaces the old
+ * per-trade-only "left" line). `capitalTotal` is the bot's own starting demo capital (same config as
+ * capitalLine's own total, never invented); `fx` is the already-resolved { rate } used to express that
+ * total in rupees (nativeInr bots pass { rate: 1 } since their capital is already INR - see capitalLine).
+ *
+ * realizedNet = sum of `pnl_inr` over every CLOSED trade of this bot's own book (pnl_inr is always stored
+ * in rupees already, nativeInr or not - docs/BOTS.md). locked = sum of `entry_price x qty` over every
+ * currently OPEN trade of this bot's own book, each converted to rupees with THAT trade's own
+ * fx_rate/nativeInr - the exact same per-trade conversion capitalLine already uses for "this trade uses"
+ * - never the alert's own trade's rate applied to a different trade. An open trade with no fx_rate and no
+ * usdInrFallback contributes nothing to `locked` (never an invented rate) rather than failing the whole
+ * calculation.
+ *
+ * Deliberately does NOT special-case the alert's own trade: `openTrades`/`closedTrades` are the bot's
+ * current book snapshot as the caller already read it, and the current trade is simply wherever it
+ * already sits in that snapshot (in `openTrades` if still open, in `closedTrades` once closed) - counting
+ * it once, in the right bucket, is what "the honest current state of the book" means here.
+ *
+ * capitalLeft = capitalTotal (in INR) + realizedNet - locked. Returns null only when `capitalTotal` or
+ * `fx` make even the total impossible to express in rupees (never a half-guessed number).
+ */
+function computeCapitalState({ capitalTotal, closedTrades = [], openTrades = [], nativeInr = false, usdInrFallback, fx } = {}) {
+  const total = Number(capitalTotal);
+  if (!(total > 0) || !fx) return null;
+  const totalInr = total * fx.rate;
+  const realizedNetInr = closedTrades.reduce((sum, t) => {
+    const net = Number(t.pnl_inr);
+    return sum + (Number.isFinite(net) ? net : 0);
+  }, 0);
+  let lockedInr = 0;
+  for (const t of openTrades) {
+    const qty = Number(t.qty);
+    const entry = Number(t.entry_price);
+    if (!Number.isFinite(qty) || !Number.isFinite(entry)) continue;
+    const nativeAmount = entry * qty;
+    if (nativeInr) { lockedInr += nativeAmount; continue; }
+    const tfx = fxInfo(t, usdInrFallback);
+    if (tfx) lockedInr += nativeAmount * tfx.rate; // no rate for this one open trade: skip it, never invent one
+  }
+  return {
+    totalInr: Math.round(totalInr),
+    realizedNetInr: Math.round(realizedNetInr),
+    lockedInr: Math.round(lockedInr),
+    capitalLeftInr: Math.round(totalInr + realizedNetInr - lockedInr),
+  };
+}
+
+/**
  * Capital line (every bot/mirror, entry AND exit): total demo capital configured for this bot, how much
  * of it THIS trade uses (entry_price x qty - already each trade's own fields, nothing invented), in
- * rupees and as a % of the total, and what is "left". `capitalTotal` is the bot's own config capital
- * (e.g. DEFAULTS.crypto.capital_usdt / DEFAULTS.nse.capital_inr in paperbot/config.js, or each bot's own
- * *_DEFAULTS.capital_usdt - see telegramAlerts/register.js) - this pure formatter never invents one, so
- * passing no `capitalTotal` simply omits the line (used by every existing test/call site that predates
- * this feature).
- *
- * "Left" = capitalTotal minus only THIS trade's own capital used, not capitalTotal minus every other
- * currently-open trade of the same bot - this formatter has no store access to read a bot's other open
- * positions, so a true running balance is not available here. That is a per-trade view, not a live
- * balance, and the line says so plainly rather than imply a number it cannot back up.
+ * rupees and as a % of the total, the LIVE running balance left in the bot's own book right now (Task:
+ * live running capital balance - `computeCapitalState` above), and that book's running realized net P&L.
+ * `capitalTotal` is the bot's own config capital (e.g. DEFAULTS.crypto.capital_usdt /
+ * DEFAULTS.nse.capital_inr in paperbot/config.js, or each bot's own *_DEFAULTS.capital_usdt - see
+ * telegramAlerts/register.js) - this pure formatter never invents one, so passing no `capitalTotal`
+ * simply omits the line (used by every existing test/call site that predates this feature). `closedTrades`
+ * / `openTrades` are this bot's own current book snapshot, read by the caller (register.js) from the same
+ * stores it already reads for everything else - this formatter stays pure and never reaches a database
+ * itself; omitting them is read as "no other activity known" (realizedNet 0, locked 0), not as "unknown".
  */
-function capitalLine(trade, { capitalTotal, nativeInr = false, usdInrFallback } = {}) {
+function capitalLine(trade, { capitalTotal, nativeInr = false, usdInrFallback, closedTrades = [], openTrades = [] } = {}) {
   const total = Number(capitalTotal);
   const qty = Number(trade.qty);
   const entry = Number(trade.entry_price);
   if (!(total > 0) || !Number.isFinite(qty) || !Number.isFinite(entry)) return null;
   const usedNative = entry * qty;
   const pct = Math.round((usedNative / total) * 1000) / 10;
-  if (nativeInr) {
-    const left = Math.round(total - usedNative);
-    return `Capital: ₹${Math.round(total).toLocaleString('en-IN')} total | this trade ₹${Math.round(usedNative).toLocaleString('en-IN')} (${pct}%) | ₹${left.toLocaleString('en-IN')} left (per-trade view)`;
-  }
-  const fx = fxInfo(trade, usdInrFallback);
+  const fx = nativeInr ? { rate: 1 } : fxInfo(trade, usdInrFallback);
   if (!fx) {
+    // No rate anywhere (crypto bot, no trade fx_rate and no USDINR_FALLBACK): the live balance needs an
+    // INR rate to even express `capitalTotal` in rupees, so it is shown as "rate n/a" too, same as before.
     const left = Math.round((total - usedNative) * 100) / 100;
-    return `Capital: $${total} total | this trade $${Math.round(usedNative * 100) / 100} (${pct}%) | $${left} left (rate n/a, per-trade view)`;
+    return `Capital: $${total} total | this trade $${Math.round(usedNative * 100) / 100} (${pct}%) | $${left} left (rate n/a, per-trade only)`;
   }
   const totalInr = Math.round(total * fx.rate);
   const usedInr = Math.round(usedNative * fx.rate);
-  return `Capital: ₹${totalInr.toLocaleString('en-IN')} total | this trade ₹${usedInr.toLocaleString('en-IN')} (${pct}%) | ₹${(totalInr - usedInr).toLocaleString('en-IN')} left (per-trade view)`;
+  const state = computeCapitalState({ capitalTotal: total, closedTrades, openTrades, nativeInr, usdInrFallback, fx });
+  const net = state.realizedNetInr;
+  const netTxt = `${net >= 0 ? '+' : '-'}₹${Math.abs(net).toLocaleString('en-IN')}`;
+  return `Capital: ₹${totalInr.toLocaleString('en-IN')} total | this trade ₹${usedInr.toLocaleString('en-IN')} (${pct}%) | ₹${state.capitalLeftInr.toLocaleString('en-IN')} left now\n`
+    + `Running net P&L: ${netTxt}`;
 }
 
 /**
@@ -91,7 +140,7 @@ function capitalLine(trade, { capitalTotal, nativeInr = false, usdInrFallback } 
  * rupee figure needs `fxInfo` (the trade's own fx_rate, else `usdInrFallback`, else shown in USD with
  * "rate n/a" - never an invented rate).
  */
-function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallback, nativeInr = false, capitalTotal } = {}) {
+function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallback, nativeInr = false, capitalTotal, closedTrades, openTrades } = {}) {
   const fx = nativeInr ? { rate: 1, source: 'native INR (no FX step for this bot)' } : fxInfo(trade, usdInrFallback);
   const target = estimateMove(trade.entry_price, trade.target_price, trade.qty, costPct, fx);
   const stop = estimateMove(trade.entry_price, trade.sl_price, trade.qty, costPct, fx);
@@ -108,14 +157,14 @@ function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallba
     `Stop lagne par ≈ ${money(stop, '-')}`,
     `Reward:Risk ${rr != null && Number.isFinite(rr) ? rr.toFixed(2) : 'n/a'}`,
   ];
-  const capLine = capitalLine(trade, { capitalTotal, nativeInr, usdInrFallback });
+  const capLine = capitalLine(trade, { capitalTotal, nativeInr, usdInrFallback, closedTrades, openTrades });
   if (capLine) lines.push(capLine);
   lines.push('', `Kyu: ${firstTwoLines(trade.basis)}`);
   return lines.join('\n');
 }
 
-/** Exit alert text (item 2): result, net INR, time in trade, and (Task: capital line) the same capital line as the entry. */
-function formatExit(trade, botLabel, { usdInrFallback, nativeInr = false, capitalTotal } = {}) {
+/** Exit alert text (item 2): result, net INR, time in trade, and (Task: live capital balance) the same capital line as the entry. */
+function formatExit(trade, botLabel, { usdInrFallback, nativeInr = false, capitalTotal, closedTrades, openTrades } = {}) {
   const minutes = trade.entry_time && trade.exit_time ? Math.round((new Date(trade.exit_time).getTime() - new Date(trade.entry_time).getTime()) / 60000) : null;
   const net = trade.pnl_inr != null ? Number(trade.pnl_inr) : null;
   const resultWord = { target: 'TARGET hit', stop: 'STOP hit', breakeven: 'breakeven' }[trade.exit_reason] || (trade.exit_reason || 'closed');
@@ -127,9 +176,9 @@ function formatExit(trade, botLabel, { usdInrFallback, nativeInr = false, capita
     net != null ? `Net: ${net >= 0 ? '+' : '-'}₹${Math.abs(Math.round(net)).toLocaleString('en-IN')}` : 'Net: n/a',
     minutes != null ? `Time in trade: ${minutes} min` : null,
   ];
-  const capLine = capitalLine(trade, { capitalTotal, nativeInr, usdInrFallback });
+  const capLine = capitalLine(trade, { capitalTotal, nativeInr, usdInrFallback, closedTrades, openTrades });
   if (capLine) lines.push(capLine);
   return lines.filter(Boolean).join('\n');
 }
 
-module.exports = { istTime, formatEntry, formatExit, estimateMove, fxInfo, firstTwoLines, capitalLine, DEFAULT_COST_PCT };
+module.exports = { istTime, formatEntry, formatExit, estimateMove, fxInfo, firstTwoLines, capitalLine, computeCapitalState, DEFAULT_COST_PCT };

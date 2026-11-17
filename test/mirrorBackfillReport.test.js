@@ -10,14 +10,18 @@ const {
   botBlock, bestBotLine, buildReportBlocks, packIntoMessages, buildTelegramMessages, TELEGRAM_MESSAGE_LIMIT,
 } = require('../src/paper/ops/mirrorBackfillReport/report');
 const registerPlugin = require('../src/paper/ops/mirrorBackfillReport/register');
+const { buildJobs, runJob } = require('../scripts/mirrorBackfill');
 
 // ---------- fixtures ----------
 
-function row({ bot, mirrorLabel, trades = 0, netPnlInr = 0, mirrorTrades = trades, mirrorNetPnlInr = 0, winRatePct = null, mirrorWinRatePct = null, feesInr = 0, mirrorFeesInr = 0 } = {}) {
+function row({
+  bot, mirrorLabel, trades = 0, netPnlInr = 0, mirrorTrades = trades, mirrorNetPnlInr = 0, winRatePct = null, mirrorWinRatePct = null,
+  feesInr = 0, mirrorFeesInr = 0, capitalTotalInr = null, capitalUsedInr = null, mirrorCapitalTotalInr = capitalTotalInr, mirrorCapitalUsedInr = capitalUsedInr,
+} = {}) {
   return {
     bot, mirrorLabel, opened: 0, closedThisRun: 0,
-    original: { trades, netPnlInr, grossPnlInr: netPnlInr, feesInr, winRatePct },
-    mirror: { trades: mirrorTrades, netPnlInr: mirrorNetPnlInr, grossPnlInr: mirrorNetPnlInr, feesInr: mirrorFeesInr, winRatePct: mirrorWinRatePct },
+    original: { trades, netPnlInr, grossPnlInr: netPnlInr, feesInr, winRatePct, capitalTotalInr, capitalUsedInr },
+    mirror: { trades: mirrorTrades, netPnlInr: mirrorNetPnlInr, grossPnlInr: mirrorNetPnlInr, feesInr: mirrorFeesInr, winRatePct: mirrorWinRatePct, capitalTotalInr: mirrorCapitalTotalInr, capitalUsedInr: mirrorCapitalUsedInr },
   };
 }
 
@@ -40,6 +44,19 @@ test('botBlock: a bot with real trades prints trade counts, PnL, win rate and fe
   assert.match(text, /-₹4,800/);
   assert.match(text, /60%/);
   assert.match(text, /40%/);
+});
+
+test('botBlock: shows "capital used" for both sides (Task: add capital to this report - it never showed any before)', () => {
+  const text = botBlock(row({
+    bot: 'scalp', mirrorLabel: 'scalp-MIRROR', trades: 5, netPnlInr: 1000, mirrorTrades: 5, mirrorNetPnlInr: -900,
+    capitalTotalInr: 90000, capitalUsedInr: 18000, mirrorCapitalTotalInr: 90000, mirrorCapitalUsedInr: 22500,
+  }));
+  assert.match(text, /Capital used: original ₹18,000 of ₹90,000, mirror ₹22,500 of ₹90,000/);
+});
+
+test('botBlock: no capitalTotalInr/capitalUsedInr known (no USDINR_FALLBACK rate) -> "n/a", never 0 or blank', () => {
+  const text = botBlock(row({ bot: 'trend_smc', mirrorLabel: 'trend_smc-MIRROR', trades: 3, netPnlInr: 100, mirrorTrades: 3 }));
+  assert.match(text, /Capital used: original n\/a of n\/a, mirror n\/a of n\/a/);
 });
 
 test('bestBotLine: picks the bot with the highest COMBINED original+mirror net P&L, and names the metric', () => {
@@ -236,4 +253,79 @@ test('protected route: no PAPER_ADMIN_SECRET/RENEW_SECRET configured at all answ
     const res = await fetch(`http://localhost:${port}/api/paper/mirror-backfill-report?key=anything`);
     assert.equal(res.status, 503);
   } finally { server.close(); }
+});
+
+// ---------- Task 1 + Task 3 proof: the real backfill path (buildJobs/runJob), against a fake
+// Postgres-like pool that returns every NUMERIC column as a STRING, exactly like real node-pg. Before the
+// mirrorStore.js fix, `mirror.netPnlInr`/`winRatePct` below would be null/NaN (the exact
+// "mirror n/a" bug docs/BOTS.md describes) - this proves runJob() now produces real numbers.
+
+// A fake pool shared by the intraday job's own store (paperbot/store.js's createPgStore, which already
+// casts NUMERIC columns via its own NUM_COLS - see paperbot/store.js) AND the intraday-MIRROR store
+// (mirrorStore.js, the file this task fixes) - the same way one real `pool` serves both in production
+// (src/paper/ops/mirrorBackfillReport/run.js). Every numeric value given is a STRING on purpose.
+function createFakeStringNumericPool({ originalRows, mirrorRows }) {
+  return {
+    async query(sql, params = []) {
+      if (/FROM paper_trades/.test(sql)) {
+        if (/status = 'closed'/.test(sql)) return { rows: originalRows.filter((r) => r.status === 'closed') };
+        if (/status = 'open'/.test(sql)) return { rows: originalRows.filter((r) => r.status === 'open') };
+        return { rows: originalRows };
+      }
+      if (/FROM intraday_mirror_trades/.test(sql)) {
+        if (/original_trade_id = \$1/.test(sql)) {
+          const id = params[0];
+          return { rows: mirrorRows.filter((r) => String(r.original_trade_id) === String(id)) };
+        }
+        if (/status = 'closed'/.test(sql)) return { rows: mirrorRows.filter((r) => r.status === 'closed') };
+        if (/status = 'open'/.test(sql)) return { rows: mirrorRows.filter((r) => r.status === 'open') };
+        return { rows: mirrorRows };
+      }
+      return { rows: [] }; // paper_config, schema setup, exhaustion_only/trend_smc tables (unused by this job): nothing to replay
+    },
+  };
+}
+
+test('runJob() (scripts/mirrorBackfill.js): mirror P&L/win-rate are REAL numbers against a fake Postgres returning string numerics, not null/NaN', async () => {
+  // The original intraday trade: a real win, +₹500 net (already closed, already mirrored below - sync()
+  // has nothing new to open/close, so this test is purely about reading and casting existing rows).
+  const originalRows = [{
+    id: '1', market: 'crypto', symbol: 'BTCUSDT', status: 'closed', trade_date: '2026-11-10',
+    entry_price: '100', qty: '1', pnl_inr: '500', fx_rate: '90',
+    entry_time: new Date('2026-11-10T10:00:00Z'), exit_time: new Date('2026-11-10T10:30:00Z'),
+  }];
+  // Its mirror: the exact opposite side, a loss, -₹430 net - every NUMERIC column a STRING, exactly as
+  // real node-pg hands back exhaustion_only_mirror/trend_smc_mirror/scalp_mirror/scalp_wide_mirror/
+  // intraday_mirror_trades' own `numeric` columns (src/paper/bots/intraday_mirror/schema.sql).
+  const mirrorRows = [{
+    id: '1', original_trade_id: '1', symbol: 'BTCUSDT', status: 'closed', trade_date: '2026-11-10',
+    direction: 'SHORT', entry_price: '100', qty: '1', sl_price: '105', target_price: '95',
+    pnl_inr: '-430', gross_pnl_inr: '-400', fx_rate: '90',
+    entry_time: new Date('2026-11-10T10:00:00Z'), exit_time: new Date('2026-11-10T10:30:00Z'),
+  }];
+  const pool = createFakeStringNumericPool({ originalRows, mirrorRows });
+  const mainStore = require('../paperbot/store').createPgStore(() => pool, () => {});
+  const [intradayJob] = buildJobs({ mainStore, pool }).map((j) => ({ ...j, pool }));
+
+  const result = await runJob(intradayJob);
+
+  assert.equal(result.bot, 'intraday');
+  // original side (paperbot/store.js already casts - unaffected by this fix, used here as a sanity check)
+  assert.equal(result.original.trades, 1);
+  assert.equal(result.original.netPnlInr, 500);
+  // mirror side: THE BUG - before the fix, pnl_inr stayed the string '-430', and computeBotStats's
+  // `closed.reduce((s, t) => s + netOf(t), 0)` on a single-element array returns the STRING '-430'
+  // unchanged (0 + '-430' === '-430' in JS), which `round()` then turns into NaN - never a real number.
+  assert.equal(result.mirror.trades, 1);
+  assert.equal(result.mirror.netPnlInr, -430);
+  assert.ok(Number.isFinite(result.mirror.netPnlInr), 'mirror netPnlInr must be a real finite number, not NaN/null - the exact "mirror n/a" bug');
+  assert.equal(result.mirror.winRatePct, 0); // the one mirror trade lost -> 0% win rate, not null
+
+  // And the report block built from this row never prints "n/a" for the mirror's P&L/win rate (it may
+  // still say "n/a" for capital - no USDINR_FALLBACK was given to this job, which is a separate, honest
+  // "no rate" case, not the bug this test targets).
+  const block = botBlock({ bot: result.bot, mirrorLabel: result.mirrorLabel, original: result.original, mirror: result.mirror });
+  assert.doesNotMatch(block, /PnL:.*n\/a/);
+  assert.doesNotMatch(block, /Win rate:.*n\/a/);
+  assert.match(block, /-₹430/);
 });

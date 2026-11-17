@@ -124,7 +124,11 @@ original's "stop hit" is the mirror's "target hit", and vice versa). P&L is alwa
 (fees + slippage) is identical on both sides and a mirror pays its own costs rather than simply negating the original's net.
 
 Each mirror has its **own table, own trade ids, own virtual balance** - never a shared row or balance with the original it shadows
-(`src/paper/lib/mirrorStore.js`). The original bot's own code, store and schedule are completely untouched: a mirror plugin only
+(`src/paper/lib/mirrorStore.js`). Every read path there casts NUMERIC/DECIMAL columns (`entry_price`, `qty`, `sl_price`,
+`target_price`, `rr`, `gross_pnl_usdt`, `cost_usdt`, `net_pnl_usdt`, `gross_pnl_inr`, `pnl_inr`, `fx_rate`) to real JS numbers
+with a shared `castNumericColumns()` helper - node-pg returns NUMERIC columns as strings, which silently made
+`computeBotStats()` produce null/NaN net/win-rate/fees for every mirror bot against real Postgres (fixed for all five mirror
+tables at once, same fix, no bot special-cased). The original bot's own code, store and schedule are completely untouched: a mirror plugin only
 *reads* the original's store (`src/paper/lib/mirrorBot.js`'s `sync()`, run on its own cron tick) and writes only to its own table.
 Telegram alerts (`src/paper/ops/telegramAlerts/`) use the exact same `formatEntry`/`formatExit` as every other bot, with the bot
 label suffixed `-MIRROR` so the two sides are visually distinguishable in the same channel. The leaderboard and mix report
@@ -142,15 +146,18 @@ real intraday bot applies none) - `paperbot/bot.js` itself is unchanged and neve
 
 A one-off backfill (`node scripts/mirrorBackfill.js`, or `npm run report:mirror-backfill`; needs `PAPER_DATABASE_URL`) replays
 **every** historical closed trade of every original bot into its mirror - no sampling - by calling the exact same `sync()` the
-live mirror bots schedule, and writes a per-bot comparison (trades, net INR, win rate, fees, original vs mirror) to
-`docs/MIRROR-BACKFILL-REPORT.md`. That script needs `PAPER_DATABASE_URL` set wherever it is run, which this session was never
-given - so the committed `docs/MIRROR-BACKFILL-REPORT.md` only ever shows 0/n-a numbers from a sandbox with no database.
+live mirror bots schedule, and writes a per-bot comparison (trades, net INR, win rate, fees, capital used, original vs mirror) to
+`docs/MIRROR-BACKFILL-REPORT.md`. "Capital used" is that side's currently-open trades' own locked capital against its own
+configured total (the same `computeCapitalState()` the Telegram capital line uses, fed that side's own `allOpenTrades()`) -
+shown as `n/a`, never 0, when there is no `USDINR_FALLBACK` rate to express it in rupees with. That script needs
+`PAPER_DATABASE_URL` set wherever it is run, which this session was never given - so the committed
+`docs/MIRROR-BACKFILL-REPORT.md` only ever shows 0/n-a numbers from a sandbox with no database.
 
 **The real backfill now runs itself, on the production server** (`src/paper/ops/mirrorBackfillReport/`, auto-loaded by
 `src/paper/pluginLoader.js`): the first time the deployed server boots with `PAPER_DATABASE_URL` configured, it reuses the exact
 same `buildJobs()`/`runJob()` as the script above - no re-implementation - to replay every closed trade of every bot
 (`intraday`, `exhaustion_only`, `trend_smc`, `scalp`, `scalp_wide`) into its mirror, then sends a per-bot summary (trade count, original vs
-mirror net INR P&L, win rate, fees impact - "no trades yet" for a bot with none) plus a "best bot" line (highest combined
+mirror net INR P&L, win rate, fees impact, capital used - "no trades yet" for a bot with none) plus a "best bot" line (highest combined
 original+mirror net P&L) to Telegram, using the same `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` the trade alerts already use (split
 across 2-3 messages if the full report would exceed Telegram's ~4096-character limit). This runs **at most once, ever**: it
 claims a row in a tiny `system_flags` table (`src/paper/ops/mirrorBackfillReport/schema.sql`) atomically before running, so a
@@ -167,19 +174,25 @@ scalp_wide share `GET /api/paper/scalp-report` (tabs **Scalp**, **Scalp wide**, 
 /api/paper/bots-report` (leaderboard, above) and `GET /api/paper/mix-report` (suggestions only, above). Manual re-run of the
 production mirror backfill (above): `GET /api/paper/mirror-backfill-report?key=<PAPER_ADMIN_SECRET>`.
 
-## Telegram alerts: capital line
+## Telegram alerts: capital line (live running balance)
 
 Every trade alert (`src/paper/ops/telegramAlerts/format.js`'s `formatEntry`/`formatExit`, every bot and every `-MIRROR`, entry
-AND exit) carries one line showing that bot's total demo capital, how much of it THIS trade uses (in rupees and as a % of the
-total - `entry_price x qty`, already each trade's own fields, converted via the same `fxInfo()`/`USDINR_FALLBACK` the rest of
-the message already uses), and what is left. "Left" is the total minus only this one trade's own capital used, not a live
-running balance across every other open trade of the same bot (the formatter is pure and has no store access) - the line says
-"per-trade view" so it is never mistaken for a live balance. Capital totals come from each bot's own existing config, never an
-invented number: `paperbot/config.js`'s `DEFAULTS.nse.capital_inr` (nse) / `DEFAULTS.crypto.capital_usdt` (intraday),
-`SCALP_DEFAULTS`/`SCALP_WIDE_DEFAULTS`/`EXHAUSTION_ONLY_DEFAULTS`/`TREND_SMC_DEFAULTS`'s own `capital_usdt` for scalp/scalp_wide/
-exhaustion_only/trend_smc. `nse_scalp` has no capital config of its own in this repo - it is shown against the main `nse` pool
-as a documented assumption. Every `-MIRROR` bot shows the SAME total as the original it mirrors (no mirror-specific capital
-config exists). The line is omitted (not shown as 0 or guessed) when a caller does not pass `capitalTotal`.
+AND exit) carries total demo capital, how much of it THIS trade uses (in rupees and as a % of the total - `entry_price x qty`,
+already each trade's own fields, converted via the same `fxInfo()`/`USDINR_FALLBACK` the rest of the message already uses),
+and a LIVE running balance: "capital left now" = capitalTotal (in INR) + realized net P&L of that bot's own CLOSED trades so
+far - capital currently locked in that bot's own OPEN trades (each one's own `entry_price x qty`, converted via ITS OWN
+`fx_rate`/`nativeInr`, never the alert's own trade's rate) - plus the running net P&L itself, shown as its own explicit line
+(`computeCapitalState()` in format.js, pure and unit-tested - `register.js`'s `check()` reads that bot's own
+`closedTrades()`/`allOpenTrades()` once per 20s poll tick, the same store calls the leaderboard already makes, and passes the
+arrays in; the formatter itself never touches a database). This replaced the earlier "per-trade view" (total minus only this
+alert's own trade), which could not reflect the bot's other open positions. Capital totals come from each bot's own existing
+config, never an invented number: `paperbot/config.js`'s `DEFAULTS.nse.capital_inr` (nse) / `DEFAULTS.crypto.capital_usdt`
+(intraday), `SCALP_DEFAULTS`/`SCALP_WIDE_DEFAULTS`/`EXHAUSTION_ONLY_DEFAULTS`/`TREND_SMC_DEFAULTS`'s own `capital_usdt` for
+scalp/scalp_wide/exhaustion_only/trend_smc. `nse_scalp` has no capital config of its own in this repo - it is shown against the
+main `nse` pool as a documented assumption. Every `-MIRROR` bot shows the SAME total as the original it mirrors (no
+mirror-specific capital config exists) and its OWN book's realized/locked numbers (never the original's). The whole capital
+block is omitted (not shown as 0 or guessed) when a caller does not pass `capitalTotal`, or when there is no rate anywhere to
+express it in rupees with.
 
 ## Not attempted
 

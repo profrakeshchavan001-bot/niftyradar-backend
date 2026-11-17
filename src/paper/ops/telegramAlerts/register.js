@@ -136,11 +136,20 @@ function register(ctx) {
 
   // Built fresh on every check() (not captured once at register() time) so an own-table bot that
   // registers its store a little later, or never (disabled), is picked up or skipped correctly either way.
+  // closedFetch/openFetch (Task: live running capital balance): this bot's OWN current book - same
+  // store methods buildSources() already reads trades from, and the same ones the leaderboard already
+  // calls cheaply on every /api/paper/bots-report request (small, per-bot tables - docs/BOTS.md), so
+  // reading them once per source per 20s poll tick adds no new query shape to the codebase.
   function buildSources() {
     const sources = [];
     for (const [market, cfg] of Object.entries(SHARED_STORE_MARKETS)) {
       if (!wanted(market, cfg.label)) continue;
-      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, capitalTotal: cfg.capitalTotal, fetch: () => state.store.listTrades(50, market) });
+      sources.push({
+        label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, capitalTotal: cfg.capitalTotal,
+        fetch: () => state.store.listTrades(50, market),
+        closedFetch: () => state.store.closedTrades(market),
+        openFetch: () => state.store.openTrades(market),
+      });
     }
     for (const [bot, cfg] of Object.entries(OWN_TABLE_BOTS)) {
       if (!wanted(bot, cfg.label)) continue;
@@ -149,7 +158,12 @@ function register(ctx) {
         if (!warnedMissingStore.has(cfg.label)) { log(`[telegram-alerts] ${cfg.label} has no store yet (disabled, or not registered) - its alerts are skipped`); warnedMissingStore.add(cfg.label); }
         continue;
       }
-      sources.push({ label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, capitalTotal: cfg.capitalTotal, fetch: () => store.listTrades(50) });
+      sources.push({
+        label: cfg.label, nativeInr: cfg.nativeInr, costPct: cfg.costPct, capitalTotal: cfg.capitalTotal,
+        fetch: () => store.listTrades(50),
+        closedFetch: () => store.closedTrades(),
+        openFetch: () => store.allOpenTrades(),
+      });
     }
     return sources;
   }
@@ -158,10 +172,17 @@ function register(ctx) {
     for (const src of buildSources()) {
       let rows;
       try { rows = await src.fetch(); } catch (e) { log(`[telegram-alerts] could not read ${src.label} trades: ${e.message}`); continue; }
+      if (!rows.length) continue; // nothing to alert on this tick - skip the extra book reads below entirely
+      // Read this bot's own current book ONCE per tick (not once per trade row) - the same closedTrades()/
+      // allOpenTrades() the leaderboard already calls, just read here too for the live capital-left line.
+      // A failure here must never drop the entry/exit alerts themselves: fall back to "unknown book" (the
+      // formatter then shows no capital line rather than a wrong one - capitalLine requires a real total).
+      let closedTrades = []; let openTrades = [];
+      try { [closedTrades, openTrades] = await Promise.all([src.closedFetch(), src.openFetch()]); } catch (e) { log(`[telegram-alerts] could not read ${src.label}'s own book for the capital line: ${e.message}`); }
       for (const t of rows) {
         try {
-          if (!(await alreadySent(src.label, t.id, 'entry'))) await deliver(formatEntry(t, src.label, { costPct: src.costPct, usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal }));
-          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(src.label, t.id, 'exit'))) await deliver(formatExit(t, src.label, { usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal }));
+          if (!(await alreadySent(src.label, t.id, 'entry'))) await deliver(formatEntry(t, src.label, { costPct: src.costPct, usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal, closedTrades, openTrades }));
+          if (exitAlertsOn && t.status === 'closed' && !(await alreadySent(src.label, t.id, 'exit'))) await deliver(formatExit(t, src.label, { usdInrFallback: env.USDINR_FALLBACK, nativeInr: src.nativeInr, capitalTotal: src.capitalTotal, closedTrades, openTrades }));
         } catch (e) { log(`[telegram-alerts] trade ${t.id} (${src.label}) failed: ${e.message}`); } // one bad row must never stop the others
       }
     }

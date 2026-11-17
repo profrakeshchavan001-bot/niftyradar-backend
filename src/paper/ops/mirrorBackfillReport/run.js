@@ -9,8 +9,8 @@
 const { buildJobs, runJob } = require('../../../../scripts/mirrorBackfill');
 const { buildTelegramMessages } = require('./report');
 
-async function runBackfillAndBuildReport({ mainStore, pool }) {
-  const jobs = buildJobs({ mainStore, pool }).map((j) => ({ ...j, pool }));
+async function runBackfillAndBuildReport({ mainStore, pool, usdInrFallback }) {
+  const jobs = buildJobs({ mainStore, pool, usdInrFallback }).map((j) => ({ ...j, pool }));
   const rows = [];
   for (const job of jobs) rows.push(await runJob(job)); // sequential: a backfill is a one-off, never time-critical
   const generatedAt = new Date().toISOString();

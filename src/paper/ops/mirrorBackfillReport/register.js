@@ -87,7 +87,7 @@ module.exports = {
     async function doRun({ trigger }) {
       running = true;
       try {
-        const { rows, messages, tradeCount } = await runBackfillAndBuildReport({ mainStore, pool });
+        const { rows, messages, tradeCount } = await runBackfillAndBuildReport({ mainStore, pool, usdInrFallback: env.USDINR_FALLBACK });
         let sent = 0;
         if (token && chat) {
           sent = await sendTelegramMessages(messages, { axios, token, chat, log });

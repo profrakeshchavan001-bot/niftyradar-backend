@@ -25,9 +25,36 @@ function createMemoryMirrorStore() {
   };
 }
 
+// Root-cause fix (mirror P&L stats showed null/NaN against real Postgres - docs/MIRROR-BACKFILL-REPORT.md
+// "mirror n/a" on every bot): node-pg returns NUMERIC/DECIMAL columns as STRINGS, never JS numbers, to
+// avoid silently losing precision on values the driver cannot represent exactly - every mirror trade table
+// (exhaustion_only_mirror/trend_smc_mirror/scalp_mirror/scalp_wide_mirror/intraday_mirror schema.sql, all
+// five identical in shape) declares these same columns `numeric`. `computeBotStats`
+// (src/paper/bots/leaderboard/stats.js) then does plain arithmetic on them (`+`, `-`), which on a STRING
+// either concatenates or silently produces NaN - never a thrown error, so the bug only ever showed up as
+// null/NaN in a report, never a crash. `id`, `original_trade_id` and `trigger_t` are `bigint`, not
+// `numeric` - left alone here on purpose (same convention as `paperbot/store.js`'s own `NUM_COLS`, which
+// also only lists columns actually used as numbers downstream; nothing in this codebase does strict `===`
+// on a mirror row's own id, so the bigint-as-string node-pg already returns is not itself a bug).
+const NUMERIC_COLUMNS = ['entry_price', 'qty', 'sl_price', 'target_price', 'rr',
+  'gross_pnl_usdt', 'cost_usdt', 'net_pnl_usdt', 'gross_pnl_inr', 'pnl_inr', 'fx_rate'];
+
+/** Casts every column in `columns` (default: every NUMERIC/DECIMAL mirror-table column) to a real JS
+ * number when present and non-null; every other field (status, symbol, direction, exit_reason, basis,
+ * timestamps, ...) passes through unchanged. Safe on a row that lacks some columns (a partial SELECT). */
+function castNumericColumns(row, columns = NUMERIC_COLUMNS) {
+  if (!row) return row;
+  const out = { ...row };
+  for (const c of columns) if (out[c] != null) out[c] = Number(out[c]);
+  return out;
+}
+
 // pool: { query(sql, params) } (the pg Pool a plugin receives via ctx.pool). Mirrors the memory store's shape.
 function createPgMirrorStore(pool, tableName) {
-  const q = (sql, params) => pool.query(sql, params).then((r) => r.rows);
+  // Every read path goes through this one q() - casting NUMERIC columns here, once, fixes
+  // openTrades/allOpenTrades/tradesForDay/byOriginalId/closedTrades/listTrades together (byOriginalId
+  // calls q() too, below), rather than repeating the cast at each call site.
+  const q = (sql, params) => pool.query(sql, params).then((r) => r.rows.map((row) => castNumericColumns(row)));
   return {
     openTrades: (symbol) => q(`SELECT * FROM ${tableName} WHERE symbol = $1 AND status = 'open' ORDER BY id`, [symbol]),
     allOpenTrades: () => q(`SELECT * FROM ${tableName} WHERE status = 'open' ORDER BY id`),
@@ -48,4 +75,4 @@ function createPgMirrorStore(pool, tableName) {
   };
 }
 
-module.exports = { createMemoryMirrorStore, createPgMirrorStore };
+module.exports = { createMemoryMirrorStore, createPgMirrorStore, castNumericColumns, NUMERIC_COLUMNS };
