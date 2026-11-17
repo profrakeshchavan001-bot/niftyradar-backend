@@ -3,7 +3,7 @@
 // Every number is hand-worked in the comment right above its assertion - never copied from the function's output.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { formatEntry, formatExit, estimateMove, fxInfo, capitalLine } = require('../src/paper/ops/telegramAlerts/format');
+const { formatEntry, formatExit, estimateMove, fxInfo, capitalLine, computeCapitalState } = require('../src/paper/ops/telegramAlerts/format');
 
 const LONG = { direction: 'LONG', symbol: 'BTCUSDT', entry_price: 100, target_price: 110, sl_price: 95, target_type: 'swing high 1h', stop_type: 'pattern low + 1xATR', qty: 10, basis: 'order_block retest.\n15m trend up, VWAP reclaim.\nextra line never shown.', fx_rate: 90, fx_source: 'coingecko' };
 
@@ -86,25 +86,89 @@ test('formatExit: a loss shows a minus sign; stop/breakeven/other exit reasons w
   assert.match(formatExit({ symbol: 'X', exit_reason: 'breakeven', pnl_inr: 0 }, 'scalp'), /breakeven/);
 });
 
-// ---- Capital line (Task: capital line on every trade alert, entry AND exit). Every number hand-worked
-// in the comment right above its assertion - never copied from the function's own output.
+// ---- Capital line (Task: live running capital balance on every trade alert, entry AND exit) + the pure
+// computeCapitalState() it is built on. Every number hand-worked in the comment right above its assertion
+// - never copied from the function's own output.
 
-test('capitalLine: nativeInr (NSE) - total/used/left in rupees, % of total, hand-checked', () => {
-  // used = 101 * 500 = 50,500; pct = 50500/100000*100 = 50.5%; left = 100000 - 50500 = 49,500
+test('computeCapitalState: nativeInr (NSE) - total + locked (own fx/nativeInr per open trade) + realized net, hand-checked', () => {
+  // totalInr = 100000 (nativeInr, fx.rate=1 so total*1=total)
+  // realizedNet = 2000 + (-500) = 1500
+  // locked = 101*500 (nativeInr, no fx) = 50,500
+  // capitalLeft = 100000 + 1500 - 50500 = 51,000
+  const state = computeCapitalState({
+    capitalTotal: 100000, nativeInr: true, fx: { rate: 1 },
+    closedTrades: [{ pnl_inr: 2000 }, { pnl_inr: -500 }],
+    openTrades: [{ entry_price: 101, qty: 500 }],
+  });
+  assert.deepEqual(state, { totalInr: 100000, realizedNetInr: 1500, lockedInr: 50500, capitalLeftInr: 51000 });
+});
+
+test('computeCapitalState: crypto - each open trade converted via ITS OWN fx_rate, not the total\'s rate, hand-checked', () => {
+  // totalInr = 1000 * 90 = 90,000
+  // realizedNet = 3000 + (-1200) = 1800
+  // locked = (100*2*90) + (50*1*85) = 18,000 + 4,250 = 22,250 (second open trade's OWN fx_rate, 85, not 90)
+  // capitalLeft = 90000 + 1800 - 22250 = 69,550
+  const state = computeCapitalState({
+    capitalTotal: 1000, nativeInr: false, fx: { rate: 90 },
+    closedTrades: [{ pnl_inr: 3000 }, { pnl_inr: -1200 }],
+    openTrades: [{ entry_price: 100, qty: 2, fx_rate: 90 }, { entry_price: 50, qty: 1, fx_rate: 85 }],
+  });
+  assert.deepEqual(state, { totalInr: 90000, realizedNetInr: 1800, lockedInr: 22250, capitalLeftInr: 69550 });
+});
+
+test('computeCapitalState: an open trade with no fx_rate and no usdInrFallback contributes nothing to locked (never an invented rate)', () => {
+  // locked = only the first open trade (100*2*90 = 18,000); the second has no rate anywhere, so it is skipped
+  const state = computeCapitalState({
+    capitalTotal: 1000, nativeInr: false, fx: { rate: 90 },
+    closedTrades: [],
+    openTrades: [{ entry_price: 100, qty: 2, fx_rate: 90 }, { entry_price: 999, qty: 5 }],
+  });
+  assert.equal(state.lockedInr, 18000);
+});
+
+test('computeCapitalState: no capitalTotal or no fx -> null, never a half-guessed number', () => {
+  assert.equal(computeCapitalState({ capitalTotal: 0, fx: { rate: 90 } }), null);
+  assert.equal(computeCapitalState({ capitalTotal: 1000, fx: null }), null);
+  assert.equal(computeCapitalState(), null);
+});
+
+test('capitalLine: nativeInr (NSE) - total/used/left-now/running-net in rupees, hand-checked', () => {
+  // used = 101 * 500 = 50,500; pct = 50500/100000*100 = 50.5%
+  // realizedNet = 2000 + (-500) = 1,500; locked (this same open trade, in the book snapshot) = 50,500
+  // left now = 100000 + 1500 - 50500 = 51,000
   const t = { entry_price: 101, qty: 500 };
-  assert.equal(capitalLine(t, { capitalTotal: 100000, nativeInr: true }), 'Capital: ₹1,00,000 total | this trade ₹50,500 (50.5%) | ₹49,500 left (per-trade view)');
+  const text = capitalLine(t, {
+    capitalTotal: 100000, nativeInr: true,
+    closedTrades: [{ pnl_inr: 2000 }, { pnl_inr: -500 }],
+    openTrades: [{ entry_price: 101, qty: 500 }],
+  });
+  assert.equal(text, 'Capital: ₹1,00,000 total | this trade ₹50,500 (50.5%) | ₹51,000 left now\nRunning net P&L: +₹1,500');
 });
 
-test('capitalLine: crypto with a real fx rate - converts total AND used to rupees, hand-checked', () => {
-  // used = 100 * 2 = 200 USDT; pct = 200/1000*100 = 20%; total INR = 1000*90 = 90,000; used INR = 200*90 = 18,000; left = 72,000
+test('capitalLine: crypto with a real fx rate - converts total AND used to rupees, live balance hand-checked', () => {
+  // used = 100 * 2 = 200 USDT; pct = 20%; total INR = 1000*90 = 90,000; used INR = 200*90 = 18,000
+  // realizedNet = 3000 + (-1200) = 1,800
+  // locked = this same open trade (100*2*90=18,000) + another open trade (50*1*90=4,500) = 22,500
+  // left now = 90000 + 1800 - 22500 = 69,300
   const t = { entry_price: 100, qty: 2, fx_rate: 90, fx_source: 'coingecko' };
-  assert.equal(capitalLine(t, { capitalTotal: 1000, nativeInr: false }), 'Capital: ₹90,000 total | this trade ₹18,000 (20%) | ₹72,000 left (per-trade view)');
+  const text = capitalLine(t, {
+    capitalTotal: 1000, nativeInr: false,
+    closedTrades: [{ pnl_inr: 3000 }, { pnl_inr: -1200 }],
+    openTrades: [{ entry_price: 100, qty: 2, fx_rate: 90 }, { entry_price: 50, qty: 1, fx_rate: 90 }],
+  });
+  assert.equal(text, 'Capital: ₹90,000 total | this trade ₹18,000 (20%) | ₹69,300 left now\nRunning net P&L: +₹1,800');
 });
 
-test('capitalLine: crypto with NO fx anywhere - shows USD and says "rate n/a", never an invented rate', () => {
-  // used = 100 * 2 = 200 USDT; pct = 20%; left = 1000 - 200 = 800
+test('capitalLine: no closedTrades/openTrades passed -> reads as "no other activity known" (realized 0, locked 0), never a crash', () => {
+  // used = 100*2=200 USDT, pct 20%, total INR 90,000, used INR 18,000; realizedNet=0, locked=0 -> left now = 90,000
+  const t = { entry_price: 100, qty: 2, fx_rate: 90 };
+  assert.equal(capitalLine(t, { capitalTotal: 1000 }), 'Capital: ₹90,000 total | this trade ₹18,000 (20%) | ₹90,000 left now\nRunning net P&L: +₹0');
+});
+
+test('capitalLine: crypto with NO fx anywhere - shows USD and says "rate n/a", never an invented rate (legacy per-trade fallback)', () => {
+  // used = 100 * 2 = 200 USDT; pct = 20%; left = 1000 - 200 = 800 (no INR rate anywhere, so no live balance either)
   const t = { entry_price: 100, qty: 2, fx_rate: null };
-  assert.equal(capitalLine(t, { capitalTotal: 1000, nativeInr: false }), 'Capital: $1000 total | this trade $200 (20%) | $800 left (rate n/a, per-trade view)');
+  assert.equal(capitalLine(t, { capitalTotal: 1000, nativeInr: false }), 'Capital: $1000 total | this trade $200 (20%) | $800 left (rate n/a, per-trade only)');
 });
 
 test('capitalLine: no capitalTotal passed -> null, never a guessed number', () => {
@@ -113,23 +177,37 @@ test('capitalLine: no capitalTotal passed -> null, never a guessed number', () =
   assert.equal(capitalLine({ entry_price: 100, qty: 2 }), null); // opts entirely omitted
 });
 
-test('formatEntry: capital line appears right after Reward:Risk, before the blank line and Kyu, only when capitalTotal is passed', () => {
-  const withCap = formatEntry(LONG, 'intraday', { costPct: 0, capitalTotal: 1000 }).split('\n');
-  // used = 100*10 = 1000 USDT = 100% of capitalTotal -> total INR = 1000*90 = 90,000; used INR = 1000*90 = 90,000; left = 0
-  assert.equal(withCap[9], 'Capital: ₹90,000 total | this trade ₹90,000 (100%) | ₹0 left (per-trade view)');
-  assert.equal(withCap[10], ''); // the blank separator before Kyu is still there, just shifted down one line
-  assert.equal(withCap[11], 'Kyu: order_block retest. 15m trend up, VWAP reclaim.');
+test('formatEntry: capital line (2 lines) appears right after Reward:Risk, before the blank line and Kyu, only when capitalTotal is passed', () => {
+  // used = 100*10 = 1000 USDT = 100% of capitalTotal -> total INR = 1000*90 = 90,000; used INR = 90,000
+  // realizedNet (one closed trade) = 500; locked (this same trade, now open) = 100*10*90 = 90,000
+  // left now = 90000 + 500 - 90000 = 500
+  const withCap = formatEntry(LONG, 'intraday', {
+    costPct: 0, capitalTotal: 1000,
+    closedTrades: [{ pnl_inr: 500 }],
+    openTrades: [{ entry_price: 100, qty: 10, fx_rate: 90 }],
+  }).split('\n');
+  assert.equal(withCap[9], 'Capital: ₹90,000 total | this trade ₹90,000 (100%) | ₹500 left now');
+  assert.equal(withCap[10], 'Running net P&L: +₹500');
+  assert.equal(withCap[11], ''); // the blank separator before Kyu is still there, just shifted down two lines
+  assert.equal(withCap[12], 'Kyu: order_block retest. 15m trend up, VWAP reclaim.');
 
   // without capitalTotal, the layout is byte-for-byte the same as before this feature (no new blank line, no stray text)
   const withoutCap = formatEntry(LONG, 'intraday', { costPct: 0 });
   assert.ok(!withoutCap.includes('Capital:'));
 });
 
-test('formatExit: capital line appears as the last line, only when capitalTotal is passed', () => {
+test('formatExit: capital line (2 lines) appears last, only when capitalTotal is passed', () => {
   const t = { symbol: 'BTCUSDT', exit_reason: 'target', pnl_inr: 4500, entry_time: '2026-11-14T10:00:00Z', exit_time: '2026-11-14T10:37:00Z', entry_price: 100, qty: 2 };
-  const withCap = formatExit(t, 'intraday', { capitalTotal: 1000, nativeInr: false, usdInrFallback: 90 });
-  // used = 100*2 = 200 USDT; pct = 20%; total INR = 1000*90 = 90,000; used INR = 18,000; left = 72,000
-  assert.match(withCap, /Capital: ₹90,000 total \| this trade ₹18,000 \(20%\) \| ₹72,000 left \(per-trade view\)$/);
+  // used = 100*2 = 200 USDT; pct = 20%; total INR = 1000*90 = 90,000; used INR = 18,000
+  // realizedNet (this same trade, now closed) = 4500; locked (no other open trades) = 0
+  // left now = 90000 + 4500 - 0 = 94,500
+  const withCap = formatExit(t, 'intraday', {
+    capitalTotal: 1000, nativeInr: false, usdInrFallback: 90,
+    closedTrades: [{ pnl_inr: 4500 }], openTrades: [],
+  });
+  const lines = withCap.split('\n');
+  assert.equal(lines[lines.length - 2], 'Capital: ₹90,000 total | this trade ₹18,000 (20%) | ₹94,500 left now');
+  assert.equal(lines[lines.length - 1], 'Running net P&L: +₹4,500');
 
   const withoutCap = formatExit(t, 'intraday');
   assert.ok(!withoutCap.includes('Capital:'));
