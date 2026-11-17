@@ -148,9 +148,18 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('[mirror-backfill] failed:', e && e.message ? e.message : e);
-  process.exitCode = 1;
-});
+// Only run main() when this file is actually executed as the CLI script (`node scripts/mirrorBackfill.js`
+// / `npm run report:mirror-backfill`) - NOT merely required as a library. src/paper/ops/mirrorBackfillReport/
+// (the production, DB-backed, Telegram-reporting job added after this script) reuses buildJobs()/runJob()
+// by requiring this file; without this guard that require() would ALSO fire this script's own main() as a
+// side effect - on a server with PAPER_DATABASE_URL set, that means a second, unflagged, unreported
+// backfill run (and its own fresh `pg.Pool`) on every single `require()`, completely outside the one-time
+// guard and Telegram report that job is responsible for.
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('[mirror-backfill] failed:', e && e.message ? e.message : e);
+    process.exitCode = 1;
+  });
+}
 
-module.exports = { buildJobs, sideSummary, toMarkdown };
+module.exports = { buildJobs, sideSummary, toMarkdown, runJob };

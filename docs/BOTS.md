@@ -133,13 +133,28 @@ label suffixed `-MIRROR` so the two sides are visually distinguishable in the sa
 A one-off backfill (`node scripts/mirrorBackfill.js`, or `npm run report:mirror-backfill`; needs `PAPER_DATABASE_URL`) replays
 **every** historical closed trade of every original bot into its mirror - no sampling - by calling the exact same `sync()` the
 live mirror bots schedule, and writes a per-bot comparison (trades, net INR, win rate, fees, original vs mirror) to
-`docs/MIRROR-BACKFILL-REPORT.md`.
+`docs/MIRROR-BACKFILL-REPORT.md`. That script needs `PAPER_DATABASE_URL` set wherever it is run, which this session was never
+given - so the committed `docs/MIRROR-BACKFILL-REPORT.md` only ever shows 0/n-a numbers from a sandbox with no database.
+
+**The real backfill now runs itself, on the production server** (`src/paper/ops/mirrorBackfillReport/`, auto-loaded by
+`src/paper/pluginLoader.js`): the first time the deployed server boots with `PAPER_DATABASE_URL` configured, it reuses the exact
+same `buildJobs()`/`runJob()` as the script above - no re-implementation - to replay every closed trade of every bot
+(`exhaustion_only`, `trend_smc`, `scalp`, `scalp_wide`) into its mirror, then sends a per-bot summary (trade count, original vs
+mirror net INR P&L, win rate, fees impact - "no trades yet" for a bot with none) plus a "best bot" line (highest combined
+original+mirror net P&L) to Telegram, using the same `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` the trade alerts already use (split
+across 2-3 messages if the full report would exceed Telegram's ~4096-character limit). This runs **at most once, ever**: it
+claims a row in a tiny `system_flags` table (`src/paper/ops/mirrorBackfillReport/schema.sql`) atomically before running, so a
+restart or redeploy never re-sends the report. To re-run it by hand later (e.g. once real trading has accumulated more
+history), hit `GET /api/paper/mirror-backfill-report?key=<PAPER_ADMIN_SECRET>` (or the `x-paper-secret` header, same convention
+as every other `/api/paper/` route) - that re-run deliberately bypasses the once-ever guard, but a simple in-process lock
+refuses a second concurrent call (`429`) so two overlapping manual calls can never double-send.
 
 ## Report
 
 `exhaustion_only`: `GET /api/paper/exhaustion-report?key=<PAPER_ADMIN_SECRET>`. `trend_smc`: `GET /api/paper/trend-smc-report`. Scalp and
 scalp_wide share `GET /api/paper/scalp-report` (tabs **Scalp**, **Scalp wide**, **Intraday**). Across every bot: `GET
-/api/paper/bots-report` (leaderboard, above) and `GET /api/paper/mix-report` (suggestions only, above).
+/api/paper/bots-report` (leaderboard, above) and `GET /api/paper/mix-report` (suggestions only, above). Manual re-run of the
+production mirror backfill (above): `GET /api/paper/mirror-backfill-report?key=<PAPER_ADMIN_SECRET>`.
 
 ## Not attempted
 
