@@ -11,7 +11,7 @@
 const { istParts, istDayStart } = require('../../../../paperbot/time');
 const { computeBotStats } = require('../../bots/leaderboard/stats');
 const { inr } = require('../../../../paperbot/report');
-const { MIRROR_OF } = require('./fetch');
+const { MIRROR_OF, REVERSE_OF } = require('./fetch');
 
 const FIVE_AM_MS = 5 * 60 * 60 * 1000;
 
@@ -89,7 +89,9 @@ function overallSection(stats) {
   const lines = ['', 'OVERALL STATUS (shuruaat se):'];
   let grandTrades = 0; let grandNet = 0; let grandFees = 0;
   for (const [original, mirror] of Object.entries(MIRROR_OF)) {
-    for (const bot of [original, mirror]) {
+    // 3-way where a REVERSE bot exists (this task: intraday, scalp_wide) - original/MIRROR/REVERSE in
+    // the same group; every other original stays original/MIRROR only, exactly as before.
+    for (const bot of [original, mirror, REVERSE_OF[original]].filter(Boolean)) {
       const s = stats[bot];
       if (!s) continue;
       grandTrades += s.trades; grandNet += s.netPnlInr; grandFees += s.costsInr;

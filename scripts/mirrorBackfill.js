@@ -32,6 +32,8 @@ const { loadMcxGoldConfig, MCX_GOLD_DEFAULTS } = require('../src/paper/bots/mcx_
 const { loadMcxCrudeConfig, MCX_CRUDE_DEFAULTS } = require('../src/paper/bots/mcx_crude/config');
 const { createPgMirrorStore } = require('../src/paper/lib/mirrorStore');
 const { createMirrorBot } = require('../src/paper/lib/mirrorBot');
+const { createReverseBot } = require('../src/paper/lib/reverseBot');
+const { estimateReverseExit } = require('../src/paper/lib/reverse');
 const { computeBotStats } = require('../src/paper/bots/leaderboard/stats');
 const { createPgCurrencyStore } = require('../src/paper/lib/currencyStore');
 const { settleInr } = require('../src/paper/lib/currencyEngine');
@@ -64,6 +66,7 @@ function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
       // comment); loadCfg mirrors what paperbot/bot.js's cryptoScan/cryptoMonitor themselves read
       // ((await loadConfig(mainStore)).crypto), not re-invented here.
       bot: 'intraday', mirrorLabel: 'intraday-MIRROR', mirrorTable: 'intraday_mirror_trades',
+      reverseLabel: 'intraday-REVERSE', reverseTable: 'intraday_reverse_trades', // this task
       originalStore: { allOpenTrades: () => mainStore.openTrades('crypto'), closedTrades: () => mainStore.closedTrades('crypto') },
       settle: settleIntraday, loadCfg: async () => (await loadConfig(mainStore)).crypto,
       capitalTotal: PAPERBOT_DEFAULTS.crypto.capital_usdt, usdInrFallback,
@@ -86,6 +89,7 @@ function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
     },
     {
       bot: 'scalp_wide', mirrorLabel: 'scalp_wide-MIRROR', mirrorTable: 'scalp_wide_mirror_trades',
+      reverseLabel: 'scalp_wide-REVERSE', reverseTable: 'scalp_wide_reverse_trades', // this task
       originalStore: { allOpenTrades: () => mainStore.openTrades(SCALP_WIDE_MARKET), closedTrades: () => mainStore.closedTrades(SCALP_WIDE_MARKET) },
       settle: settleScalp, loadCfg: () => loadScalpWideConfig(mainStore),
       capitalTotal: SCALP_WIDE_DEFAULTS.capital_usdt, usdInrFallback,
@@ -138,6 +142,35 @@ function sideSummary(closed, open = [], { capitalTotal, usdInrFallback, nativeIn
   };
 }
 
+// REVERSE backfill (this task, intraday/scalp_wide only - job.reverseTable is undefined for every other
+// bot): opens a reverse row for EVERY original trade via the SAME createReverseBot().sync() the live
+// <bot>_reverse/register.js schedules on a cron (no sampling, same convention as the mirror side above),
+// then resolves as many OPEN reverse rows as the stored data honestly allows via
+// estimateReverseExit() (src/paper/lib/reverse.js) - there is no stored candle history for this backfill
+// to run the real, live, candle-accurate monitor on, so a reverse trade that cannot be resolved from its
+// original's own stored row stays OPEN rather than being force-closed with an invented number.
+async function runReverseBackfill(job, { originalClosed, originalOpen }) {
+  const reverseStore = createPgMirrorStore(job.pool, job.reverseTable);
+  const bot = createReverseBot({ originalStore: job.originalStore, reverseStore, fetchCandles: async () => [], evaluateExitFn: () => ({ exit: false }), settle: job.settle, loadCfg: job.loadCfg, log: () => {}, label: job.bot });
+  const { opened } = await bot.sync();
+  const byId = new Map([...originalClosed, ...originalOpen].map((o) => [o.id, o]));
+  const cfg = await job.loadCfg();
+  let resolved = 0;
+  for (const r of await reverseStore.allOpenTrades()) {
+    const original = byId.get(r.original_trade_id);
+    if (!original || original.status !== 'closed') continue;
+    const patch = estimateReverseExit(original, r);
+    if (!patch) continue; // genuinely inconclusive from the stored row alone - left open, never guessed
+    const fxRate = original.fx_rate != null && Number(original.fx_rate) > 0 ? Number(original.fx_rate) : (job.usdInrFallback || 88);
+    const s = job.settle({ trade: r, exitPrice: patch.exit_price, cfg, fxRate });
+    await reverseStore.updateTrade(r.id, { ...patch, ...s });
+    resolved += 1;
+  }
+  const [reverseClosed, reverseOpen] = await Promise.all([reverseStore.closedTrades(), reverseStore.allOpenTrades()]);
+  const sideOpts = { capitalTotal: job.capitalTotal, usdInrFallback: job.usdInrFallback, nativeInr: job.nativeInr || false };
+  return { reverseLabel: job.reverseLabel, opened, resolvedThisRun: resolved, leftOpen: reverseOpen.length, ...sideSummary(reverseClosed, reverseOpen, sideOpts) };
+}
+
 async function runJob(job) {
   const mirrorStore = createPgMirrorStore(job.pool, job.mirrorTable);
   const bot = createMirrorBot({ originalStore: job.originalStore, mirrorStore, settle: job.settle, loadCfg: job.loadCfg, log: () => {}, label: job.bot });
@@ -147,9 +180,11 @@ async function runJob(job) {
     job.originalStore.allOpenTrades(), mirrorStore.allOpenTrades(),
   ]);
   const sideOpts = { capitalTotal: job.capitalTotal, usdInrFallback: job.usdInrFallback, nativeInr: job.nativeInr || false };
+  const reverse = job.reverseTable ? await runReverseBackfill(job, { originalClosed, originalOpen }) : null;
   return {
     bot: job.bot, mirrorLabel: job.mirrorLabel, opened, closedThisRun: closed,
     original: sideSummary(originalClosed, originalOpen, sideOpts), mirror: sideSummary(mirrorClosed, mirrorOpen, sideOpts),
+    reverse,
   };
 }
 
@@ -188,7 +223,38 @@ function toMarkdown(rows, { generatedAt, dbConfigured }) {
     out += `- Original: ${r.original.trades} closed trades, gross ${inr(r.original.grossPnlInr)}, net ${inr(r.original.netPnlInr)}, `
       + `fees ${inr(r.original.feesInr)}, win rate ${pct(r.original.winRatePct)}, capital used ${inrPlain(r.original.capitalUsedInr)} of ${inrPlain(r.original.capitalTotalInr)}\n`;
     out += `- Mirror: ${r.mirror.trades} closed trades, gross ${inr(r.mirror.grossPnlInr)}, net ${inr(r.mirror.netPnlInr)}, `
-      + `fees ${inr(r.mirror.feesInr)}, win rate ${pct(r.mirror.winRatePct)}, capital used ${inrPlain(r.mirror.capitalUsedInr)} of ${inrPlain(r.mirror.capitalTotalInr)}\n\n`;
+      + `fees ${inr(r.mirror.feesInr)}, win rate ${pct(r.mirror.winRatePct)}, capital used ${inrPlain(r.mirror.capitalUsedInr)} of ${inrPlain(r.mirror.capitalTotalInr)}\n`;
+    if (r.reverse) {
+      out += `- Reverse: ${r.reverse.trades} closed trades (${r.reverse.leftOpen} left open - see note below), gross ${inr(r.reverse.grossPnlInr)}, `
+        + `net ${inr(r.reverse.netPnlInr)}, fees ${inr(r.reverse.feesInr)}, win rate ${pct(r.reverse.winRatePct)}, `
+        + `capital used ${inrPlain(r.reverse.capitalUsedInr)} of ${inrPlain(r.reverse.capitalTotalInr)}\n`;
+    }
+    out += '\n';
+  }
+  const withReverse = rows.filter((r) => r.reverse);
+  if (withReverse.length) {
+    out += '## 3-way comparison: original vs MIRROR vs REVERSE\n\n'
+      + 'REVERSE (this task) takes the SAME direction as the MIRROR (opposite of the original) but with its '
+      + 'own proper reward:risk (2.0: stop at the original\'s own stop distance, target at 2x that distance) '
+      + 'instead of the mirror\'s swapped, ~0.3 reward:risk levels - src/paper/lib/reverse.js. Only intraday '
+      + 'and scalp_wide have a REVERSE bot, as asked.\n\n'
+      + '> **Reverse numbers here are a conservative estimate, not a live replay.** No candle history is '
+      + 'stored anywhere in this schema, so this backfill cannot run the real, candle-accurate monitor the '
+      + 'live `<bot>-REVERSE` cron does retroactively - it can only resolve a reverse trade\'s exit when the '
+      + 'original\'s own stored row PROVES it (src/paper/lib/reverse.js\'s estimateReverseExit): the original '
+      + 'hitting its own target always means the reverse side had already been stopped out (its reward:risk '
+      + 'is always >= 1, so the stop distance is always crossed first); anything else is left OPEN rather '
+      + 'than guessed. "Left open" counts below are real and will fall over time as the live bot resolves '
+      + 'them going forward.\n\n';
+    out += '| Bot | Trades (orig / mirror / reverse) | Net P&L (orig / mirror / reverse) | Win rate (orig / mirror / reverse) | Fees (orig / mirror / reverse) |\n';
+    out += '|---|---|---|---|---|\n';
+    for (const r of withReverse) {
+      out += `| ${r.bot} | ${r.original.trades} / ${r.mirror.trades} / ${r.reverse.trades} (${r.reverse.leftOpen} open) | `
+        + `${inr(r.original.netPnlInr)} / ${inr(r.mirror.netPnlInr)} / ${inr(r.reverse.netPnlInr)} | `
+        + `${pct(r.original.winRatePct)} / ${pct(r.mirror.winRatePct)} / ${pct(r.reverse.winRatePct)} | `
+        + `${inr(r.original.feesInr)} / ${inr(r.mirror.feesInr)} / ${inr(r.reverse.feesInr)} |\n`;
+    }
+    out += '\n';
   }
   return out;
 }
