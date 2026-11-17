@@ -357,3 +357,15 @@ test('formatExit: capital line (2 lines) appears last, only when capitalTotal is
   const withoutCap = formatExit(t, 'intraday');
   assert.ok(!withoutCap.includes('Capital:'));
 });
+
+test('computeCapitalState: capitalLeftInr is floored at 0, never negative (backfill bug report problem 1 - a bot whose openTrades legitimately holds more than its own total must still show a presentable number)', () => {
+  // totalInr = 1000 * 90 = 90,000; realizedNet = 0; locked = 50*90*90 = 405,000 (way more than the total,
+  // e.g. hundreds of still-open backfilled rows) -> raw capitalLeft would be 90000 - 405000 = -315,000
+  const state = computeCapitalState({
+    capitalTotal: 1000, nativeInr: false, fx: { rate: 90 },
+    closedTrades: [],
+    openTrades: Array.from({ length: 50 }, () => ({ entry_price: 90, qty: 1, fx_rate: 90 })),
+  });
+  assert.equal(state.capitalLeftInr, 0);
+  assert.equal(state.lockedInr, 405000); // the real locked figure is still reported as-is, only "left" is floored
+});

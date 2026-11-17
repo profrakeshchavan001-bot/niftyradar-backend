@@ -379,3 +379,32 @@ test('runJob() (scripts/mirrorBackfill.js): mirror P&L/win-rate are REAL numbers
   assert.doesNotMatch(block, /Win rate:.*n\/a/);
   assert.match(block, /-₹430/);
 });
+
+// ---------- backfill bug report problem 3: wins/losses/best-worst + per-trade table in the ONE summary ----------
+
+test('botBlock: shows wins/losses/best/worst for the mirror and reverse sides when sideSummary() provides them', () => {
+  const r = reverseRow({
+    bot: 'intraday', mirrorLabel: 'intraday-MIRROR', trades: 10, mirrorTrades: 10, reverseTrades: 8, leftOpen: 2,
+  });
+  r.mirror.wins = 4; r.mirror.losses = 6; r.mirror.bestTradeInr = 900; r.mirror.bestSymbol = 'BTCUSDT'; r.mirror.worstTradeInr = -300; r.mirror.worstSymbol = 'ETHUSDT';
+  r.reverse.wins = 5; r.reverse.losses = 3; r.reverse.bestTradeInr = 1600; r.reverse.bestSymbol = 'SOLUSDT'; r.reverse.worstTradeInr = -400; r.reverse.worstSymbol = 'ETHUSDT';
+  const text = botBlock(r);
+  assert.match(text, /Mirror: 4 wins, 6 losses, best \+₹900 \(BTCUSDT\), worst -₹300 \(ETHUSDT\)/);
+  assert.match(text, /Reverse: 5 wins, 3 losses, best \+₹1,600 \(SOLUSDT\), worst -₹400 \(ETHUSDT\)/);
+});
+
+test('botBlock: renders the per-trade table (#, symbol, direction, net) for mirror/reverse when sideSummary() provides tradeTable, no sampling', () => {
+  const r = reverseRow({ bot: 'intraday', mirrorLabel: 'intraday-MIRROR', trades: 2, mirrorTrades: 2, reverseTrades: 2 });
+  r.mirror.tradeTable = [{ id: 1, symbol: 'BTCUSDT', direction: 'SHORT', netPnlInr: -300 }, { id: 2, symbol: 'ETHUSDT', direction: 'LONG', netPnlInr: 900 }];
+  r.reverse.tradeTable = [{ id: 1, symbol: 'BTCUSDT', direction: 'SHORT', netPnlInr: 1600 }];
+  const text = botBlock(r);
+  assert.match(text, /Mirror trades:\n#1 BTCUSDT SHORT -₹300\n#2 ETHUSDT LONG \+₹900/);
+  assert.match(text, /Reverse trades:\n#1 BTCUSDT SHORT \+₹1,600/);
+});
+
+test('botBlock: no wins/losses or tradeTable given (older/fixture rows) -> no such lines at all, never a blank/NaN section', () => {
+  const r = reverseRow({ bot: 'intraday', mirrorLabel: 'intraday-MIRROR', trades: 2, mirrorTrades: 2, reverseTrades: 2 });
+  const text = botBlock(r);
+  assert.ok(!/wins/.test(text));
+  assert.ok(!/trades:\n#/.test(text));
+});

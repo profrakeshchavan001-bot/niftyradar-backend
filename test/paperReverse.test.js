@@ -93,3 +93,58 @@ test('estimateReverseExit: no stop distance (degenerate row) -> null, never divi
   const reverseEntry = { direction: 'LONG', entry_price: 100, sl_price: 100, target_price: 100 };
   assert.equal(estimateReverseExit({ exit_reason: 'stop', exit_price: 95 }, reverseEntry), null);
 });
+
+// --- excursion-based resolution (root-cause fix, backfill bug report problem 2: "exits never arrived"
+// for a bot whose trades mostly end in 'stop'/'time' - the single-exit-point checks above alone almost
+// never resolve those; max_fav_pct/max_adv_pct (tracked on every original trade) resolve far more of them,
+// still never a guess. ---
+
+test('estimateReverseExit: original swung far in ITS OWN favor before eventually time-exiting -> reverse PROVABLY hit its own stop', () => {
+  // original LONG, entry 100, reverse (SHORT) stop at 105 (distance 5), target at 90 (distance 10).
+  // original's max_fav_pct = +8% (price reached 108 at best for the original) - that is 8 against the
+  // reverse (SHORT), past its 5-wide stop - while original's max_adv_pct = -1% (barely moved the other
+  // way) - only 1 in the reverse's favor, nowhere near its own 10-wide target. Only the stop is provably
+  // crossed.
+  const original = { exit_reason: 'time', exit_price: 102, exit_time: '2026-11-01T02:00:00Z', max_fav_pct: 8, max_adv_pct: -1 };
+  const reverseEntry = { direction: 'SHORT', entry_price: 100, sl_price: 105, target_price: 90 };
+  const r = estimateReverseExit(original, reverseEntry);
+  assert.deepEqual(r, { status: 'closed', exit_price: 105, exit_time: original.exit_time, exit_reason: 'stop', estimated: true });
+});
+
+test('estimateReverseExit: original swung far AGAINST itself before stopping out -> reverse PROVABLY hit its own target', () => {
+  // original LONG, entry 100, reverse (SHORT) stop 105 (distance 5), target 90 (distance 10). original's
+  // max_adv_pct = -12% (price dropped to 88 at worst for the original) - that is 12 in the reverse's
+  // favor, past its 10-wide target - while max_fav_pct = +0.5% (barely moved up) - only 0.5 against the
+  // reverse, nowhere near its 5-wide stop. Only the target is provably crossed.
+  const original = { exit_reason: 'stop', exit_price: 95, exit_time: '2026-11-01T02:00:00Z', max_fav_pct: 0.5, max_adv_pct: -12 };
+  const reverseEntry = { direction: 'SHORT', entry_price: 100, sl_price: 105, target_price: 90 };
+  const r = estimateReverseExit(original, reverseEntry);
+  assert.deepEqual(r, { status: 'closed', exit_price: 90, exit_time: original.exit_time, exit_reason: 'target', estimated: true });
+});
+
+test('estimateReverseExit: original barely moved either way -> still genuinely inconclusive (excursion proves neither threshold), left OPEN', () => {
+  const original = { exit_reason: 'stop', exit_price: 95, exit_time: '2026-11-01T02:00:00Z', max_fav_pct: 0.2, max_adv_pct: -5 };
+  const reverseEntry = { direction: 'SHORT', entry_price: 100, sl_price: 105, target_price: 90 };
+  assert.equal(estimateReverseExit(original, reverseEntry), null);
+});
+
+test('estimateReverseExit: both the reverse\'s own stop AND target were crossed within the original\'s life -> order unknown, left OPEN rather than guessed', () => {
+  // max_fav_pct +6 (6 against reverse, past its 5-wide stop) AND max_adv_pct -11 (11 in reverse's favor,
+  // past its 10-wide target) - both thresholds provably crossed at some point, but which one first (and
+  // so which one the reverse would really have exited on) cannot be told from these two scalars alone.
+  const original = { exit_reason: 'time', exit_price: 100, exit_time: '2026-11-01T02:00:00Z', max_fav_pct: 6, max_adv_pct: -11 };
+  const reverseEntry = { direction: 'SHORT', entry_price: 100, sl_price: 105, target_price: 90 };
+  assert.equal(estimateReverseExit(original, reverseEntry), null);
+});
+
+test('estimateReverseExit: excursion data resolves a SHORT original (-> LONG reverse) the same symmetric way', () => {
+  // original SHORT, entry 100, reverse (LONG) stop at 95 (distance 5), target at 110 (distance 10).
+  // original's max_adv_pct = -9% (price rose to 109 at worst for the SHORT original) - 9 in the LONG
+  // reverse's favor, just short of its 10-wide target but past nothing of its own 5-wide stop (max_fav_pct 0).
+  const original = { exit_reason: 'time', exit_price: 101, exit_time: '2026-11-01T02:00:00Z', max_fav_pct: 0, max_adv_pct: -9 };
+  const reverseEntry = { direction: 'LONG', entry_price: 100, sl_price: 95, target_price: 110 };
+  assert.equal(estimateReverseExit(original, reverseEntry), null); // 9 < 10: close, but not provably at target
+  const original2 = { ...original, max_adv_pct: -11 }; // now past the 10-wide target
+  const r = estimateReverseExit(original2, reverseEntry);
+  assert.deepEqual(r, { status: 'closed', exit_price: 110, exit_time: original2.exit_time, exit_reason: 'target', estimated: true });
+});

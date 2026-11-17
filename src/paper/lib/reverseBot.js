@@ -12,6 +12,12 @@
 // differ.
 const { buildReverseEntry } = require('./reverse');
 
+// How much later than a trade's own entry the earliest candle a fetch returns may be before monitor()
+// treats that as "no real history for this trade" and skips it rather than evaluating it against
+// unrelated candles (see monitor()'s own comment) - a generous 2 five-minute candles, well past the
+// couple of minutes of normal fetch/alignment slack a genuinely fresh trade has.
+const FIVE_MIN_MONITOR_GAP_MS = 2 * 5 * 60000;
+
 function createReverseBot({ originalStore, reverseStore, fetchCandles, evaluateExitFn, settle, loadCfg, fxRateFallback = 88, log = console.log, label = 'reverse' }) {
   async function allOriginalTrades() {
     const [open, closed] = await Promise.all([originalStore.allOpenTrades(), originalStore.closedTrades()]);
@@ -52,6 +58,21 @@ function createReverseBot({ originalStore, reverseStore, fetchCandles, evaluateE
       let candles;
       try { candles = await fetchCandles(t.symbol, Date.parse(t.entry_time)); } catch (e) { log(`[${label}] candles for ${t.symbol} failed: ${e.response?.status || e.message}`); continue; }
       if (!candles || !candles.length) continue;
+      // Root-cause fix (backfill bug report: absurd "time in trade", up to 4374 min): a cached candle
+      // source only ever keeps recent history, so a trade whose entry is much older than that window
+      // (a backfilled reverse row estimateReverseExit() could not resolve) gets back candles that start
+      // well AFTER its own entry - evaluating it against them is not watching its real path, it is
+      // comparing an old entry price to unrelated recent candles, and would eventually "close" it on
+      // whichever one of those happens to cross its level, with exit_time stamped from a real but
+      // unrelated recent candle - entry_time stays old, so "time in trade" balloons to days. Skip a trade
+      // this fetch cannot actually cover from its own entry, rather than resolve it on data that is not
+      // its own history; the backfill's own estimateReverseExit() (src/paper/lib/reverse.js) is the
+      // honest way to resolve a trade with no real candle history, not this live monitor.
+      const entryMs = Date.parse(t.entry_time);
+      if (Number.isFinite(entryMs) && candles[0].t > entryMs + FIVE_MIN_MONITOR_GAP_MS) {
+        log(`[${label}] ${t.symbol} trade #${t.id}: earliest available candle is after its own entry - skipping (no real history to evaluate it against)`);
+        continue;
+      }
       let r;
       try { r = evaluateExitFn(t, candles, now, cfg); } catch (e) { log(`[${label}] evaluateExit for ${t.symbol} failed: ${e.message}`); continue; }
       if (!r || !r.exit) continue;
@@ -71,4 +92,4 @@ function createReverseBot({ originalStore, reverseStore, fetchCandles, evaluateE
   return { sync, monitor };
 }
 
-module.exports = { createReverseBot };
+module.exports = { createReverseBot, FIVE_MIN_MONITOR_GAP_MS };
