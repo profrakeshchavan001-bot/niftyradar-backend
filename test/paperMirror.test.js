@@ -60,6 +60,34 @@ test('buildMirrorEntry: SELL/SHORT original -> LONG mirror, target/stop swapped 
   assert.equal(m.sl_price, 180); // original's target
 });
 
+// Task 1, point 2: a LEGACY original trade (opened before level-based exits existed, paperbot/bot.js's
+// cryptoMonitor) stores target_price/sl_price as null. buildMirrorEntry must resolve the ORIGINAL's real
+// levels (src/paper/lib/legacyExit.js) BEFORE swapping - never propagate the null, and never reconstruct
+// the mirror's own side independently (which would be wrong, since the legacy rule's target_pct/stop_pct differ).
+test('buildMirrorEntry: LEGACY original (target_price/sl_price both null) - resolves the real legacy levels THEN swaps, never propagates null', () => {
+  // original SHORT, entry 1819.91: legacy target = 1819.91*0.98 = 1783.5118, legacy stop = 1819.91*1.01 = 1838.1091
+  // (same numbers as src/paper/lib/legacyExit.js's own test - DEFAULTS.crypto target_pct 2 / stop_pct 1)
+  const original = { id: 77, symbol: 'ETHUSDT', direction: 'SHORT', entry_price: 1819.91, entry_time: 't', qty: 1, sl_price: null, target_price: null };
+  const m = buildMirrorEntry(original);
+  assert.equal(m.direction, 'LONG');
+  assert.notEqual(m.target_price, null);
+  assert.notEqual(m.sl_price, null);
+  // SWAPPED, using the RESOLVED (not null) numbers: mirror target = original's resolved stop, mirror stop = original's resolved target
+  assert.equal(Math.round(m.target_price * 1e4) / 1e4, 1838.1091);
+  assert.equal(Math.round(m.sl_price * 1e4) / 1e4, 1783.5118);
+  assert.match(m.target_type, /reconstructed/);
+  assert.match(m.stop_type, /reconstructed/);
+});
+
+test('buildMirrorEntry: a LEGACY original independently-reconstructed-as-LONG would be WRONG (target_pct != stop_pct) - proves the fix resolves the ORIGINAL first, not the mirror independently', () => {
+  // If the mirror (LONG) were reconstructed as if it were its own fresh trade using the legacy rule
+  // directly (entry * (1 + targetPct/100) = 1819.91*1.02 = 1856.3082), that would NOT match the correct
+  // swap of the original's own resolved stop (1838.1091, asserted above) - because target_pct (2) != stop_pct (1).
+  const original = { id: 78, symbol: 'ETHUSDT', direction: 'SHORT', entry_price: 1819.91, entry_time: 't', qty: 1, sl_price: null, target_price: null };
+  const m = buildMirrorEntry(original);
+  assert.notEqual(Math.round(m.target_price * 1e4) / 1e4, 1856.3082); // the WRONG, independently-reconstructed number
+});
+
 // Invariant required by the task brief: for a BUY, target > entry > stop; for a SELL, target < entry < stop.
 // Proves the SWAP preserves that invariant on the mirror's own (now opposite) side.
 test('invariant: mirror of a BUY (target>entry>stop) is a SELL with target<entry<stop, and vice versa', () => {

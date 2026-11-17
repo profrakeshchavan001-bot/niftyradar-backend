@@ -1,6 +1,15 @@
 'use strict';
 // Storage for exhaustion_only, own tables (schema.sql), own market: in memory for tests and for a server with no PAPER_DATABASE_URL,
 // or Postgres via the pool a plugin receives in register(ctx) (docs/BOT-INTERFACE.md). Same shape either way, so bot.js never knows which.
+// Root-cause fix (same bug PR #69 fixed for the 5 mirror tables): node-pg returns NUMERIC/DECIMAL columns
+// as STRINGS, never JS numbers - exhaustion_only_trades declares these columns `numeric`, so the leaderboard/
+// report's plain arithmetic on them silently produced null/NaN against real Postgres. Same shared helper,
+// no bespoke copy (src/paper/lib/numericCast.js).
+const { castNumericColumns } = require('../../lib/numericCast');
+
+const NUMERIC_COLUMNS = ['entry_price', 'sl_price', 'target_price', 'qty', 'rr', 'exit_price',
+  'gross_pnl_usdt', 'cost_usdt', 'net_pnl_usdt', 'gross_pnl_inr', 'pnl_inr', 'fx_rate'];
+
 function createMemoryExhaustionStore() {
   const trades = []; const skips = []; let seq = 0;
   return {
@@ -23,7 +32,7 @@ function createMemoryExhaustionStore() {
 
 // pool: { query(sql, params) } (the pg Pool a plugin receives via ctx.pool). Mirrors the memory store's shape.
 function createPgExhaustionStore(pool) {
-  const q = (sql, params) => pool.query(sql, params).then((r) => r.rows);
+  const q = (sql, params) => pool.query(sql, params).then((r) => r.rows.map((row) => castNumericColumns(row, NUMERIC_COLUMNS)));
   return {
     openTrades: (symbol) => q("SELECT * FROM exhaustion_only_trades WHERE symbol = $1 AND status = 'open' ORDER BY id", [symbol]),
     allOpenTrades: () => q("SELECT * FROM exhaustion_only_trades WHERE status = 'open' ORDER BY id"),

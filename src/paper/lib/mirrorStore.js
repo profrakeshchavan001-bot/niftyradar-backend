@@ -39,15 +39,12 @@ function createMemoryMirrorStore() {
 const NUMERIC_COLUMNS = ['entry_price', 'qty', 'sl_price', 'target_price', 'rr',
   'gross_pnl_usdt', 'cost_usdt', 'net_pnl_usdt', 'gross_pnl_inr', 'pnl_inr', 'fx_rate'];
 
-/** Casts every column in `columns` (default: every NUMERIC/DECIMAL mirror-table column) to a real JS
- * number when present and non-null; every other field (status, symbol, direction, exit_reason, basis,
- * timestamps, ...) passes through unchanged. Safe on a row that lacks some columns (a partial SELECT). */
-function castNumericColumns(row, columns = NUMERIC_COLUMNS) {
-  if (!row) return row;
-  const out = { ...row };
-  for (const c of columns) if (out[c] != null) out[c] = Number(out[c]);
-  return out;
-}
+// The actual cast now lives in src/paper/lib/numericCast.js (extracted so exhaustion_only/store.js and
+// trend_smc/store.js, which have the identical bug against their own `numeric` columns, reuse the same
+// helper instead of a third/fourth bespoke copy) - re-exported here with this file's own default column
+// list so every existing call site/import in this file is unchanged.
+const { castNumericColumns: castNumericColumnsShared } = require('./numericCast');
+const castNumericColumns = (row, columns = NUMERIC_COLUMNS) => castNumericColumnsShared(row, columns);
 
 // pool: { query(sql, params) } (the pg Pool a plugin receives via ctx.pool). Mirrors the memory store's shape.
 function createPgMirrorStore(pool, tableName) {
