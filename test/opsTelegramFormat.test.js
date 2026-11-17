@@ -23,11 +23,17 @@ test('estimateMove: no fx -> inr is null (never guessed), usd still computed', (
   assert.deepEqual(estimateMove(100, 110, 10, 0, null), { usd: 100, inr: null });
 });
 
-test('fxInfo: trade row fx_rate wins; else env fallback; else null', () => {
+test('fxInfo: trade row fx_rate wins; else a pre-fetched live rate; else env fallback; else the hard-coded default - never null (Task 1 fix)', () => {
   assert.deepEqual(fxInfo({ fx_rate: 88, fx_source: 'coingecko' }, 90), { rate: 88, source: 'coingecko' });
   assert.deepEqual(fxInfo({ fx_rate: null }, 90), { rate: 90, source: 'USDINR_FALLBACK' });
-  assert.equal(fxInfo({ fx_rate: null }, undefined), null);
-  assert.equal(fxInfo({ fx_rate: 0 }, undefined), null); // a zero/invalid rate is never trusted
+  // (b) a liveRate resolved by the caller (register.js) wins over the env fallback, but loses to the trade's own rate
+  assert.deepEqual(fxInfo({ fx_rate: null }, 90, { rate: 91.5, source: 'coingecko' }), { rate: 91.5, source: 'coingecko' });
+  assert.deepEqual(fxInfo({ fx_rate: 88, fx_source: 'coingecko' }, 90, { rate: 91.5, source: 'coingecko' }), { rate: 88, source: 'coingecko' });
+  // Root-cause fix: before, no trade fx_rate + no fallback of any kind returned null -> "$X (rate n/a)".
+  // Now it falls all the way to the hard-coded 88 (same number as paperbot/config.js's
+  // DEFAULTS.crypto.usdt_inr_fallback) - there is always a usable rate for a crypto-denominated bot.
+  assert.deepEqual(fxInfo({ fx_rate: null }, undefined), { rate: 88, source: 'default_fallback' });
+  assert.deepEqual(fxInfo({ fx_rate: 0 }, undefined), { rate: 88, source: 'default_fallback' }); // a zero/invalid rate is never trusted, but still never null
 });
 
 test('formatEntry: exact layout, level types in brackets, hand-checked INR, Reward:Risk, Kyu first 2 lines only', () => {
@@ -54,11 +60,22 @@ test('formatEntry: SHORT direction emoji; missing level type falls back to "fixe
   assert.match(text, /Stop: 95 \(fixed %\)/);
 });
 
-test('formatEntry: no fx anywhere -> shows USD and says "rate n/a", never a silently invented rate', () => {
+test('formatEntry: no trade fx_rate, no liveRate, no USDINR_FALLBACK -> Task 1 fix uses the hard default (88), never "$"/"rate n/a"', () => {
+  // This is the exact root-cause scenario: an OPEN crypto trade, fx_rate not yet set (only set at exit).
+  // target: 100usd net (costPct 0) x 88 = 8,800; stop: 50usd net x 88 = 4,400 (hand-worked, not copied).
   const t = { ...LONG, fx_rate: null };
   const text = formatEntry(t, 'intraday', { costPct: 0 });
-  assert.match(text, /Target lagne par ≈ \+\$100 \(rate n\/a\)/);
-  assert.match(text, /Stop lagne par ≈ -\$50 \(rate n\/a\)/);
+  assert.match(text, /Target lagne par ≈ \+₹8,800/);
+  assert.match(text, /Stop lagne par ≈ -₹4,400/);
+  assert.doesNotMatch(text, /\$|rate n\/a/);
+});
+
+test('formatEntry: no trade fx_rate, but a liveRate was resolved for this alert (Task 1) -> uses it, wins over USDINR_FALLBACK', () => {
+  // target: 100usd net x 91.5 = 9,150; stop: 50usd net x 91.5 = 4,575
+  const t = { ...LONG, fx_rate: null };
+  const text = formatEntry(t, 'intraday', { costPct: 0, usdInrFallback: 90, liveRate: { rate: 91.5, source: 'coingecko' } });
+  assert.match(text, /Target lagne par ≈ \+₹9,150/);
+  assert.match(text, /Stop lagne par ≈ -₹4,575/);
 });
 
 test('formatEntry: nativeInr (Task Group C - NSE bots) shows rupees directly, no FX line, no "rate n/a"', () => {
@@ -116,14 +133,28 @@ test('computeCapitalState: crypto - each open trade converted via ITS OWN fx_rat
   assert.deepEqual(state, { totalInr: 90000, realizedNetInr: 1800, lockedInr: 22250, capitalLeftInr: 69550 });
 });
 
-test('computeCapitalState: an open trade with no fx_rate and no usdInrFallback contributes nothing to locked (never an invented rate)', () => {
-  // locked = only the first open trade (100*2*90 = 18,000); the second has no rate anywhere, so it is skipped
+test('computeCapitalState: an open trade with no fx_rate falls back to the SAME liveRate as the alert (Task 1/2 fix - no longer skipped)', () => {
+  // Before the fix, an open trade with no fx_rate/usdInrFallback contributed 0 to locked - which in
+  // practice meant almost EVERY open crypto trade (fx_rate is only ever set at exit) was silently
+  // excluded, overstating "capital left now". Now it falls back to the same liveRate tier fxInfo uses.
+  // locked = first open trade (100*2*90 = 18,000, its OWN fx_rate) + second (999*5*91.5 = 457,042.5, the
+  // liveRate) = 475,042.5, rounded to 475,043 (computeCapitalState rounds the total, not each addend)
+  const state = computeCapitalState({
+    capitalTotal: 1000, nativeInr: false, fx: { rate: 90 }, liveRate: { rate: 91.5, source: 'coingecko' },
+    closedTrades: [],
+    openTrades: [{ entry_price: 100, qty: 2, fx_rate: 90 }, { entry_price: 999, qty: 5 }],
+  });
+  assert.equal(state.lockedInr, 475043);
+});
+
+test('computeCapitalState: an open trade with no fx_rate and no liveRate/usdInrFallback anywhere still falls back to the hard default (88), never skipped any more', () => {
+  // locked = first open trade (100*2*90=18,000, its own fx_rate) + second (999*5*88 = 439,560, the hard default)
   const state = computeCapitalState({
     capitalTotal: 1000, nativeInr: false, fx: { rate: 90 },
     closedTrades: [],
     openTrades: [{ entry_price: 100, qty: 2, fx_rate: 90 }, { entry_price: 999, qty: 5 }],
   });
-  assert.equal(state.lockedInr, 18000);
+  assert.equal(state.lockedInr, 18000 + 439560);
 });
 
 test('computeCapitalState: no capitalTotal or no fx -> null, never a half-guessed number', () => {
@@ -165,10 +196,17 @@ test('capitalLine: no closedTrades/openTrades passed -> reads as "no other activ
   assert.equal(capitalLine(t, { capitalTotal: 1000 }), 'Capital: ₹90,000 total | this trade ₹18,000 (20%) | ₹90,000 left now\nRunning net P&L: +₹0');
 });
 
-test('capitalLine: crypto with NO fx anywhere - shows USD and says "rate n/a", never an invented rate (legacy per-trade fallback)', () => {
-  // used = 100 * 2 = 200 USDT; pct = 20%; left = 1000 - 200 = 800 (no INR rate anywhere, so no live balance either)
+test('capitalLine: crypto with no trade fx_rate/liveRate/usdInrFallback - Task 1/2 fix uses the hard default (88), never "$"/"rate n/a"', () => {
+  // used = 100*2 = 200 USDT -> ₹17,600 (x88); pct = 20%; total ₹88,000; no closed/open trades -> left now = ₹88,000
   const t = { entry_price: 100, qty: 2, fx_rate: null };
-  assert.equal(capitalLine(t, { capitalTotal: 1000, nativeInr: false }), 'Capital: $1000 total | this trade $200 (20%) | $800 left (rate n/a, per-trade only)');
+  assert.equal(capitalLine(t, { capitalTotal: 1000, nativeInr: false }), 'Capital: ₹88,000 total | this trade ₹17,600 (20%) | ₹88,000 left now\nRunning net P&L: +₹0');
+});
+
+test('capitalLine: crypto with no trade fx_rate but a liveRate resolved for this alert (Task 1/2 fix) - uses it, shown in rupees', () => {
+  // used = 100*2 = 200 USDT -> ₹18,300 (x91.5); total ₹91,500; left now = 91500 (no closed/open trades)
+  const t = { entry_price: 100, qty: 2, fx_rate: null };
+  const text = capitalLine(t, { capitalTotal: 1000, nativeInr: false, liveRate: { rate: 91.5, source: 'coingecko' } });
+  assert.equal(text, 'Capital: ₹91,500 total | this trade ₹18,300 (20%) | ₹91,500 left now\nRunning net P&L: +₹0');
 });
 
 test('capitalLine: no capitalTotal passed -> null, never a guessed number', () => {
@@ -263,6 +301,32 @@ for (const label of ALL_BOT_LABELS) {
       assert.doesNotMatch(entryText, re, `formatEntry(${label}) leaked ${re}`);
       assert.doesNotMatch(exitText, re, `formatExit(${label}) leaked ${re}`);
     }
+  });
+}
+
+// ---- Task 3 (entry-alert INR fx fix): EVERY bot label telegramAlerts/register.js actually sends alerts
+// for - nse, nse_scalp, intraday, scalp, scalp_wide, exhaustion_only, trend_smc, mcx_gold, mcx_crude, every
+// NSE currency bot, and every one of their mirrors - must show an all-INR entry alert with no "rate n/a",
+// no "$", and no null/undefined/NaN, for a REALISTIC OPEN trade (fx_rate absent, exactly as a real open
+// trade is - fx_rate is only ever set at exit, paperbot/bot.js's closeTrade). Built from register.js's own
+// SHARED_STORE_MARKETS/OWN_TABLE_BOTS wiring tables (the actual source of truth), not a hand-copied list,
+// so this test fails the moment a bot's wiring in register.js drifts from this guarantee.
+const { SHARED_STORE_MARKETS, OWN_TABLE_BOTS } = require('../src/paper/ops/telegramAlerts/register');
+const EVERY_WIRED_BOT = [...Object.values(SHARED_STORE_MARKETS), ...Object.values(OWN_TABLE_BOTS)];
+const BAD_MONEY_SUBSTRINGS = [/\brate n\/a\b/, /\$/, /\bnull\b/, /\bundefined\b/, /\bNaN\b/];
+
+for (const cfg of EVERY_WIRED_BOT) {
+  test(`formatEntry (${cfg.label}): a realistic OPEN trade (no fx_rate, as a real open trade is) is fully INR - no "rate n/a", no "$", no null/undefined/NaN`, () => {
+    const openTrade = {
+      id: 1, symbol: 'X', direction: 'LONG', entry_price: 100, target_price: 110, sl_price: 95,
+      target_type: 'swing high', stop_type: 'pattern low', qty: 10, rr: 2, basis: 'test basis',
+      status: 'open', fx_rate: null, fx_source: null, // the exact Task 1 root-cause shape
+    };
+    // No liveRate passed either - the worst case (ctx.cachedCrypto unavailable to register.js) - even
+    // then fxInfo's hard-coded last resort must still produce an all-rupee message.
+    const text = formatEntry(openTrade, cfg.label, { costPct: cfg.costPct, nativeInr: cfg.nativeInr, capitalTotal: cfg.capitalTotal });
+    for (const re of BAD_MONEY_SUBSTRINGS) assert.doesNotMatch(text, re, `formatEntry(${cfg.label}) leaked ${re}`);
+    assert.match(text, /₹/, `formatEntry(${cfg.label}) should show at least one rupee amount`);
   });
 }
 

@@ -206,6 +206,90 @@ test('exhaustion_only/trend_smc disabled or not yet registered: no store on ctx 
   assert.equal(logs.filter((l) => /trend_smc has no store yet/.test(l)).length, 1);
 });
 
+// --- Task 1: live/fallback USDT-INR rate wired into ENTRY alerts, reusing ctx.cachedCrypto.usdtInr() ----
+
+function fakeCachedCrypto(rate = 91.5, source = 'coingecko') {
+  const calls = [];
+  return { stub: { usdtInr: async (fallback) => { calls.push(fallback); return { rate, source }; } }, calls };
+}
+
+test('entry alert for a crypto bot with no fx_rate uses ctx.cachedCrypto.usdtInr() live rate, shown in rupees, never "rate n/a"/"$"', async () => {
+  const sent = [];
+  const store = createMemoryStore();
+  await store.insertTrade({ market: 'crypto', symbol: 'BTCUSDT', trade_date: '2026-11-14', status: 'open', direction: 'LONG', entry_price: 100, target_price: 110, sl_price: 95, qty: 1, basis: 'b', patterns: [] });
+  const { stub } = fakeCachedCrypto(91.5, 'coingecko');
+  const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub(), cachedCrypto: stub });
+  await check();
+  assert.equal(sent.length, 1);
+  // target: |110-100|*1 = 10 gross, default costPct 0.0023 -> cost = 100*1*0.0023 = 0.23 -> net 9.77usd x 91.5 = 893.955 -> round 894
+  assert.match(sent[0], /Target lagne par ≈ \+₹894/);
+  assert.doesNotMatch(sent[0], /rate n\/a|\$/);
+});
+
+test('live rate is resolved ONCE PER SOURCE PER TICK, not once per trade: 2 open trades in the same market -> usdtInr() called once', async () => {
+  const sent = [];
+  const store = createMemoryStore();
+  await store.insertTrade({ market: 'crypto', symbol: 'A', trade_date: '2026-11-14', status: 'open', entry_price: 1, target_price: 2, sl_price: 0.5, qty: 1, basis: 'b', patterns: [] });
+  await store.insertTrade({ market: 'crypto', symbol: 'B', trade_date: '2026-11-14', status: 'open', entry_price: 1, target_price: 2, sl_price: 0.5, qty: 1, basis: 'b', patterns: [] });
+  const { stub, calls } = fakeCachedCrypto();
+  const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub(), cachedCrypto: stub });
+  await check();
+  assert.equal(sent.length, 2); // both trades alerted
+  assert.equal(calls.length, 1); // but the live rate was fetched only once for the whole tick
+});
+
+test('live rate is NOT fetched for nativeInr bots (nse) - usdtInr() is never called for a rupee-native trade', async () => {
+  const sent = [];
+  const store = createMemoryStore();
+  await store.insertTrade({ market: 'nse', symbol: 'RELIANCE', trade_date: '2026-11-14', status: 'open', direction: 'CALL', entry_price: 101, target_price: 106, sl_price: 97, qty: 500, basis: 'b', patterns: [] });
+  const { stub, calls } = fakeCachedCrypto();
+  const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub(), cachedCrypto: stub });
+  await check();
+  assert.equal(sent.length, 1);
+  assert.equal(calls.length, 0);
+});
+
+test('mirror bot (own table) also gets the live rate for its entry alert - same mechanism, no second fix needed', async () => {
+  const sent = [];
+  const rows = [{ id: 1, symbol: 'BTCUSDT', direction: 'LONG', status: 'open', entry_price: 100, target_price: 110, sl_price: 95, qty: 1, basis: 'b' }];
+  const { stub, calls } = fakeCachedCrypto(91.5, 'coingecko');
+  const { check } = register({
+    env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: () => {}, pool: fakePool(),
+    state: { store: createMemoryStore() }, axios: fakeAxios(sent), cron: cronStub(), cachedCrypto: stub,
+    exhaustionMirrorMemoryStore: fakeOwnTableStore(rows),
+  });
+  await check();
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /\| exhaustion_only-MIRROR/);
+  assert.doesNotMatch(sent[0], /rate n\/a|\$/);
+  assert.equal(calls.length, 1); // resolved for the mirror's own book, same as the original would be
+});
+
+test('no ctx.cachedCrypto at all (plugin not threaded / crypto source unavailable): still never "rate n/a" - falls back to the hard default, logged once not every tick', async () => {
+  const sent = []; const logs = [];
+  const store = createMemoryStore();
+  await store.insertTrade({ market: 'crypto', symbol: 'A', trade_date: '2026-11-14', status: 'open', entry_price: 100, target_price: 110, sl_price: 95, qty: 1, basis: 'b', patterns: [] });
+  const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on' }, log: (m) => logs.push(m), pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub() });
+  await check();
+  await check(); // a second tick - must not log the fallback notice again
+  assert.equal(sent.length, 1);
+  assert.doesNotMatch(sent[0], /rate n\/a|\$/);
+  assert.equal(logs.filter((l) => /no shared crypto source on ctx/.test(l)).length, 1); // logged once, not every tick
+});
+
+test('USDINR_FALLBACK env var is honoured as the fallback usdtInr() itself is given, when the live CoinGecko call fails', async () => {
+  const sent = [];
+  const store = createMemoryStore();
+  await store.insertTrade({ market: 'crypto', symbol: 'A', trade_date: '2026-11-14', status: 'open', entry_price: 100, target_price: 110, sl_price: 95, qty: 1, basis: 'b', patterns: [] });
+  const fallbacksGiven = [];
+  const stub = { usdtInr: async (fallback) => { fallbacksGiven.push(fallback); return { rate: fallback, source: 'config_fallback' }; } };
+  const { check } = register({ env: { TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: 'C', TELEGRAM_TRADE_ALERTS: 'on', USDINR_FALLBACK: '95' }, log: () => {}, pool: fakePool(), state: { store }, axios: fakeAxios(sent), cron: cronStub(), cachedCrypto: stub });
+  await check();
+  assert.equal(fallbacksGiven[0], 95); // env fallback passed to usdtInr(), not the hard-coded 88
+  // target: |110-100|*1=10 gross, cost 100*1*0.0023=0.23 -> net 9.77 x 95 = 928.15 -> round 928
+  assert.match(sent[0], /Target lagne par ≈ \+₹928/);
+});
+
 test('TELEGRAM_BOTS also filters the own-table bots by name', async () => {
   const sent = [];
   const rows = [{ id: 1, symbol: 'BTCUSDT', direction: 'LONG', status: 'open', entry_price: 100, target_price: 110, sl_price: 95, qty: 1, basis: 'b' }];
