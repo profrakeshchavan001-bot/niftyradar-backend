@@ -196,6 +196,87 @@ test('formatEntry: capital line (2 lines) appears right after Reward:Risk, befor
   assert.ok(!withoutCap.includes('Capital:'));
 });
 
+// ---- Task 1 root-cause fix: a legacy crypto/intraday trade opened before level-based exits existed
+// (paperbot/bot.js's cryptoMonitor) stores target_price/sl_price as null. estimateMove() used to coerce
+// `Number(null)` to 0, so `distance = Math.abs(0 - entryPrice) = entryPrice` - a ~100%-of-entry-price
+// "move", inflating the shown implied risk by 40-150x and showing the literal word "null" for Target/Stop.
+// Every number below is hand-worked, never copied from the function's own output.
+
+test('estimateMove: a null/undefined level is never coerced to price 0 - returns n/a (null), not an inflated number', () => {
+  assert.deepEqual(estimateMove(1819.91, null, 1, 0, { rate: 88 }), { usd: null, inr: null });
+  assert.deepEqual(estimateMove(1819.91, undefined, 1, 0, { rate: 88 }), { usd: null, inr: null });
+  // a missing entry_price or qty must not be coerced to 0 either
+  assert.deepEqual(estimateMove(null, 110, 1, 0, { rate: 88 }), { usd: null, inr: null });
+  assert.deepEqual(estimateMove(100, 110, null, 0, { rate: 88 }), { usd: null, inr: null });
+});
+
+test('formatEntry: legacy crypto trade (target_price/sl_price both null) - the exact ETHUSDT SHORT incident entry (1819.91) - shows reconstructed prices, never "null", and a sane implied risk', () => {
+  // Reconstruction (src/paper/lib/legacyExit.js, DEFAULTS.crypto target_pct 2 / stop_pct 1, SHORT so dir=-1):
+  // target = 1819.91 * (1 - 2/100) = 1819.91 * 0.98 = 1783.5118 (below entry, correct for a SHORT)
+  // stop   = 1819.91 * (1 + 1/100) = 1819.91 * 1.01 = 1838.1091 (above entry, correct for a SHORT)
+  const legacy = { id: 501, direction: 'SHORT', symbol: 'ETHUSDT', entry_price: 1819.91, target_price: null, sl_price: null, qty: 1, basis: 'legacy fixed-rule trade' };
+  const text = formatEntry(legacy, 'intraday', { costPct: 0, usdInrFallback: 88 });
+  assert.match(text, /Target: 1783\.5118 \(legacy fixed % \(reconstructed\)\)/);
+  assert.match(text, /Stop: 1838\.1091 \(legacy fixed % \(reconstructed\)\)/);
+  assert.doesNotMatch(text, /\bnull\b/);
+  assert.doesNotMatch(text, /\bundefined\b/);
+  assert.doesNotMatch(text, /\bNaN\b/);
+  // distance to target = |1783.5118 - 1819.91| = 36.3982 -> net 36.4usd -> inr = round(36.4*88) = 3,203
+  // distance to stop = |1838.1091 - 1819.91| = 18.1991 -> net 18.2usd -> inr = round(18.2*88) = 1,602
+  // (BEFORE the fix: a null-coerced-to-0 level made distance = entry_price = 1819.91, giving an inr figure
+  // roughly 1819.91*88 ≈ 160,152 for a qty of 1 - 40-150x too large, and the "null" bug text besides.)
+  assert.match(text, /Target lagne par ≈ \+₹3,203/);
+  assert.match(text, /Stop lagne par ≈ -₹1,602/);
+  // reward:risk = 36.4 / 18.2 = 2.00 - a real, sane number, not the meaningless 1.00 the null-coercion bug produced
+  assert.match(text, /Reward:Risk 2\.00/);
+});
+
+test('formatEntry: legacy LONG crypto trade (both null) - target above entry, stop below, same reconstruction', () => {
+  // target = 100 * 1.02 = 102; stop = 100 * 0.99 = 99
+  const legacy = { id: 502, direction: 'LONG', symbol: 'BTCUSDT', entry_price: 100, target_price: null, sl_price: null, qty: 1 };
+  const text = formatEntry(legacy, 'intraday', { costPct: 0, usdInrFallback: 88 });
+  assert.match(text, /Target: 102 \(legacy fixed % \(reconstructed\)\)/);
+  assert.match(text, /Stop: 99 \(legacy fixed % \(reconstructed\)\)/);
+});
+
+test('formatEntry: a NORMAL level-based trade (target_price/sl_price both present) is completely unaffected by the legacy-reconstruction code path', () => {
+  const text = formatEntry(LONG, 'intraday', { costPct: 0 });
+  assert.match(text, /Target: 110 \(swing high 1h\)/);
+  assert.match(text, /Stop: 95 \(pattern low \+ 1xATR\)/);
+  assert.doesNotMatch(text, /reconstructed/);
+});
+
+// ---- Task 3: blanket robustness - a maximally-sparse trade (only the truly required identity fields)
+// must never throw and must never leak "null"/"undefined"/"NaN"/"[object Object]" into a Telegram message,
+// for every bot label telegramAlerts/register.js sends alerts for.
+const ALL_BOT_LABELS = ['intraday', 'intraday-MIRROR', 'scalp', 'scalp-MIRROR', 'scalp_wide', 'scalp_wide-MIRROR',
+  'nse', 'nse_scalp', 'exhaustion_only', 'exhaustion_only-MIRROR', 'trend_smc', 'trend_smc-MIRROR'];
+const BAD_SUBSTRINGS = [/\bnull\b/, /\bundefined\b/, /\bNaN\b/, /\[object Object\]/];
+
+for (const label of ALL_BOT_LABELS) {
+  test(`formatEntry/formatExit (${label}): a maximally-sparse trade (id, symbol, direction only) never throws and never leaks null/undefined/NaN/[object Object]`, () => {
+    const sparse = { id: 1, symbol: 'X', direction: 'LONG' };
+    const nativeInr = label === 'nse' || label === 'nse_scalp';
+    const entryText = formatEntry(sparse, label, { nativeInr });
+    const exitText = formatExit(sparse, label, { nativeInr });
+    for (const re of BAD_SUBSTRINGS) {
+      assert.doesNotMatch(entryText, re, `formatEntry(${label}) leaked ${re}`);
+      assert.doesNotMatch(exitText, re, `formatExit(${label}) leaked ${re}`);
+    }
+  });
+}
+
+test('formatEntry/formatExit: a maximally-sparse SHORT/PUT trade and a trade with a totally unknown exit_reason are also safe', () => {
+  for (const direction of ['SHORT', 'PUT', 'CALL', 'unknown']) {
+    const t = { id: 2, symbol: 'Y', direction };
+    const entryText = formatEntry(t, 'intraday', {});
+    for (const re of BAD_SUBSTRINGS) assert.doesNotMatch(entryText, re);
+  }
+  const exitText = formatExit({ id: 3, symbol: 'Y', direction: 'LONG', exit_reason: 'some_future_reason_this_code_does_not_know_about' }, 'intraday', {});
+  for (const re of BAD_SUBSTRINGS) assert.doesNotMatch(exitText, re);
+  assert.match(exitText, /some_future_reason_this_code_does_not_know_about/); // shown plainly, not swallowed
+});
+
 test('formatExit: capital line (2 lines) appears last, only when capitalTotal is passed', () => {
   const t = { symbol: 'BTCUSDT', exit_reason: 'target', pnl_inr: 4500, entry_time: '2026-11-14T10:00:00Z', exit_time: '2026-11-14T10:37:00Z', entry_price: 100, qty: 2 };
   // used = 100*2 = 200 USDT; pct = 20%; total INR = 1000*90 = 90,000; used INR = 18,000

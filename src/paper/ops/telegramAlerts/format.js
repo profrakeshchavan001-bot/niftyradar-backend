@@ -3,10 +3,23 @@
  * Pure message formatting + the INR estimate math for Telegram trade alerts (add-on v2, items 1-2).
  * No network, no clock, no store - every function here is deterministic and unit-testable.
  */
+const { resolveExitLevels } = require('../../lib/legacyExit');
+
 // Same default round-trip cost (2 x fee_pct_per_side + slippage_pct) as src/paper/scalp/config.js's
 // costPct() with SCALP_DEFAULTS (0.1% x2 + 0.03% = 0.23%) - used only as a fallback when the trade's own
 // bot did not store one; always labelled "≈" because it is an estimate either way.
 const DEFAULT_COST_PCT = 0.0023;
+
+// Root-cause fix (null target/stop showing as "null" and an implied risk 40-150x too large): the legacy
+// fixed rule's own target_pct/stop_pct, used ONLY to reconstruct a missing target_price/sl_price for
+// display (src/paper/lib/legacyExit.js) - never read from live config here (this file stays pure), and
+// never a fresh decision. nse/nse_scalp prices are already in rupees with their own (wider) legacy rule
+// (paperbot/config.js DEFAULTS.nse: target_pct 10 / stop_pct 5); every other bot here is crypto-
+// denominated and shares the one legacy rule documented in paperbot/bot.js's cryptoMonitor (DEFAULTS.crypto:
+// target_pct 2 / stop_pct 1).
+const NSE_LEGACY_PCT = { targetPct: 10, stopPct: 5 };
+const CRYPTO_LEGACY_PCT = { targetPct: 2, stopPct: 1 };
+const legacyPctFor = (botLabel) => (botLabel === 'nse' || botLabel === 'nse_scalp' ? NSE_LEGACY_PCT : CRYPTO_LEGACY_PCT);
 
 /** "15-Nov 10:41 PM IST" for a Date/ISO string; 'n/a' when missing or invalid (never throws). */
 function istTime(value) {
@@ -30,11 +43,27 @@ function fxInfo(trade, usdInrFallback) {
   return null;
 }
 
-/** qty x distance to a level, minus an estimated round-trip cost, in USD; and in INR when a rate exists. */
+/**
+ * qty x distance to a level, minus an estimated round-trip cost, in USD; and in INR when a rate exists.
+ *
+ * Root-cause fix (Nov 2026 incident - a null/undefined target or stop showed an implied risk ~40-150x
+ * too large): `Number(null)` and `Number(undefined)` are `0`/`NaN`, so a missing `level` used to make
+ * `distance = Math.abs(0 - entryPrice) = entryPrice` - silently treating "no stored level" as "the price
+ * went all the way to zero", a ~100%-of-entry-price move. A missing/invalid level, entry price or qty
+ * now returns `{ usd: null, inr: null }` ('n/a' at the call site) instead of ever computing a number out
+ * of a 0-coerced input.
+ */
 function estimateMove(entryPrice, level, qty, costPct, fx) {
-  const distance = Math.abs(Number(level) - Number(entryPrice));
-  const grossUsd = distance * Number(qty);
-  const costUsd = Number(entryPrice) * Number(qty) * costPct;
+  // `Number(null)` is 0 (finite!), not NaN - checking `!= null` FIRST is the actual fix; `Number.isFinite`
+  // alone would let a null level/entryPrice/qty straight through as a silent 0, reproducing the exact bug.
+  if (entryPrice == null || level == null || qty == null) return { usd: null, inr: null };
+  const entry = Number(entryPrice);
+  const lvl = Number(level);
+  const q = Number(qty);
+  if (!Number.isFinite(entry) || !Number.isFinite(lvl) || !Number.isFinite(q)) return { usd: null, inr: null };
+  const distance = Math.abs(lvl - entry);
+  const grossUsd = distance * q;
+  const costUsd = entry * q * costPct;
   const netUsd = Math.max(0, Math.round((grossUsd - costUsd) * 100) / 100);
   return { usd: netUsd, inr: fx ? Math.round(netUsd * fx.rate) : null };
 }
@@ -142,17 +171,27 @@ function capitalLine(trade, { capitalTotal, nativeInr = false, usdInrFallback, c
  */
 function formatEntry(trade, botLabel, { costPct = DEFAULT_COST_PCT, usdInrFallback, nativeInr = false, capitalTotal, closedTrades, openTrades } = {}) {
   const fx = nativeInr ? { rate: 1, source: 'native INR (no FX step for this bot)' } : fxInfo(trade, usdInrFallback);
-  const target = estimateMove(trade.entry_price, trade.target_price, trade.qty, costPct, fx);
-  const stop = estimateMove(trade.entry_price, trade.sl_price, trade.qty, costPct, fx);
+  // Root-cause fix: a trade whose row predates level-based exits stores target_price/sl_price as null
+  // (paperbot/bot.js's cryptoMonitor legacy path) - reconstruct the REAL price the trade actually closes
+  // on (src/paper/lib/legacyExit.js), the same single fix point src/paper/lib/mirror.js's buildMirrorEntry
+  // uses for the mirror side of the exact same gap. A normal, level-based trade is returned unchanged.
+  const levels = resolveExitLevels(trade, legacyPctFor(botLabel));
+  const target = estimateMove(trade.entry_price, levels.target, trade.qty, costPct, fx);
+  const stop = estimateMove(trade.entry_price, levels.stop, trade.qty, costPct, fx);
   const rr = trade.rr != null ? Number(trade.rr) : (stop.usd > 0 ? Math.round((target.usd / stop.usd) * 100) / 100 : null);
-  const money = (m, sign) => (fx ? `${sign}₹${m.inr.toLocaleString('en-IN')}` : `${sign}$${m.usd} (rate n/a)`);
+  const money = (m, sign) => {
+    if (m.usd == null) return 'n/a';
+    return fx ? `${sign}₹${m.inr.toLocaleString('en-IN')}` : `${sign}$${m.usd} (rate n/a)`;
+  };
+  const targetLabel = trade.target_type || (levels.reconstructed ? 'legacy fixed % (reconstructed)' : 'fixed %');
+  const stopLabel = trade.stop_type || (levels.reconstructed ? 'legacy fixed % (reconstructed)' : 'fixed %');
   const lines = [
     `${tradeTag(trade)} | ${botLabel}`,
     `${emojiDir(trade.direction)} ${trade.symbol}`,
     `Entry time: ${istTime(trade.entry_time)}`,
-    `Entry: ${trade.entry_price}`,
-    `Target: ${trade.target_price} (${trade.target_type || 'fixed %'})`,
-    `Stop: ${trade.sl_price} (${trade.stop_type || 'fixed %'})`,
+    `Entry: ${trade.entry_price != null ? trade.entry_price : 'n/a'}`,
+    `Target: ${levels.target != null ? levels.target : 'n/a'} (${targetLabel})`,
+    `Stop: ${levels.stop != null ? levels.stop : 'n/a'} (${stopLabel})`,
     `Target lagne par ≈ ${money(target, '+')}`,
     `Stop lagne par ≈ ${money(stop, '-')}`,
     `Reward:Risk ${rr != null && Number.isFinite(rr) ? rr.toFixed(2) : 'n/a'}`,
