@@ -27,6 +27,9 @@ const { loadTrendSmcConfig, TREND_SMC_DEFAULTS } = require('../src/paper/bots/tr
 const { settle: settleScalp } = require('../src/paper/scalp/engine');
 const { loadScalpConfig, loadScalpWideConfig, SCALP_DEFAULTS, SCALP_WIDE_DEFAULTS } = require('../src/paper/scalp/config');
 const { MARKET: SCALP_MARKET, MARKET_WIDE: SCALP_WIDE_MARKET } = require('../src/paper/scalp/bot');
+const { createPgMcxStore } = require('../src/paper/lib/mcxStore');
+const { loadMcxGoldConfig, MCX_GOLD_DEFAULTS } = require('../src/paper/bots/mcx_gold/config');
+const { loadMcxCrudeConfig, MCX_CRUDE_DEFAULTS } = require('../src/paper/bots/mcx_crude/config');
 const { createPgMirrorStore } = require('../src/paper/lib/mirrorStore');
 const { createMirrorBot } = require('../src/paper/lib/mirrorBot');
 const { computeBotStats } = require('../src/paper/bots/leaderboard/stats');
@@ -51,6 +54,8 @@ const REPORT_PATH = path.join(__dirname, '..', 'docs', 'MIRROR-BACKFILL-REPORT.m
 function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
   const exhaustionStore = createPgExhaustionStore(pool);
   const trendSmcStore = createPgTrendSmcStore(pool);
+  const mcxGoldStore = createPgMcxStore(pool, 'mcx_gold_trades');
+  const mcxCrudeStore = createPgMcxStore(pool, 'mcx_crude_trades');
   return [
     {
       // intraday (the main crypto bot, paperbot/bot.js's cryptoScan/cryptoMonitor): no own table, reads
@@ -95,6 +100,20 @@ function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
       settle: settleInr, loadCfg: () => loadCurrencyConfig(mainStore, `ccy_${pair}`),
       capitalTotal: CCY_WIDE_DEFAULTS.capital_inr, usdInrFallback,
     })),
+    // mcx_gold / mcx_crude (this task): own tables (src/paper/bots/mcx_gold, mcx_crude), reuse the same
+    // scalp_wide settle() (src/paper/scalp/engine.js) their own bot.js uses. nativeInr: true - their
+    // prices/qty are already INR (the proxy source converts before the bot ever sees a candle, fx_rate
+    // always 1), so computeCapitalState must not apply a second USD->INR conversion (see sideSummary below).
+    {
+      bot: 'mcx_gold', mirrorLabel: 'mcx_gold-MIRROR', mirrorTable: 'mcx_gold_mirror_trades',
+      originalStore: mcxGoldStore, settle: settleScalp, loadCfg: () => loadMcxGoldConfig(mainStore),
+      capitalTotal: MCX_GOLD_DEFAULTS.capital_inr, usdInrFallback, nativeInr: true,
+    },
+    {
+      bot: 'mcx_crude', mirrorLabel: 'mcx_crude-MIRROR', mirrorTable: 'mcx_crude_mirror_trades',
+      originalStore: mcxCrudeStore, settle: settleScalp, loadCfg: () => loadMcxCrudeConfig(mainStore),
+      capitalTotal: MCX_CRUDE_DEFAULTS.capital_inr, usdInrFallback, nativeInr: true,
+    },
   ];
 }
 
@@ -105,9 +124,9 @@ function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
 // guessed, when there is no capitalTotal or no USDINR_FALLBACK rate to express it in rupees with.
 function sideSummary(closed, open = [], { capitalTotal, usdInrFallback, nativeInr = false } = {}) {
   const s = computeBotStats(closed, 1); // 1, not the usual 20-trade floor: a backfill wants every number, ranked or not
-  // nativeInr (new, this task): a rupee-native bot (ccy_*) needs no fx rate to express its own INR capital
-  // in rupees - { rate: 1 }, same convention capitalLine()/computeCapitalState() already use for the
-  // nse/nse_scalp bots (src/paper/ops/telegramAlerts/format.js). Every pre-existing crypto job omits
+  // nativeInr (new, this task): a rupee-native bot (ccy_*/mcx_*) needs no fx rate to express its own INR
+  // capital in rupees - { rate: 1 }, same convention capitalLine()/computeCapitalState() already use for
+  // the nse/nse_scalp bots (src/paper/ops/telegramAlerts/format.js). Every pre-existing crypto job omits
   // `nativeInr` (default false), so this is purely additive - their own fx-rate-from-usdInrFallback path
   // below is completely unchanged.
   const fx = nativeInr ? { rate: 1 } : (usdInrFallback ? { rate: Number(usdInrFallback) } : null);
@@ -187,6 +206,8 @@ async function main() {
       { bot: 'scalp', mirrorLabel: 'scalp-MIRROR', opened: 0, closedThisRun: 0, original: zeroSide, mirror: zeroSide },
       { bot: 'scalp_wide', mirrorLabel: 'scalp_wide-MIRROR', opened: 0, closedThisRun: 0, original: zeroSide, mirror: zeroSide },
       ...['usdinr', 'eurinr', 'gbpinr', 'jpyinr'].map((pair) => ({ bot: `ccy_${pair}`, mirrorLabel: `ccy_${pair}-MIRROR`, opened: 0, closedThisRun: 0, original: zeroSide, mirror: zeroSide })),
+      { bot: 'mcx_gold', mirrorLabel: 'mcx_gold-MIRROR', opened: 0, closedThisRun: 0, original: zeroSide, mirror: zeroSide },
+      { bot: 'mcx_crude', mirrorLabel: 'mcx_crude-MIRROR', opened: 0, closedThisRun: 0, original: zeroSide, mirror: zeroSide },
     ], { generatedAt, dbConfigured: false });
     fs.writeFileSync(REPORT_PATH, md);
     console.log(`[mirror-backfill] PAPER_DATABASE_URL is not set - wrote a zero-trade report to ${REPORT_PATH}. `

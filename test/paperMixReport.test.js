@@ -113,6 +113,7 @@ test('wiring: JSON carries scoreboard (every known bot) and a mixCandidate shape
     // ccy_* (new, this task): NSE currency futures USDINR/EURINR/GBPINR/JPYINR + their mirrors.
     'ccy_usdinr', 'ccy_eurinr', 'ccy_gbpinr', 'ccy_jpyinr',
     'ccy_usdinr_mirror', 'ccy_eurinr_mirror', 'ccy_gbpinr_mirror', 'ccy_jpyinr_mirror',
+    'mcx_gold', 'mcx_crude', 'mcx_gold_mirror', 'mcx_crude_mirror',
   ].sort());
   assert.ok('avgRFactor' in d.scoreboard.scalp); assert.ok('tradesPerDay' in d.scoreboard.scalp);
   assert.ok(Array.isArray(d.mixCandidate.description));

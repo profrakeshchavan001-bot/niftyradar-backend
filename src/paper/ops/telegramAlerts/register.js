@@ -48,6 +48,10 @@ const { SCALP_DEFAULTS, SCALP_WIDE_DEFAULTS } = require('../../scalp/config');
 const { EXHAUSTION_ONLY_DEFAULTS } = require('../../bots/exhaustion_only/config');
 const { TREND_SMC_DEFAULTS } = require('../../bots/trend_smc/config');
 const { CCY_WIDE_DEFAULTS } = require('../../lib/currencyConfig');
+// mcx_gold/mcx_crude (this task): own tables, own capital_inr (already INR - no FX step), priced from a
+// PROXY feed (src/paper/lib/yahooFutures.js) - see each bot's own register.js for that caveat.
+const { MCX_GOLD_DEFAULTS } = require('../../bots/mcx_gold/config');
+const { MCX_CRUDE_DEFAULTS } = require('../../bots/mcx_crude/config');
 
 // nse_scalp has no capital config of its own anywhere in the repo (paperbot/config.js's DEFAULTS has no
 // nse_scalp section) - ASSUMED DEFAULT: it shares the main nse capital pool (DEFAULTS.nse.capital_inr),
@@ -94,6 +98,15 @@ const OWN_TABLE_BOTS = {
   ccy_eurinr_mirror: { label: 'ccy_eurinr-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'ccyEurinrMirrorMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
   ccy_gbpinr_mirror: { label: 'ccy_gbpinr-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'ccyGbpinrMirrorMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
   ccy_jpyinr_mirror: { label: 'ccy_jpyinr-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'ccyJpyinrMirrorMemoryStore', capitalTotal: CCY_WIDE_DEFAULTS.capital_inr },
+  // mcx_gold / mcx_crude (this task, src/paper/bots/mcx_gold, mcx_crude): own table, nativeInr: true -
+  // their prices are already converted to INR before anything stores them (the proxy source converts
+  // USD -> INR before the bot ever sees a candle; settle() always runs with fxRate 1), same convention
+  // as nse/nse_scalp above. Unlike nse/nse_scalp, these DO model round-trip costs (fee + slippage, same
+  // 0.23% shape as the crypto bots - src/paper/scalp/config.js), so costPct is DEFAULT_COST_PCT, not 0.
+  mcx_gold: { label: 'mcx_gold', nativeInr: true, costPct: DEFAULT_COST_PCT, ctxKey: 'mcxGoldMemoryStore', capitalTotal: MCX_GOLD_DEFAULTS.capital_inr },
+  mcx_crude: { label: 'mcx_crude', nativeInr: true, costPct: DEFAULT_COST_PCT, ctxKey: 'mcxCrudeMemoryStore', capitalTotal: MCX_CRUDE_DEFAULTS.capital_inr },
+  mcx_gold_mirror: { label: 'mcx_gold-MIRROR', nativeInr: true, costPct: DEFAULT_COST_PCT, ctxKey: 'mcxGoldMirrorMemoryStore', capitalTotal: MCX_GOLD_DEFAULTS.capital_inr },
+  mcx_crude_mirror: { label: 'mcx_crude-MIRROR', nativeInr: true, costPct: DEFAULT_COST_PCT, ctxKey: 'mcxCrudeMirrorMemoryStore', capitalTotal: MCX_CRUDE_DEFAULTS.capital_inr },
 };
 
 const POLL_MS = 20000;
