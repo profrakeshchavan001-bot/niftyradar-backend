@@ -111,7 +111,11 @@ function firstTwoLines(basis) {
  * already sits in that snapshot (in `openTrades` if still open, in `closedTrades` once closed) - counting
  * it once, in the right bucket, is what "the honest current state of the book" means here.
  *
- * capitalLeft = capitalTotal (in INR) + realizedNet - locked. Returns null only when `capitalTotal` or
+ * capitalLeft = capitalTotal (in INR) + realizedNet - locked, floored at 0 (Root-cause backstop,
+ * backfill bug report: a bot whose `openTrades` legitimately holds far more than it should - e.g. a
+ * backfill replay that has not finished resolving every row yet - must never show a negative "left now";
+ * the real fix is each caller never handing this a locked figure that large in the first place, but the
+ * floor itself costs nothing and keeps this always presentable). Returns null only when `capitalTotal` or
  * `fx` make even the total impossible to express in rupees (never a half-guessed number).
  */
 function computeCapitalState({ capitalTotal, closedTrades = [], openTrades = [], nativeInr = false, usdInrFallback, fx, liveRate } = {}) {
@@ -136,7 +140,7 @@ function computeCapitalState({ capitalTotal, closedTrades = [], openTrades = [],
     totalInr: Math.round(totalInr),
     realizedNetInr: Math.round(realizedNetInr),
     lockedInr: Math.round(lockedInr),
-    capitalLeftInr: Math.round(totalInr + realizedNetInr - lockedInr),
+    capitalLeftInr: Math.max(0, Math.round(totalInr + realizedNetInr - lockedInr)),
   };
 }
 

@@ -81,12 +81,34 @@ function buildReverseEntry(original, { targetPct = LEGACY_CRYPTO_TARGET_PCT, sto
  * `reverseEntry` is this trade's own buildReverseEntry() output (direction/entry_price/target_price/
  * sl_price already resolved - never re-derives them). Returns `{ status: 'closed', exit_price,
  * exit_time, exit_reason, estimated: true }` or `null` (stays open).
+ *
+ * Root-cause fix (backfill bug report: REVERSE exits "never arrived" for some bots): the checks above
+ * alone only ever resolve an original that won (exit_reason 'target') or one whose single exit POINT
+ * happens to already clear a 2x/1x threshold - a bot whose trades mostly end in 'stop'/'time' (so neither
+ * holds) left EVERY one of its reverse rows open forever, even though the original's own stored row
+ * already proves more than that: every trade (paperbot/bot.js, src/paper/scalp/bot.js) also tracks
+ * max_fav_pct/max_adv_pct - the furthest the price ever moved in/against the ORIGINAL's own favor during
+ * its whole life, not just where it finally closed. REVERSE sits at the exact same entry price but the
+ * OPPOSITE direction, so its own excursions are the original's with the sign flipped: the furthest REVERSE
+ * ever moved in its own favor is -(the original's worst move), and the furthest it moved against itself is
+ * -(the original's best move). Whichever one of REVERSE's own thresholds this PROVES was crossed (and only
+ * one of them - both or neither is still genuinely ambiguous, never guessed) is its real exit.
  */
 function estimateReverseExit(original, reverseEntry) {
   const entry = Number(reverseEntry.entry_price);
   const stopDistance = Math.abs(entry - Number(reverseEntry.sl_price));
   const targetDistance = stopDistance * 2;
   if (!(stopDistance > 0) || !Number.isFinite(targetDistance)) return null;
+  const favPct = Number(original.max_fav_pct);
+  const advPct = Number(original.max_adv_pct);
+  if (Number.isFinite(favPct) && Number.isFinite(advPct)) {
+    const reverseFavDistance = entry * Math.max(0, -advPct) / 100; // furthest price moved in REVERSE's own favor
+    const reverseAdvDistance = entry * Math.max(0, favPct) / 100; // furthest price moved against REVERSE
+    const hitTarget = reverseFavDistance >= targetDistance;
+    const hitStop = reverseAdvDistance >= stopDistance;
+    if (hitTarget && !hitStop) return { status: 'closed', exit_price: reverseEntry.target_price, exit_time: original.exit_time, exit_reason: 'target', estimated: true };
+    if (hitStop && !hitTarget) return { status: 'closed', exit_price: reverseEntry.sl_price, exit_time: original.exit_time, exit_reason: 'stop', estimated: true };
+  }
   if (original.exit_reason === 'target') {
     return { status: 'closed', exit_price: reverseEntry.sl_price, exit_time: original.exit_time, exit_reason: 'stop', estimated: true };
   }
@@ -96,7 +118,7 @@ function estimateReverseExit(original, reverseEntry) {
   const moveInReverseFavor = long ? exitPrice - entry : entry - exitPrice;
   if (moveInReverseFavor >= targetDistance) return { status: 'closed', exit_price: reverseEntry.target_price, exit_time: original.exit_time, exit_reason: 'target', estimated: true };
   if (moveInReverseFavor <= -stopDistance) return { status: 'closed', exit_price: reverseEntry.sl_price, exit_time: original.exit_time, exit_reason: 'stop', estimated: true };
-  return null; // genuinely inconclusive from this one stored point - left open rather than guessed
+  return null; // genuinely inconclusive from every stored signal - left open rather than guessed
 }
 
 module.exports = { buildReverseEntry, estimateReverseExit, LEGACY_CRYPTO_TARGET_PCT, LEGACY_CRYPTO_STOP_PCT };

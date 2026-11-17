@@ -28,6 +28,28 @@ const inrPlain = (v) => (v == null ? 'n/a' : `₹${Math.round(v).toLocaleString(
  * configured total (scripts/mirrorBackfill.js's sideSummary()/computeCapitalState()) - "n/a" rather than
  * 0 when there is no USDINR_FALLBACK rate to express it in rupees with, never a guessed number.
  */
+// Problem 3 (backfill bug report): "wins, losses, ..., best/worst trade" for the REPLAYED sides (mirror,
+// reverse) - never the original, which is real live data the bot's own alerts already cover. Guarded on
+// `side.wins != null` (sideSummary() always sets it now, but older/fixture rows in tests do not) so a row
+// built before this field existed still renders exactly as before, with no "wins/losses"/"best/worst"
+// line at all - never a blank or NaN one.
+function winLossBestWorstLine(label, side) {
+  if (side.wins == null && side.losses == null) return null;
+  const best = side.bestTradeInr != null ? `${inr(side.bestTradeInr)}${side.bestSymbol ? ` (${side.bestSymbol})` : ''}` : 'n/a';
+  const worst = side.worstTradeInr != null ? `${inr(side.worstTradeInr)}${side.worstSymbol ? ` (${side.worstSymbol})` : ''}` : 'n/a';
+  return `${label}: ${side.wins ?? 0} wins, ${side.losses ?? 0} losses, best ${best}, worst ${worst}`;
+}
+
+// Problem 3's plain-text table of every replayed trade (#, side, net) - no sampling: every row
+// sideSummary()'s own tradeTable() produced for this side, oldest trade first. Absent/empty on a fixture
+// row (older tests, or a side with zero trades) renders nothing, never an empty table.
+function tradeTableBlock(label, side) {
+  const rows = side.tradeTable;
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const lines = rows.map((t) => `#${t.id} ${t.symbol} ${t.direction || '?'} ${inr(t.netPnlInr)}`);
+  return [`${label} trades:`, ...lines].join('\n');
+}
+
 function botBlock(row) {
   const { bot, mirrorLabel, original, mirror, reverse } = row;
   if (!original.trades && !mirror.trades && !(reverse && reverse.trades)) {
@@ -41,7 +63,11 @@ function botBlock(row) {
     `Fees: original ${inr(original.feesInr)}, mirror ${inr(mirror.feesInr)}${reverse ? `, reverse ${inr(reverse.feesInr)}` : ''}`,
     `Capital used: original ${inrPlain(original.capitalUsedInr)} of ${inrPlain(original.capitalTotalInr)}, mirror ${inrPlain(mirror.capitalUsedInr)} of ${inrPlain(mirror.capitalTotalInr)}`
       + (reverse ? `, reverse ${inrPlain(reverse.capitalUsedInr)} of ${inrPlain(reverse.capitalTotalInr)}` : ''),
-  ];
+    winLossBestWorstLine('Mirror', mirror),
+    reverse ? winLossBestWorstLine('Reverse', reverse) : null,
+    tradeTableBlock('Mirror', mirror),
+    reverse ? tradeTableBlock('Reverse', reverse) : null,
+  ].filter((l) => l != null);
   return lines.join('\n');
 }
 

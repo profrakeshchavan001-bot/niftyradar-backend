@@ -43,6 +43,9 @@ const { loadCurrencyConfig, CCY_WIDE_DEFAULTS } = require('../src/paper/lib/curr
 // line uses (src/paper/ops/telegramAlerts/format.js), fed this bot's own currently-open trades, so the
 // "locked" math (entry_price x qty, each trade's own fx_rate) is never duplicated or re-invented here.
 const { computeCapitalState } = require('../src/paper/ops/telegramAlerts/format');
+// Backfill bug report problems 1/3 (root cause: register.js's live poller alerting individually on every
+// backfilled row - see the module's own header for the full explanation).
+const { markAlreadySent } = require('../src/paper/lib/backfillAlertSuppress');
 
 const REPORT_PATH = path.join(__dirname, '..', 'docs', 'MIRROR-BACKFILL-REPORT.md');
 
@@ -126,6 +129,30 @@ function buildJobs({ mainStore, pool, usdInrFallback } = {}) {
 // currently-open trades) + `capitalTotal` feed computeCapitalState() for the "capital used" (locked)
 // figure (Task: add capital to this report) - capitalTotalInr/capitalUsedInr are null, never 0 or
 // guessed, when there is no capitalTotal or no USDINR_FALLBACK rate to express it in rupees with.
+// Best/worst closed trade by net INR P&L, and a plain {#, side, net} line per closed trade (oldest
+// first, by id) - the per-trade table problem 3 asks for alongside the one-summary-per-bot message
+// (src/paper/ops/mirrorBackfillReport/report.js renders these; never sent as individual alerts - see
+// markAlreadySent above). Kept here, next to sideSummary, so both read the exact same `closed` array.
+function bestWorst(closed) {
+  let best = null; let worst = null;
+  for (const t of closed) {
+    const net = Number(t.pnl_inr);
+    if (!Number.isFinite(net)) continue;
+    if (!best || net > Number(best.pnl_inr)) best = t;
+    if (!worst || net < Number(worst.pnl_inr)) worst = t;
+  }
+  return {
+    bestTradeInr: best ? Number(best.pnl_inr) : null, bestSymbol: best ? best.symbol : null,
+    worstTradeInr: worst ? Number(worst.pnl_inr) : null, worstSymbol: worst ? worst.symbol : null,
+  };
+}
+
+function tradeTable(closed) {
+  return [...closed]
+    .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
+    .map((t) => ({ id: t.id, symbol: t.symbol, direction: t.direction, netPnlInr: Number.isFinite(Number(t.pnl_inr)) ? Number(t.pnl_inr) : null }));
+}
+
 function sideSummary(closed, open = [], { capitalTotal, usdInrFallback, nativeInr = false } = {}) {
   const s = computeBotStats(closed, 1); // 1, not the usual 20-trade floor: a backfill wants every number, ranked or not
   // nativeInr (new, this task): a rupee-native bot (ccy_*/mcx_*) needs no fx rate to express its own INR
@@ -134,11 +161,23 @@ function sideSummary(closed, open = [], { capitalTotal, usdInrFallback, nativeIn
   // `nativeInr` (default false), so this is purely additive - their own fx-rate-from-usdInrFallback path
   // below is completely unchanged.
   const fx = nativeInr ? { rate: 1 } : (usdInrFallback ? { rate: Number(usdInrFallback) } : null);
+  // capitalTotal is each bot's own FIXED configured demo capital, converted with ONE fx rate for the
+  // whole job (never a per-trade rate) - so this number is always the same INR base for every bot/side
+  // (backfill bug report problem 1's "same INR base" requirement); `open` here is this side's own
+  // CURRENTLY open rows only (never every historical row - see runJob/runReverseBackfill), so "capital
+  // used" reflects real, still-open risk, not a snapshot of everything that was ever opened.
   const capital = computeCapitalState({ capitalTotal, closedTrades: [], openTrades: open, nativeInr, usdInrFallback, fx });
+  const wins = closed.filter((t) => Number(t.pnl_inr) > 0).length;
+  const losses = closed.filter((t) => Number(t.pnl_inr) < 0).length;
   return {
     trades: s.trades, netPnlInr: s.netPnlInr, grossPnlInr: s.grossPnlInr, feesInr: s.costsInr, winRatePct: s.winRatePct,
+    wins, losses, ...bestWorst(closed), tradeTable: tradeTable(closed),
     capitalTotalInr: capital ? capital.totalInr : null,
-    capitalUsedInr: capital ? capital.lockedInr : null,
+    // Never negative (problem 1): capitalUsedInr/"left now" are derived from THIS side's own currently-
+    // open rows and a single fixed fx rate above, so this should not happen in practice any more, but the
+    // floor costs nothing and guarantees the number shown is never nonsensical even if a future caller
+    // ever does hand this more locked capital than the bot's own total.
+    capitalUsedInr: capital ? Math.min(capital.lockedInr, capital.totalInr) : null,
   };
 }
 
@@ -156,17 +195,26 @@ async function runReverseBackfill(job, { originalClosed, originalOpen }) {
   const byId = new Map([...originalClosed, ...originalOpen].map((o) => [o.id, o]));
   const cfg = await job.loadCfg();
   let resolved = 0;
+  // One bad row must never stop every OTHER row from being resolved (problem 2 root cause: without this,
+  // a single settle()/updateTrade() failure partway through silently aborted the whole loop, leaving
+  // every trade after it - and on an unlucky run, every trade, period - unresolved).
   for (const r of await reverseStore.allOpenTrades()) {
-    const original = byId.get(r.original_trade_id);
-    if (!original || original.status !== 'closed') continue;
-    const patch = estimateReverseExit(original, r);
-    if (!patch) continue; // genuinely inconclusive from the stored row alone - left open, never guessed
-    const fxRate = original.fx_rate != null && Number(original.fx_rate) > 0 ? Number(original.fx_rate) : (job.usdInrFallback || 88);
-    const s = job.settle({ trade: r, exitPrice: patch.exit_price, cfg, fxRate });
-    await reverseStore.updateTrade(r.id, { ...patch, ...s });
-    resolved += 1;
+    try {
+      const original = byId.get(r.original_trade_id);
+      if (!original || original.status !== 'closed') continue;
+      const patch = estimateReverseExit(original, r);
+      if (!patch) continue; // genuinely inconclusive from the stored row alone - left open, never guessed
+      const fxRate = original.fx_rate != null && Number(original.fx_rate) > 0 ? Number(original.fx_rate) : (job.usdInrFallback || 88);
+      const s = job.settle({ trade: r, exitPrice: patch.exit_price, cfg, fxRate });
+      await reverseStore.updateTrade(r.id, { ...patch, ...s });
+      resolved += 1;
+    } catch (e) { console.warn(`[mirror-backfill] ${job.reverseLabel} trade #${r.id}: could not resolve (${e.message}) - left open, other trades continue`); }
   }
   const [reverseClosed, reverseOpen] = await Promise.all([reverseStore.closedTrades(), reverseStore.allOpenTrades()]);
+  // Problems 1/3 root fix: every reverse row this job knows about (just-opened or already there from an
+  // earlier run) is marked already-sent BEFORE the live telegram-alerts poller's next tick can see it -
+  // see src/paper/lib/backfillAlertSuppress.js's own header for why. Never blocks/throws on failure.
+  await markAlreadySent(job.pool, job.reverseLabel, [...reverseClosed, ...reverseOpen]);
   const sideOpts = { capitalTotal: job.capitalTotal, usdInrFallback: job.usdInrFallback, nativeInr: job.nativeInr || false };
   return { reverseLabel: job.reverseLabel, opened, resolvedThisRun: resolved, leftOpen: reverseOpen.length, ...sideSummary(reverseClosed, reverseOpen, sideOpts) };
 }
@@ -179,6 +227,10 @@ async function runJob(job) {
     job.originalStore.closedTrades(), mirrorStore.closedTrades(),
     job.originalStore.allOpenTrades(), mirrorStore.allOpenTrades(),
   ]);
+  // Problems 1/3 root fix (same as the reverse side - see runReverseBackfill): every mirror row is
+  // marked already-sent before the live telegram-alerts poller's next tick can see it. Original trades
+  // are NOT touched here - they are real, live trades the poller has always correctly alerted on.
+  await markAlreadySent(job.pool, job.mirrorLabel, [...mirrorClosed, ...mirrorOpen]);
   const sideOpts = { capitalTotal: job.capitalTotal, usdInrFallback: job.usdInrFallback, nativeInr: job.nativeInr || false };
   const reverse = job.reverseTable ? await runReverseBackfill(job, { originalClosed, originalOpen }) : null;
   return {
