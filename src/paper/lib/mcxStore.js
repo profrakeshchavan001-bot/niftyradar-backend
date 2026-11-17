@@ -4,6 +4,15 @@
 // in memory for tests and a server with no PAPER_DATABASE_URL, or Postgres via the pool a plugin receives
 // in register(ctx). Parametrised by table name so mcx_gold and mcx_crude (two separate tables, two
 // separate virtual balances) share this one implementation instead of two near-identical copies.
+//
+// Root-cause fix: unlike every other bot's own store (exhaustion_only/store.js, trend_smc/store.js,
+// currencyStore.js, mirrorStore.js), createPgMcxStore's Postgres path used to read every row RAW -
+// node-pg returns NUMERIC/DECIMAL columns as strings, so mcx_gold/mcx_crude's own report route
+// (/api/paper/mcx-gold-report, /api/paper/mcx-crude-report) and the mirror backfill
+// (scripts/mirrorBackfill.js) silently did string concatenation or produced NaN on these bots' INR
+// totals. Same shared helper every other store already uses (src/paper/lib/numericCast.js).
+const { castNumericColumns } = require('./numericCast');
+
 function createMemoryMcxStore() {
   const trades = []; const skips = []; let seq = 0;
   return {
@@ -25,7 +34,7 @@ function createMemoryMcxStore() {
 
 function createPgMcxStore(pool, table) {
   const skipsTable = `${table}_skips`;
-  const q = (sql, params) => pool.query(sql, params).then((r) => r.rows);
+  const q = (sql, params) => pool.query(sql, params).then((r) => r.rows.map((row) => castNumericColumns(row)));
   return {
     openTrades: (symbol) => q(`SELECT * FROM ${table} WHERE symbol = $1 AND status = 'open' ORDER BY id`, [symbol]),
     allOpenTrades: () => q(`SELECT * FROM ${table} WHERE status = 'open' ORDER BY id`),

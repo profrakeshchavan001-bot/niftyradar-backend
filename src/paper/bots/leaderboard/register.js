@@ -2,9 +2,25 @@
 // Leaderboard of every CC3/CC2 bot (docs/BOTS.md): GET /api/paper/bots-report (+ ?format=json), auto-loaded by src/paper/pluginLoader.js.
 // Read-only: reads whatever each bot already stored, never writes, never trades. A bot under 20 trades is shown but not ranked.
 const { computeBotStats, dailyWinners, NO_CONCLUSION } = require('./stats');
+// Root-cause fix: every raw pool.query() below used to hand back node-pg's RAW row (NUMERIC/DECIMAL
+// columns as strings), so computeBotStats()'s plain `+`/`-` on pnl_inr/cost_usdt/... either silently
+// string-concatenated or produced NaN for every own-table bot and every mirror bot read through this
+// function on real Postgres - the exact bug already fixed for each bot's OWN store (exhaustion_only,
+// trend_smc, currencyStore, mirrorStore, mcxStore) but never applied here, where the leaderboard, the
+// daily 05:00 report (src/paper/ops/dailyReport/) and the mix report all get their numbers from. Every
+// row from `queryClosed` below now goes through the same shared helper those stores use.
+const { castNumericColumns } = require('../../lib/numericCast');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const inr = (v) => (v == null ? '-' : `${v < 0 ? '-' : '+'}₹${Math.abs(Math.round(v)).toLocaleString('en-IN')}`);
+
+/** Closed trades of one own-table bot straight from Postgres, numeric columns cast to real numbers. "Table not there yet" (fresh database, bot disabled) is empty, never an error. */
+async function queryClosed(pool, table) {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM ${table} WHERE status = 'closed' ORDER BY id`);
+    return rows.map((r) => castNumericColumns(r));
+  } catch (e) { return []; }
+}
 
 // One row per known bot: how to read its closed trades. `pool`/`mainStore`/`ctx` are read live at request time, not captured at
 // register() time, so this works whatever order the plugins happened to load in (see docs/decisions/CC3.md).
@@ -13,85 +29,47 @@ async function closedTradesByBot(ctx) {
   const scalp = await mainStore.closedTrades('crypto_scalp');
   const scalp_wide = await mainStore.closedTrades('crypto_wide_scalp');
   const intraday = await mainStore.closedTrades(null); // nse + crypto, excludes every "*_scalp" market
-  let exhaustion_only = [];
-  try {
-    exhaustion_only = pool ? (await pool.query("SELECT * FROM exhaustion_only_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.exhaustionMemoryStore ? await ctx.exhaustionMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet (fresh database before exhaustion_only's own schema has run) - treat as no trades */ }
-  let trend_smc = [];
-  try {
-    trend_smc = pool ? (await pool.query("SELECT * FROM trend_smc_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.trendSmcMemoryStore ? await ctx.trendSmcMemoryStore.closedTrades() : []);
-  } catch (e) { /* trend_smc may not exist yet at all (docs/decisions/CC3.md) - an empty leaderboard row, not an error */ }
+  const exhaustion_only = pool ? await queryClosed(pool, 'exhaustion_only_trades')
+    : (ctx.exhaustionMemoryStore ? await ctx.exhaustionMemoryStore.closedTrades().catch(() => []) : []);
+  const trend_smc = pool ? await queryClosed(pool, 'trend_smc_trades')
+    : (ctx.trendSmcMemoryStore ? await ctx.trendSmcMemoryStore.closedTrades().catch(() => []) : []);
   // MIRROR bots (docs/BOTS.md "Mirror bots"): own tables, read the same way, same "not there yet = empty
   // row, never an error" rule - so the leaderboard (and mix, which reuses this function) show the mirrors
   // right alongside the originals they shadow.
-  let exhaustion_only_mirror = [];
-  try {
-    exhaustion_only_mirror = pool ? (await pool.query("SELECT * FROM exhaustion_only_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.exhaustionMirrorMemoryStore ? await ctx.exhaustionMirrorMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  let trend_smc_mirror = [];
-  try {
-    trend_smc_mirror = pool ? (await pool.query("SELECT * FROM trend_smc_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.trendSmcMirrorMemoryStore ? await ctx.trendSmcMirrorMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  let scalp_mirror = [];
-  try {
-    scalp_mirror = pool ? (await pool.query("SELECT * FROM scalp_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.scalpMirrorMemoryStore ? await ctx.scalpMirrorMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  let scalp_wide_mirror = [];
-  try {
-    scalp_wide_mirror = pool ? (await pool.query("SELECT * FROM scalp_wide_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.scalpWideMirrorMemoryStore ? await ctx.scalpWideMirrorMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  // intraday-MIRROR (new, this task): own table, mirrors ONLY the 'crypto' market of `intraday` above
+  const exhaustion_only_mirror = pool ? await queryClosed(pool, 'exhaustion_only_mirror_trades')
+    : (ctx.exhaustionMirrorMemoryStore ? await ctx.exhaustionMirrorMemoryStore.closedTrades().catch(() => []) : []);
+  const trend_smc_mirror = pool ? await queryClosed(pool, 'trend_smc_mirror_trades')
+    : (ctx.trendSmcMirrorMemoryStore ? await ctx.trendSmcMirrorMemoryStore.closedTrades().catch(() => []) : []);
+  const scalp_mirror = pool ? await queryClosed(pool, 'scalp_mirror_trades')
+    : (ctx.scalpMirrorMemoryStore ? await ctx.scalpMirrorMemoryStore.closedTrades().catch(() => []) : []);
+  const scalp_wide_mirror = pool ? await queryClosed(pool, 'scalp_wide_mirror_trades')
+    : (ctx.scalpWideMirrorMemoryStore ? await ctx.scalpWideMirrorMemoryStore.closedTrades().catch(() => []) : []);
+  // intraday-MIRROR: own table, mirrors ONLY the 'crypto' market of `intraday` above
   // (src/paper/bots/intraday_mirror/register.js) - same "not there yet = empty row, never an error" rule.
-  let intraday_mirror = [];
-  try {
-    intraday_mirror = pool ? (await pool.query("SELECT * FROM intraday_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.intradayMirrorMemoryStore ? await ctx.intradayMirrorMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  // ccy_* (new, this task): NSE currency futures USDINR/EURINR/GBPINR/JPYINR, own tables
-  // (src/paper/bots/ccy_*/schema.sql) + their _mirror siblings - same "not there yet = empty row, never
-  // an error" rule as every bot above.
+  const intraday_mirror = pool ? await queryClosed(pool, 'intraday_mirror_trades')
+    : (ctx.intradayMirrorMemoryStore ? await ctx.intradayMirrorMemoryStore.closedTrades().catch(() => []) : []);
+  // ccy_*: NSE currency futures USDINR/EURINR/GBPINR/JPYINR, own tables (src/paper/bots/ccy_*/schema.sql)
+  // + their _mirror siblings - same "not there yet = empty row, never an error" rule as every bot above.
   const ccyPairs = ['usdinr', 'eurinr', 'gbpinr', 'jpyinr'];
   const ccy = {};
   for (const pair of ccyPairs) {
     const ctxKey = `ccy${pair[0].toUpperCase()}${pair.slice(1)}MemoryStore`;
     const mirrorCtxKey = `ccy${pair[0].toUpperCase()}${pair.slice(1)}MirrorMemoryStore`;
-    try {
-      ccy[`ccy_${pair}`] = pool ? (await pool.query(`SELECT * FROM ccy_${pair}_trades WHERE status = 'closed' ORDER BY id`)).rows
-        : (ctx[ctxKey] ? await ctx[ctxKey].closedTrades() : []);
-    } catch (e) { ccy[`ccy_${pair}`] = []; }
-    try {
-      ccy[`ccy_${pair}_mirror`] = pool ? (await pool.query(`SELECT * FROM ccy_${pair}_mirror_trades WHERE status = 'closed' ORDER BY id`)).rows
-        : (ctx[mirrorCtxKey] ? await ctx[mirrorCtxKey].closedTrades() : []);
-    } catch (e) { ccy[`ccy_${pair}_mirror`] = []; }
+    ccy[`ccy_${pair}`] = pool ? await queryClosed(pool, `ccy_${pair}_trades`)
+      : (ctx[ctxKey] ? await ctx[ctxKey].closedTrades().catch(() => []) : []);
+    ccy[`ccy_${pair}_mirror`] = pool ? await queryClosed(pool, `ccy_${pair}_mirror_trades`)
+      : (ctx[mirrorCtxKey] ? await ctx[mirrorCtxKey].closedTrades().catch(() => []) : []);
   }
-  // mcx_gold / mcx_crude (this task, src/paper/bots/mcx_gold, mcx_crude) + their mirrors: own tables, same
+  // mcx_gold / mcx_crude (src/paper/bots/mcx_gold, mcx_crude) + their mirrors: own tables, same
   // "not there yet = empty row, never an error" rule.
-  let mcx_gold = [];
-  try {
-    mcx_gold = pool ? (await pool.query("SELECT * FROM mcx_gold_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.mcxGoldMemoryStore ? await ctx.mcxGoldMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  let mcx_crude = [];
-  try {
-    mcx_crude = pool ? (await pool.query("SELECT * FROM mcx_crude_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.mcxCrudeMemoryStore ? await ctx.mcxCrudeMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  let mcx_gold_mirror = [];
-  try {
-    mcx_gold_mirror = pool ? (await pool.query("SELECT * FROM mcx_gold_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.mcxGoldMirrorMemoryStore ? await ctx.mcxGoldMirrorMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
-  let mcx_crude_mirror = [];
-  try {
-    mcx_crude_mirror = pool ? (await pool.query("SELECT * FROM mcx_crude_mirror_trades WHERE status = 'closed' ORDER BY id")).rows
-      : (ctx.mcxCrudeMirrorMemoryStore ? await ctx.mcxCrudeMirrorMemoryStore.closedTrades() : []);
-  } catch (e) { /* table not there yet - treat as no trades */ }
+  const mcx_gold = pool ? await queryClosed(pool, 'mcx_gold_trades')
+    : (ctx.mcxGoldMemoryStore ? await ctx.mcxGoldMemoryStore.closedTrades().catch(() => []) : []);
+  const mcx_crude = pool ? await queryClosed(pool, 'mcx_crude_trades')
+    : (ctx.mcxCrudeMemoryStore ? await ctx.mcxCrudeMemoryStore.closedTrades().catch(() => []) : []);
+  const mcx_gold_mirror = pool ? await queryClosed(pool, 'mcx_gold_mirror_trades')
+    : (ctx.mcxGoldMirrorMemoryStore ? await ctx.mcxGoldMirrorMemoryStore.closedTrades().catch(() => []) : []);
+  const mcx_crude_mirror = pool ? await queryClosed(pool, 'mcx_crude_mirror_trades')
+    : (ctx.mcxCrudeMirrorMemoryStore ? await ctx.mcxCrudeMirrorMemoryStore.closedTrades().catch(() => []) : []);
   return {
     intraday, scalp, scalp_wide, exhaustion_only, trend_smc,
     exhaustion_only_mirror, trend_smc_mirror, scalp_mirror, scalp_wide_mirror, intraday_mirror,
@@ -133,11 +111,35 @@ table{border-collapse:collapse;width:100%;margin-top:6px}th,td{border-bottom:1px
 </body></html>`;
 }
 
+const round2 = (n) => Math.round(n * 100) / 100;
+
+/**
+ * Self-check (no DB write, never throws): for every bot, computeBotStats()'s own netPnlInr/costsInr must
+ * equal the plain sum of that bot's closed trades' own pnl_inr/cost (Number(...) on the raw value, the
+ * same "what would this be without any cast at all" check the task asked for), and must never be
+ * NaN/non-finite. A mismatch here means a column castNumericColumns does not know about slipped through
+ * uncast - logs one line, never crashes the server.
+ */
+async function numericSelfCheck(ctx, log = ctx.log || console.log, getClosed = closedTradesByBot) {
+  let closed;
+  try { closed = await getClosed(ctx); } catch (e) { log(`[leaderboard] numeric self-check could not read trades: ${e.message}`); return; }
+  const bad = [];
+  for (const [bot, rows] of Object.entries(closed)) {
+    const s = computeBotStats(rows);
+    const expectedNet = round2(rows.reduce((sum, t) => sum + (Number(t.pnl_inr ?? t.net_pnl_inr) || 0), 0));
+    if (!Number.isFinite(s.netPnlInr) || Math.abs(s.netPnlInr - expectedNet) > 0.01) bad.push(`${bot} (net: got ${s.netPnlInr}, expected ${expectedNet})`);
+    if (s.trades > 0 && !Number.isFinite(s.costsInr)) bad.push(`${bot} (fees: ${s.costsInr})`);
+  }
+  if (bad.length) log(`[leaderboard] numeric self-check FAILED: ${bad.join('; ')} - a Postgres NUMERIC column is reaching computeBotStats() uncast (src/paper/lib/numericCast.js)`);
+  else log('[leaderboard] numeric self-check passed for every bot (net P&L matches a plain sum, no NaN)');
+}
+
 module.exports = {
   name: 'leaderboard',
-  closedTradesByBot, // reused by src/paper/bots/mix/ so the suggestion engine reads the SAME trade lists, nothing re-fetched
+  closedTradesByBot, numericSelfCheck, // reused by src/paper/bots/mix/ (closedTradesByBot) and tests
   async register(ctx) {
     const { app, env, log } = ctx;
+    numericSelfCheck(ctx, log).catch((e) => log(`[leaderboard] numeric self-check error (non-fatal): ${e.message}`)); // startup check (item 3), fire-and-forget like every other plugin's startup work
     app.get('/api/paper/bots-report', async (req, res) => {
       res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
       const secret = env.PAPER_ADMIN_SECRET || env.RENEW_SECRET;
