@@ -99,6 +99,21 @@ test('buildDailyReport: overall status pairs every original with its mirror, gra
   assert.match(r.text, /Worst bot so far: intraday_mirror \(Rs -1,000\)/);
 });
 
+test('buildDailyReport: where a REVERSE bot exists (intraday, scalp_wide), the overall status is a 3-way original/MIRROR/REVERSE group', () => {
+  const closedByBot = {
+    intraday: [closed({ pnl_inr: 1000, gross_pnl_inr: 1050 })], // net 1000, fee 50
+    intraday_mirror: [closed({ pnl_inr: -1000, gross_pnl_inr: -950 })], // net -1000, fee 50
+    intraday_reverse: [closed({ pnl_inr: 1800, gross_pnl_inr: 1850 })], // net 1800, fee 50
+    scalp: [closed({ pnl_inr: 10 })], // no reverse config for plain scalp - stays original/MIRROR only; no gross given -> 0 fee
+  };
+  const r = buildDailyReport({ now: Date.now(), closedByBot, openByBot: {} });
+  assert.match(r.text, /intraday_reverse: 1T \| 100% win \| Rs \+1,800 \| fees Rs \+50/);
+  // GRAND TOTAL sums every bot present in closedByBot that MIRROR_OF's pairs reach: intraday (1000) +
+  // intraday_mirror (-1000) + intraday_reverse (1800) + scalp (10, no fee) = 1810 net, 150 fees.
+  assert.match(r.text, /GRAND TOTAL: 4T \| net Rs \+1,810 \| fees Rs \+150/);
+  assert.match(r.text, /Best bot so far: intraday_reverse \(Rs \+1,800\)/);
+});
+
 test('maybeSend: sends once at/after 05:00 IST and never a second time the same day (restart-safe dedupe)', async () => {
   const store = createMemoryStore();
   const sent = [];

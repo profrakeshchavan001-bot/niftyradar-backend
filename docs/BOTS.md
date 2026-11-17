@@ -166,6 +166,41 @@ history), hit `GET /api/paper/mirror-backfill-report?key=<PAPER_ADMIN_SECRET>` (
 as every other `/api/paper/` route) - that re-run deliberately bypasses the once-ever guard, but a simple in-process lock
 refuses a second concurrent call (`429`) so two overlapping manual calls can never double-send.
 
+## REVERSE bots (`src/paper/bots/<bot>_reverse/`, plugins): `intraday-REVERSE`, `scalp_wide-REVERSE`
+
+MIRROR takes the opposite side of the original but swaps target and stop, which makes its own reward:risk about 0.3 - it needs
+roughly an 88% win rate after fees and tax just to break even. REVERSE takes the **same direction as the MIRROR** (opposite of
+the original) but with a proper reward:risk instead: same entry price/time/qty as the original, stop placed at the distance of
+the ORIGINAL's own stop from entry (the same pattern high/low + ATR distance, resolved via the shared
+`resolveExitLevels()`/`legacyExit.js` a legacy pre-level-exits trade already needs), on the *losing* side of the reverse trade;
+target at **2x** that distance, on the *winning* side - reward:risk is always exactly 2.0, by construction
+(`src/paper/lib/reverse.js`'s `buildReverseEntry`). Only `intraday` and `scalp_wide` have a REVERSE bot, as asked - plain `scalp`
+does not.
+
+Unlike MIRROR (whose target/stop are a literal swap of the original's own two numbers, so whichever one the original hits, the
+mirror hits the other at the same instant - closing it is just a patch), REVERSE's levels are independent, so its exit is **not**
+determined by the original's close. The live `<bot>-REVERSE` plugin runs its own candle-by-candle monitor
+(`src/paper/lib/reverseBot.js`'s `monitor()`), reusing the SAME `evaluateExit`/`simulateExit` and `settle()` the original bot
+itself uses - never a different exit rule, just the reverse trade's own levels. `sync()` opens a reverse trade for every
+original trade not reversed yet (open or closed), the same no-sampling convention `createMirrorBot`'s `sync()` uses. Each
+REVERSE bot has its own table/balance (`intraday_reverse_trades`, `scalp_wide_reverse_trades` - same shape as the matching
+mirror table), and sends its own Telegram alert (`formatEntry`/`formatExit`, label suffixed `-REVERSE`, basis line "REVERSE of
+trade #N: same direction as the MIRROR..."), so every signal gives **3** Telegram messages: original, MIRROR, REVERSE. Switch:
+`PAPER_INTRADAY_REVERSE_ENABLED` / `PAPER_SCALP_WIDE_REVERSE_ENABLED` (default on, follow `PAPER_BOT_ENABLED`/`PAPER_SCALP_ENABLED`
+the same way their matching MIRROR bots do). Reports: `GET /api/paper/intraday-reverse-report` / `GET
+/api/paper/scalp-wide-reverse-report` (`?key=<PAPER_ADMIN_SECRET>`).
+
+The mirror backfill (`scripts/mirrorBackfill.js`) replays REVERSE too for these two bots, opening a row for every original
+trade exactly like the mirror side - but **cannot** run the real, candle-accurate monitor retroactively, because no candle
+history is stored anywhere in this schema. It can only resolve an exit when the original's own stored row *proves* one
+(`estimateReverseExit()`): the original hitting its own target always means the reverse side was already stopped out (every
+bot's own reward:risk floor is >= 1, so the stop distance is always crossed first); anything else is left **open** rather than
+guessed. `docs/MIRROR-BACKFILL-REPORT.md`'s "3-way comparison" table and the production mirror-backfill Telegram report
+(`src/paper/ops/mirrorBackfillReport/`) both show original vs MIRROR vs REVERSE for these two bots, and "Best bot" there is the
+highest *combined* original+mirror+reverse net P&L. The daily 05:00 IST report (`src/paper/ops/dailyReport/`) picks REVERSE up
+automatically the same way (`REVERSE_OF` in `fetch.js`) - a 3-way group in "OVERALL STATUS" for `intraday`/`scalp_wide`, still
+original/MIRROR-only for every other bot.
+
 ## Report
 
 `exhaustion_only`: `GET /api/paper/exhaustion-report?key=<PAPER_ADMIN_SECRET>`. `trend_smc`: `GET /api/paper/trend-smc-report`. Scalp and

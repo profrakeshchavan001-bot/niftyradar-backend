@@ -109,6 +109,11 @@ const OWN_TABLE_BOTS = {
   mcx_crude: { label: 'mcx_crude', nativeInr: true, costPct: DEFAULT_COST_PCT, ctxKey: 'mcxCrudeMemoryStore', capitalTotal: MCX_CRUDE_DEFAULTS.capital_inr },
   mcx_gold_mirror: { label: 'mcx_gold-MIRROR', nativeInr: true, costPct: DEFAULT_COST_PCT, ctxKey: 'mcxGoldMirrorMemoryStore', capitalTotal: MCX_GOLD_DEFAULTS.capital_inr },
   mcx_crude_mirror: { label: 'mcx_crude-MIRROR', nativeInr: true, costPct: DEFAULT_COST_PCT, ctxKey: 'mcxCrudeMirrorMemoryStore', capitalTotal: MCX_CRUDE_DEFAULTS.capital_inr },
+  // REVERSE bots (this task): same direction as the MIRROR (opposite of the original) but with proper
+  // 2:1 reward:risk levels of its own (src/paper/lib/reverse.js) instead of the mirror's swapped ones -
+  // only intraday and scalp_wide have one, as asked. Same capitalTotal as the original they reverse.
+  intraday_reverse: { label: 'intraday-REVERSE', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'intradayReverseMemoryStore', capitalTotal: PAPERBOT_DEFAULTS.crypto.capital_usdt },
+  scalp_wide_reverse: { label: 'scalp_wide-REVERSE', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpWideReverseMemoryStore', capitalTotal: SCALP_WIDE_DEFAULTS.capital_usdt },
 };
 
 const POLL_MS = 20000;

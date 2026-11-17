@@ -15,7 +15,7 @@ async function runBackfillAndBuildReport({ mainStore, pool, usdInrFallback }) {
   for (const job of jobs) rows.push(await runJob(job)); // sequential: a backfill is a one-off, never time-critical
   const generatedAt = new Date().toISOString();
   const messages = buildTelegramMessages(rows, { generatedAt });
-  const tradeCount = rows.reduce((s, r) => s + r.original.trades + r.mirror.trades, 0);
+  const tradeCount = rows.reduce((s, r) => s + r.original.trades + r.mirror.trades + (r.reverse ? r.reverse.trades : 0), 0);
   return { rows, messages, generatedAt, tradeCount };
 }
 

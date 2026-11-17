@@ -10,7 +10,7 @@ const {
   botBlock, bestBotLine, buildReportBlocks, packIntoMessages, buildTelegramMessages, TELEGRAM_MESSAGE_LIMIT,
 } = require('../src/paper/ops/mirrorBackfillReport/report');
 const registerPlugin = require('../src/paper/ops/mirrorBackfillReport/register');
-const { buildJobs, runJob } = require('../scripts/mirrorBackfill');
+const { buildJobs, runJob, toMarkdown } = require('../scripts/mirrorBackfill');
 
 // ---------- fixtures ----------
 
@@ -73,6 +73,56 @@ test('bestBotLine: picks the bot with the highest COMBINED original+mirror net P
 test('bestBotLine: every bot has zero trades -> says so instead of naming an arbitrary winner', () => {
   const rows = [row({ bot: 'a' }), row({ bot: 'b' })];
   assert.match(bestBotLine(rows), /n\/a.*no bot has any trades/i);
+});
+
+// ---------- REVERSE (this task): botBlock/bestBotLine, 3-way with original/MIRROR/REVERSE ----------
+
+function reverseRow(overrides = {}) {
+  const r = row(overrides);
+  const { reverseLabel = 'intraday-REVERSE', reverseTrades = 0, reverseNetPnlInr = 0, reverseWinRatePct = null, reverseFeesInr = 0, leftOpen = 0 } = overrides;
+  r.reverse = { reverseLabel, trades: reverseTrades, netPnlInr: reverseNetPnlInr, grossPnlInr: reverseNetPnlInr, winRatePct: reverseWinRatePct, feesInr: reverseFeesInr, leftOpen, capitalTotalInr: null, capitalUsedInr: null };
+  return r;
+}
+
+test('botBlock: a bot with a reverse side shows 3 sets of numbers (original/mirror/reverse) and the reverse label', () => {
+  const text = botBlock(reverseRow({ bot: 'intraday', mirrorLabel: 'intraday-MIRROR', trades: 10, netPnlInr: 1000, winRatePct: 60, mirrorTrades: 10, mirrorNetPnlInr: -900, mirrorWinRatePct: 40, reverseTrades: 8, reverseNetPnlInr: 1600, reverseWinRatePct: 62.5, leftOpen: 2 }));
+  assert.match(text, /intraday-REVERSE/);
+  assert.match(text, /8 reverse \(2 left open\)/);
+  assert.match(text, /reverse \+?₹1,600/);
+  assert.match(text, /reverse 62\.5%/);
+});
+
+test('botBlock: a bot with no reverse configured (every other bot) renders exactly as before - no "reverse" text at all', () => {
+  const text = botBlock(row({ bot: 'exhaustion_only', mirrorLabel: 'exhaustion_only-MIRROR', trades: 5, mirrorTrades: 5 }));
+  assert.ok(!/reverse/i.test(text));
+});
+
+test('bestBotLine: combined P&L includes the reverse side when present, and names it in the metric', () => {
+  const rows = [
+    row({ bot: 'scalp', trades: 5, netPnlInr: 1000, mirrorTrades: 5, mirrorNetPnlInr: -900 }), // combined 100, no reverse
+    reverseRow({ bot: 'intraday', trades: 5, netPnlInr: 100, mirrorTrades: 5, mirrorNetPnlInr: -50, reverseTrades: 5, reverseNetPnlInr: 2000 }), // combined 2050 - best, thanks to reverse
+  ];
+  const line = bestBotLine(rows);
+  assert.match(line, /^Best bot: intraday/);
+  assert.match(line, /original\+mirror\+reverse/);
+});
+
+test('toMarkdown (scripts/mirrorBackfill.js): adds a 3-way comparison section only for bots with a reverse side', () => {
+  const rows = [
+    row({ bot: 'exhaustion_only', mirrorLabel: 'exhaustion_only-MIRROR', trades: 3, mirrorTrades: 3 }), // no reverse
+    reverseRow({ bot: 'intraday', mirrorLabel: 'intraday-MIRROR', trades: 5, netPnlInr: 100, mirrorTrades: 5, mirrorNetPnlInr: -50, winRatePct: 60, mirrorWinRatePct: 40, reverseTrades: 4, reverseNetPnlInr: 900, reverseWinRatePct: 75, leftOpen: 1 }),
+  ];
+  const md = toMarkdown(rows, { generatedAt: '2026-11-17T00:00:00Z', dbConfigured: true });
+  assert.match(md, /## 3-way comparison: original vs MIRROR vs REVERSE/);
+  assert.match(md, /\| intraday \| 5 \/ 5 \/ 4 \(1 open\) \|/);
+  assert.doesNotMatch(md, /\| exhaustion_only \|/); // only bots with a reverse side appear in the 3-way table
+  assert.match(md, /conservative estimate, not a live replay/); // the honesty note about the backfill approximation
+});
+
+test('toMarkdown: no bot has a reverse side -> no 3-way section at all', () => {
+  const rows = [row({ bot: 'scalp', mirrorLabel: 'scalp-MIRROR', trades: 1, mirrorTrades: 1 })];
+  const md = toMarkdown(rows, { generatedAt: '2026-11-17T00:00:00Z', dbConfigured: true });
+  assert.ok(!/3-way comparison/.test(md));
 });
 
 test('buildReportBlocks: one block per bot (in order) plus a header first and the best-bot line last', () => {

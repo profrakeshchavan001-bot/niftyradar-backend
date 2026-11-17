@@ -29,18 +29,20 @@ const inrPlain = (v) => (v == null ? 'n/a' : `₹${Math.round(v).toLocaleString(
  * 0 when there is no USDINR_FALLBACK rate to express it in rupees with, never a guessed number.
  */
 function botBlock(row) {
-  const { bot, mirrorLabel, original, mirror } = row;
-  if (!original.trades && !mirror.trades) {
-    return `${bot} (mirror: ${mirrorLabel})\nno trades yet`;
+  const { bot, mirrorLabel, original, mirror, reverse } = row;
+  if (!original.trades && !mirror.trades && !(reverse && reverse.trades)) {
+    return `${bot} (mirror: ${mirrorLabel}${reverse ? `, reverse: ${reverse.reverseLabel}` : ''})\nno trades yet`;
   }
-  return [
-    `${bot} (mirror: ${mirrorLabel})`,
-    `Trades: ${original.trades} original, ${mirror.trades} mirror`,
-    `PnL: original ${inr(original.netPnlInr)}, mirror ${inr(mirror.netPnlInr)}`,
-    `Win rate: original ${pct(original.winRatePct)}, mirror ${pct(mirror.winRatePct)}`,
-    `Fees: original ${inr(original.feesInr)}, mirror ${inr(mirror.feesInr)}`,
-    `Capital used: original ${inrPlain(original.capitalUsedInr)} of ${inrPlain(original.capitalTotalInr)}, mirror ${inrPlain(mirror.capitalUsedInr)} of ${inrPlain(mirror.capitalTotalInr)}`,
-  ].join('\n');
+  const lines = [
+    `${bot} (mirror: ${mirrorLabel}${reverse ? `, reverse: ${reverse.reverseLabel}` : ''})`,
+    `Trades: ${original.trades} original, ${mirror.trades} mirror${reverse ? `, ${reverse.trades} reverse (${reverse.leftOpen} left open)` : ''}`,
+    `PnL: original ${inr(original.netPnlInr)}, mirror ${inr(mirror.netPnlInr)}${reverse ? `, reverse ${inr(reverse.netPnlInr)}` : ''}`,
+    `Win rate: original ${pct(original.winRatePct)}, mirror ${pct(mirror.winRatePct)}${reverse ? `, reverse ${pct(reverse.winRatePct)}` : ''}`,
+    `Fees: original ${inr(original.feesInr)}, mirror ${inr(mirror.feesInr)}${reverse ? `, reverse ${inr(reverse.feesInr)}` : ''}`,
+    `Capital used: original ${inrPlain(original.capitalUsedInr)} of ${inrPlain(original.capitalTotalInr)}, mirror ${inrPlain(mirror.capitalUsedInr)} of ${inrPlain(mirror.capitalTotalInr)}`
+      + (reverse ? `, reverse ${inrPlain(reverse.capitalUsedInr)} of ${inrPlain(reverse.capitalTotalInr)}` : ''),
+  ];
+  return lines.join('\n');
 }
 
 /**
@@ -51,12 +53,16 @@ function botBlock(row) {
  */
 function bestBotLine(rows) {
   const ranked = rows
-    .map((r) => ({ bot: r.bot, combined: (r.original.netPnlInr || 0) + (r.mirror.netPnlInr || 0), hasTrades: r.original.trades > 0 || r.mirror.trades > 0 }))
+    .map((r) => ({
+      bot: r.bot,
+      combined: (r.original.netPnlInr || 0) + (r.mirror.netPnlInr || 0) + (r.reverse ? (r.reverse.netPnlInr || 0) : 0),
+      hasTrades: r.original.trades > 0 || r.mirror.trades > 0 || (r.reverse && r.reverse.trades > 0),
+    }))
     .filter((r) => r.hasTrades)
     .sort((a, b) => b.combined - a.combined);
   if (!ranked.length) return 'Best bot: n/a (no bot has any trades yet)';
   const top = ranked[0];
-  return `Best bot: ${top.bot} (highest combined original+mirror net P&L: ${inr(top.combined)})`;
+  return `Best bot: ${top.bot} (highest combined original+mirror+reverse net P&L: ${inr(top.combined)})`;
 }
 
 /**

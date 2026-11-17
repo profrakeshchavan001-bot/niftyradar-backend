@@ -25,6 +25,9 @@ const OWN_TABLE_BOTS = {
   ccy_jpyinr: 'ccyJpyinrMemoryStore', ccy_jpyinr_mirror: 'ccyJpyinrMirrorMemoryStore',
   mcx_gold: 'mcxGoldMemoryStore', mcx_gold_mirror: 'mcxGoldMirrorMemoryStore',
   mcx_crude: 'mcxCrudeMemoryStore', mcx_crude_mirror: 'mcxCrudeMirrorMemoryStore',
+  // REVERSE bots (this task): own table, same ctx-key convention as every mirror above - set by each
+  // <bot>_reverse/register.js (src/paper/bots/intraday_reverse, scalp_wide_reverse).
+  intraday_reverse: 'intradayReverseMemoryStore', scalp_wide_reverse: 'scalpWideReverseMemoryStore',
 };
 
 // Original -> mirror bot name, for the "overall status" section (requirement 5: original vs mirror per bot).
@@ -35,6 +38,10 @@ const MIRROR_OF = {
   ccy_usdinr: 'ccy_usdinr_mirror', ccy_eurinr: 'ccy_eurinr_mirror',
   ccy_gbpinr: 'ccy_gbpinr_mirror', ccy_jpyinr: 'ccy_jpyinr_mirror',
 };
+
+// Original -> reverse bot name (this task: requirement 5, the 3-way original/MIRROR/REVERSE breakdown).
+// Only intraday and scalp_wide have a REVERSE bot, as asked - every other original is simply absent here.
+const REVERSE_OF = { intraday: 'intraday_reverse', scalp_wide: 'scalp_wide_reverse' };
 
 async function ownTableRows(ctx, bot, status) {
   const { pool } = ctx;
@@ -73,4 +80,4 @@ async function tradesByBot(ctx, status) {
 const closedTradesByBot = (ctx) => tradesByBot(ctx, 'closed');
 const openTradesByBot = (ctx) => tradesByBot(ctx, 'open');
 
-module.exports = { closedTradesByBot, openTradesByBot, MIRROR_OF, OWN_TABLE_BOTS };
+module.exports = { closedTradesByBot, openTradesByBot, MIRROR_OF, REVERSE_OF, OWN_TABLE_BOTS };
