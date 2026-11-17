@@ -33,7 +33,10 @@ test('wiring: behind the secret; JSON has every known bot even with nothing stor
   const r = await call(app, '/api/paper/bots-report', { query: { key: 's3cret', format: 'json' } });
   assert.equal(r.status, 200);
   const d = JSON.parse(r.body);
-  assert.deepEqual(Object.keys(d.stats).sort(), ['exhaustion_only', 'intraday', 'scalp', 'scalp_wide', 'trend_smc'].sort());
+  assert.deepEqual(Object.keys(d.stats).sort(), [
+    'exhaustion_only', 'intraday', 'scalp', 'scalp_wide', 'trend_smc',
+    'exhaustion_only_mirror', 'trend_smc_mirror', 'scalp_mirror', 'scalp_wide_mirror',
+  ].sort());
   for (const bot of Object.keys(d.stats)) assert.deepEqual([d.stats[bot].trades, d.stats[bot].ranked], [0, false]);
   assert.equal(d.daily.length, 0);
 });

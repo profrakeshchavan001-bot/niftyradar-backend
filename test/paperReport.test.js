@@ -197,7 +197,13 @@ test('GET /api/paper/report: needs the PAPER_ADMIN_SECRET as ?key=, answers HTML
     Date.now = () => NOW;
     await m.state.store.insertTrade({ ...T.nseWin, id: undefined });
     await m.state.store.insertTrade({ ...T.cryptoOpen, id: undefined });
-    const before = JSON.stringify(m.state.store._db);
+    // Scoped to trades/skips, not the whole _db: other bots/ plugins (auto-loaded fire-and-forget -
+    // paperbot/index.js's own comment calls this out) lazily write their OWN config rows in the
+    // background on their own schedule, unrelated to this route and not synchronized with this test -
+    // comparing the whole _db would make this assertion race against that unrelated background work
+    // (how many plugins happen to exist) instead of testing what it actually means to: this ROUTE never
+    // inserts/updates a trade or a skip.
+    const before = JSON.stringify({ trades: m.state.store._db.trades, skips: m.state.store._db.skips });
     const ok = await m.call('/api/paper/report', { query: { key: 'right-key' } });
     assert.equal(ok.status, 200);
     assert.equal(ok.type, 'html');
@@ -206,7 +212,7 @@ test('GET /api/paper/report: needs the PAPER_ADMIN_SECRET as ?key=, answers HTML
     assert.match(ok.body, /NSE · RELIANCE · CALL/);
     assert.match(ok.body, /Open trades \(1\)/);
     assert.match(ok.body, /2026-11-13 \(IST\) · made 14:30 IST · storage: memory/);
-    assert.equal(JSON.stringify(m.state.store._db), before); // read-only: not even the config rows are written
+    assert.equal(JSON.stringify({ trades: m.state.store._db.trades, skips: m.state.store._db.skips }), before); // read-only: never inserts/updates a trade or a skip
     assert.equal((await m.call('/api/paper/report', { headers: { 'x-paper-secret': 'right-key' } })).status, 200);
   } finally { Date.now = real; }
   // the JSON routes that were there before still answer JSON

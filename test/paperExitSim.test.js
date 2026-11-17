@@ -62,3 +62,25 @@ test('neither level reached: holds', () => {
   assert.deepEqual(r.exit, false);
   assert.equal(r.action, 'hold');
 });
+
+// --- Direction invariant (root-cause audit: "every paper bot always reports a loss"). A BUY (short:
+// false) must only ever book 'target' on a RISE to the target price and 'stop' on a FALL to the stop
+// price; a SELL/SHORT must do the exact mirror. Proven here with symmetric candle walks, not just by
+// inspecting the target/stop numbers passed in.
+test('invariant: BUY books target on a rise to the target price, never on a fall to the same distance', () => {
+  // entry 100, target 110, stop 95 (target above entry, stop below - the BUY shape). Price only rises.
+  const rise = simulateExit({ entry: 100, target: 110, stop: 95, short: false, candles: [k(1, 101, 112, 100, 108)] });
+  assert.deepEqual([rise.exit, rise.reason, rise.price], [true, 'target', 110]);
+  // same distances, price only falls: must book the stop, never the target.
+  const fall = simulateExit({ entry: 100, target: 110, stop: 95, short: false, candles: [k(1, 99, 100, 88, 90)] });
+  assert.deepEqual([fall.exit, fall.reason, fall.price], [true, 'stop', 95]);
+});
+
+test('invariant: SELL/SHORT books target on a FALL to the target price (the mirror of the BUY case above)', () => {
+  // entry 100, SHORT: target 90 (below entry), stop 105 (above entry) - the SELL shape.
+  const fall = simulateExit({ entry: 100, target: 90, stop: 105, short: true, candles: [k(1, 99, 100, 88, 92)] });
+  assert.deepEqual([fall.exit, fall.reason, fall.price], [true, 'target', 90]);
+  // same distances, price only rises: a short must book its stop, never its target.
+  const rise = simulateExit({ entry: 100, target: 90, stop: 105, short: true, candles: [k(1, 101, 112, 100, 108)] });
+  assert.deepEqual([rise.exit, rise.reason, rise.price], [true, 'stop', 105]);
+});

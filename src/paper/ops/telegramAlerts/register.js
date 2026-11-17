@@ -49,6 +49,15 @@ const SHARED_STORE_MARKETS = {
 const OWN_TABLE_BOTS = {
   exhaustion_only: { label: 'exhaustion_only', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'exhaustionMemoryStore' },
   trend_smc: { label: 'trend_smc', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'trendSmcMemoryStore' },
+  // MIRROR bots (docs/BOTS.md "Mirror bots"): own table, own ctx key (set by each <bot>_mirror/register.js,
+  // which the loader always runs after its original - the folder name sorts after it), same INR/cost
+  // convention as the bot they mirror. Label carries the "-MIRROR" suffix so formatEntry/formatExit (same
+  // exact message format, unchanged) are visibly distinguishable from the original's own alerts in the
+  // same Telegram channel.
+  exhaustion_only_mirror: { label: 'exhaustion_only-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'exhaustionMirrorMemoryStore' },
+  trend_smc_mirror: { label: 'trend_smc-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'trendSmcMirrorMemoryStore' },
+  scalp_mirror: { label: 'scalp-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpMirrorMemoryStore' },
+  scalp_wide_mirror: { label: 'scalp_wide-MIRROR', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpWideMirrorMemoryStore' },
 };
 
 const POLL_MS = 20000;
