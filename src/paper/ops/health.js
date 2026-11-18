@@ -119,6 +119,11 @@ async function cryptoHeartbeat(store, now) {
   } catch (e) { return null; /* tables missing or database down - already reported via database.ok */ }
 }
 
+// MCX gold/crude price feeds (Yahoo GC=F / CL=F proxy). A failed candle fetch is only logged by the bot and writes no DB row,
+// so a dead feed looked like "no signal". Each bot registers its source.stats here; health reports it as a real measurement.
+const mcxFeeds = new Map();
+const registerMcxFeed = (name, stats) => { if (stats) mcxFeeds.set(name, stats); };
+
 const JOB_NAMES = ['nseScan', 'nseMonitor', 'cryptoScan', 'cryptoMonitor'];
 
 /** Assembles the whole health snapshot. `now` is injected ms for tests; defaults to the real clock. */
@@ -213,6 +218,11 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
     } catch (e) { /* a table may not exist yet, or the database is down - already reported via database.ok */ }
   }
   const cryptoBeat = await cryptoHeartbeat(store, now);
+  const mcxFeedStatus = {};
+  for (const [name, st] of mcxFeeds) {
+    mcxFeedStatus[name] = st.ok === 0 && st.failures === 0 ? { status: 'unchecked', note: 'not asked yet this run' }
+      : { status: st.lastSuccessAt && (st.ok > 0) && !(st.lastError && st.lastErrorAt > st.lastSuccessAt) ? 'ok' : 'failing', ok: st.ok, fail: st.failures, lastError: st.lastError || null, lastSuccessAt: st.lastSuccessAt ? new Date(st.lastSuccessAt).toISOString() : null };
+  }
   const storageNotPostgres = Boolean(store) && store.kind !== 'postgres';
 
   // PROBLEM: real faults only.
@@ -239,6 +249,7 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
   if (dataSources.dhan.status === 'failing' && dataSources.yahoo.status === 'ok') degraded.push('Dhan down, Yahoo fallback working');
   if (cryptoBeat) for (const [m, b] of Object.entries(cryptoBeat)) if (b.verdict === 'scanning-no-signal' && b.lastTradeHoursAgo != null && b.lastTradeHoursAgo >= CRYPTO_QUIET_HOURS) degraded.push(`crypto ${m}: no trade for ${b.lastTradeHoursAgo}h, still scanning (filters rejecting: ${b.topRejections.join(', ')})`);
   if (cryptoBeat) for (const [m, b] of Object.entries(cryptoBeat)) if (b.verdict === 'silent') degraded.push(`crypto ${m}: no rejection/scan row in ${b.lastScanMinutesAgo} min (a quiet market writes none, a dead scan would also show under jobs)`);
+  for (const [n, f] of Object.entries(mcxFeedStatus)) if (f.status === 'failing') degraded.push(`${n} price feed failing (${f.fail} fail, last error: ${f.lastError}) - no trades possible until it recovers`);
   const telegramConfigured = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID);
   if (!telegramConfigured) degraded.push('Telegram not configured (alerts stored only)');
 
@@ -266,6 +277,7 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
     lastDbWriteAt,
     lastDbWriteMinutesAgo,
     cryptoHeartbeat: cryptoBeat,
+    mcxFeeds: mcxFeedStatus,
     storageNotPostgres,
     telegram: { configured: telegramConfigured, lastSendOk: state && state.telegramStats ? state.telegramStats.lastSendOk : null },
   };
@@ -302,6 +314,7 @@ ${row('today trades', h.today.trades ?? 'n/a')}
 ${row('today skips', h.today.skips ?? 'n/a')}
 ${row('stale shadows (60min+)', h.staleShadows ?? 'n/a')}
 ${Object.entries(h.cryptoHeartbeat || {}).map(([m, b]) => row(`crypto ${m}`, `${b.verdict}; last trade ${b.lastTradeHoursAgo ?? 'never'}h ago; scan ${b.lastScanMinutesAgo}m ago`)).join('')}
+${Object.entries(h.mcxFeeds || {}).map(([n, f]) => row(n + ' feed', f.status === 'unchecked' ? 'unchecked' : f.status + ' (' + f.ok + ' ok, ' + f.fail + ' fail' + (f.lastError ? ', last error: ' + f.lastError : '') + ')')).join('')}
 ${row('last DB write', h.lastDbWriteMinutesAgo != null ? `${h.lastDbWriteMinutesAgo}m ago` : 'n/a')}
 </table>
 ${errRows}
@@ -329,4 +342,4 @@ function attachHealthRoute(app, { secret, okSecret, tracker, state }) {
   });
 }
 
-module.exports = { createHealthTracker, defaultTracker, buildHealth, attachHealthRoute, htmlPage, JOB_NAMES, STALE_MS, NSE_JOBS, CRYPTO_JOBS };
+module.exports = { registerMcxFeed, createHealthTracker, defaultTracker, buildHealth, attachHealthRoute, htmlPage, JOB_NAMES, STALE_MS, NSE_JOBS, CRYPTO_JOBS };
