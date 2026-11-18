@@ -11,4 +11,15 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
-      - run: npm test
+      - name: Run tests
+        id: test
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
+      - name: Show failing test detail (log tails are truncated upstream, so surface it here)
+        if: steps.test.outcome == 'failure'
+        run: |
+          echo "----- failing test(s) -----"
+          grep -n "^not ok" -A 40 test-output.log || echo "(no 'not ok' line found - check the full log)"
+          exit 1
