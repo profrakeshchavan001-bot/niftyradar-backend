@@ -1,3 +1,5 @@
 node_modules/
 .dhan-token.json
 .claude/
+__pycache__/
+*.pyc

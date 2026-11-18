@@ -1,0 +1,7 @@
+yfinance
+pandas
+numpy
+pyarrow
+scipy
+statsmodels
+requests

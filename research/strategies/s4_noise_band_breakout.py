@@ -44,7 +44,7 @@ def backtest_s4(intraday: pd.DataFrame, capital: float = 100_000.0, instrument: 
     for di, d in enumerate(days):
         if di < lookback_days:
             continue
-        day_df = df[df["date"] == d].reset_index()
+        day_df = df[df["date"] == d]
         prior_days = days[di - lookback_days: di]
         prior_df = df[df["date"].isin(prior_days)]
         position = None  # dict(side, entry_px, entry_idx)
@@ -63,9 +63,9 @@ def backtest_s4(intraday: pd.DataFrame, capital: float = 100_000.0, instrument: 
 
             if position is None:
                 if close_px > upper:
-                    position = {"side": "long", "entry_px": close_px, "entry_time": day_df["index"].iloc[bar_i]}
+                    position = {"side": "long", "entry_px": close_px, "entry_time": day_df.index[bar_i]}
                 elif close_px < lower:
-                    position = {"side": "short", "entry_px": close_px, "entry_time": day_df["index"].iloc[bar_i]}
+                    position = {"side": "short", "entry_px": close_px, "entry_time": day_df.index[bar_i]}
             else:
                 hit_trail = (position["side"] == "long" and close_px < vwap) or \
                             (position["side"] == "short" and close_px > vwap)
@@ -79,7 +79,7 @@ def backtest_s4(intraday: pd.DataFrame, capital: float = 100_000.0, instrument: 
                     c = cost_fn(buy_value, sell_value)
                     gross = (sell_value - buy_value) if position["side"] == "long" else (sell_value - buy_value)
                     trades.append({
-                        "entry_date": position["entry_time"], "exit_date": day_df["index"].iloc[bar_i],
+                        "entry_date": position["entry_time"], "exit_date": day_df.index[bar_i],
                         "side": position["side"], "entry_px": float(entry_px), "exit_px": float(exit_px),
                         "pnl_inr": round(gross - c.total, 2), "costs_inr": c.total,
                     })
