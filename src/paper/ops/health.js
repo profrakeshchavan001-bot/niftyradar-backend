@@ -75,6 +75,50 @@ async function dbStatus(store) {
   }
 }
 
+
+const CRYPTO_QUIET_HOURS = 12; // scanning but no trade this long = informational DEGRADED (not a fault): filters are rejecting everything
+
+/**
+ * Crypto heartbeat (CC1, 18 Nov): "no trade for hours" was indistinguishable from "bot dead". This reads the DB directly:
+ * per crypto market, the newest trade, the newest scan (a skip row is written on every rejected scan), and the top
+ * rejection buckets in the last 24h. verdict = 'scanning-no-signal' (alive, filters rejecting) | 'silent' (no scan in 30+ min)
+ * | 'no-data'. null = not checked (no raw query access) - never reported as healthy when unknown.
+ */
+async function cryptoHeartbeat(store, now) {
+  if (!store || typeof store.query !== 'function') return null;
+  try {
+    const trades = (await store.query("SELECT market, max(created_at) AS t FROM paper_trades WHERE market LIKE 'crypto%' GROUP BY market")).rows;
+    const scans = (await store.query("SELECT market, max(created_at) AS t, count(*)::int AS n24 FROM paper_skips WHERE market LIKE 'crypto%' AND created_at > now() - interval '24 hours' GROUP BY market")).rows;
+    const reasons = (await store.query(`SELECT market, bucket, count(*)::int AS n FROM (
+        SELECT market, CASE WHEN reason LIKE '%against the%trend%' THEN 'pattern against trend/VWAP'
+          WHEN reason LIKE 'momentum score%' THEN 'momentum too low'
+          WHEN reason LIKE 'reward/risk%' THEN 'reward/risk too low'
+          WHEN reason LIKE '%room to the nearest%' OR reason LIKE 'nearest %' THEN 'too close to support/resistance'
+          ELSE 'other' END AS bucket
+        FROM paper_skips WHERE market LIKE 'crypto%' AND created_at > now() - interval '24 hours') x
+        GROUP BY market, bucket ORDER BY n DESC`)).rows;
+    const markets = new Set([...trades.map((r) => r.market), ...scans.map((r) => r.market)]);
+    const out = {};
+    for (const m of markets) {
+      const lt = trades.find((r) => r.market === m);
+      const ls = scans.find((r) => r.market === m);
+      const lastTradeMs = lt && lt.t ? new Date(lt.t).getTime() : null;
+      const lastScanMs = ls && ls.t ? new Date(ls.t).getTime() : null;
+      const scanAge = minutesAgo(lastScanMs, now);
+      out[m] = {
+        lastTradeAt: lastTradeMs ? new Date(lastTradeMs).toISOString() : null,
+        lastTradeHoursAgo: lastTradeMs ? Math.round(((now - lastTradeMs) / 3600000) * 10) / 10 : null,
+        lastScanAt: lastScanMs ? new Date(lastScanMs).toISOString() : null,
+        lastScanMinutesAgo: scanAge,
+        rejections24h: ls ? ls.n24 : 0,
+        topRejections: reasons.filter((r) => r.market === m).slice(0, 3).map((r) => `${r.bucket} x${r.n}`),
+        verdict: scanAge == null ? 'no-data' : scanAge > 30 ? 'silent' : 'scanning-no-signal',
+      };
+    }
+    return out;
+  } catch (e) { return null; /* tables missing or database down - already reported via database.ok */ }
+}
+
 const JOB_NAMES = ['nseScan', 'nseMonitor', 'cryptoScan', 'cryptoMonitor'];
 
 /** Assembles the whole health snapshot. `now` is injected ms for tests; defaults to the real clock. */
@@ -168,6 +212,7 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
       if (t) { lastDbWriteAt = new Date(t).toISOString(); lastDbWriteMinutesAgo = minutesAgo(new Date(t).getTime(), now); }
     } catch (e) { /* a table may not exist yet, or the database is down - already reported via database.ok */ }
   }
+  const cryptoBeat = await cryptoHeartbeat(store, now);
   const storageNotPostgres = Boolean(store) && store.kind !== 'postgres';
 
   // PROBLEM: real faults only.
@@ -192,6 +237,8 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
   const degraded = [];
   if (!session.open) degraded.push(`NSE closed (${session.reason || 'outside market hours'})`);
   if (dataSources.dhan.status === 'failing' && dataSources.yahoo.status === 'ok') degraded.push('Dhan down, Yahoo fallback working');
+  if (cryptoBeat) for (const [m, b] of Object.entries(cryptoBeat)) if (b.verdict === 'scanning-no-signal' && b.lastTradeHoursAgo != null && b.lastTradeHoursAgo >= CRYPTO_QUIET_HOURS) degraded.push(`crypto ${m}: no trade for ${b.lastTradeHoursAgo}h, still scanning (filters rejecting: ${b.topRejections.join(', ')})`);
+  if (cryptoBeat) for (const [m, b] of Object.entries(cryptoBeat)) if (b.verdict === 'silent') degraded.push(`crypto ${m}: no rejection/scan row in ${b.lastScanMinutesAgo} min (a quiet market writes none, a dead scan would also show under jobs)`);
   const telegramConfigured = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID);
   if (!telegramConfigured) degraded.push('Telegram not configured (alerts stored only)');
 
@@ -218,6 +265,7 @@ async function buildHealth({ tracker, store, state, now = Date.now(), env = proc
     staleShadows,
     lastDbWriteAt,
     lastDbWriteMinutesAgo,
+    cryptoHeartbeat: cryptoBeat,
     storageNotPostgres,
     telegram: { configured: telegramConfigured, lastSendOk: state && state.telegramStats ? state.telegramStats.lastSendOk : null },
   };
@@ -253,6 +301,7 @@ ${row('open trades (crypto)', h.openTrades.crypto ?? 'n/a')}
 ${row('today trades', h.today.trades ?? 'n/a')}
 ${row('today skips', h.today.skips ?? 'n/a')}
 ${row('stale shadows (60min+)', h.staleShadows ?? 'n/a')}
+${Object.entries(h.cryptoHeartbeat || {}).map(([m, b]) => row(`crypto ${m}`, `${b.verdict}; last trade ${b.lastTradeHoursAgo ?? 'never'}h ago; scan ${b.lastScanMinutesAgo}m ago`)).join('')}
 ${row('last DB write', h.lastDbWriteMinutesAgo != null ? `${h.lastDbWriteMinutesAgo}m ago` : 'n/a')}
 </table>
 ${errRows}

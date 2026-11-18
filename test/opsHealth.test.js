@@ -256,3 +256,22 @@ test('stale shadows: 0 is not a problem; no raw query access (memory mode) repor
   const memOnly = await buildHealth({ tracker, store: createMemoryStore(), state: { enabled: true, ready: true }, now: MARKET_OPEN, env: {} });
   assert.equal(memOnly.staleShadows, null);
 });
+
+test('crypto heartbeat: scanning but no trade for 12h+ is DEGRADED with the top rejection reasons; recent trade stays quiet', async () => {
+  const now = Date.UTC(2026, 10, 18, 3, 0);
+  const tracker = createHealthTracker({ now: () => now });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const rows = (sql) => {
+    if (/FROM paper_trades WHERE market LIKE/.test(sql)) return [{ market: 'crypto', t: new Date(now - 14 * 3600000) }, { market: 'crypto_scalp', t: new Date(now - 1 * 3600000) }];
+    if (/count\(\*\)::int AS n24/.test(sql)) return [{ market: 'crypto', t: new Date(now - 5 * 60000), n24: 300 }, { market: 'crypto_scalp', t: new Date(now - 5 * 60000), n24: 900 }];
+    if (/AS bucket/.test(sql)) return [{ market: 'crypto', bucket: 'pattern against trend/VWAP', n: 183 }, { market: 'crypto', bucket: 'momentum too low', n: 102 }];
+    return [];
+  };
+  const store = { ...createMemoryStore(), query: async (sql) => ({ rows: rows(sql) }) };
+  const h = await buildHealth({ tracker, store, state: { enabled: true, ready: true, holidays: [] }, now, env: { TELEGRAM_BOT_TOKEN: 'x', TELEGRAM_CHAT_ID: 'y' } });
+  assert.equal(h.cryptoHeartbeat.crypto.verdict, 'scanning-no-signal');
+  assert.equal(h.cryptoHeartbeat.crypto.lastTradeHoursAgo, 14); // 14h exactly
+  assert.deepEqual(h.cryptoHeartbeat.crypto.topRejections, ['pattern against trend/VWAP x183', 'momentum too low x102']);
+  assert.ok(h.degraded.some((d) => /crypto crypto: no trade for 14h/.test(d))); // 14 >= 12
+  assert.ok(!h.degraded.some((d) => /crypto_scalp: no trade/.test(d))); // 1h < 12
+});
