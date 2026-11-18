@@ -33,6 +33,10 @@ const OWN_TABLE_BOTS = {
   research_usdinr_trend: 'researchUsdinrTrendMemoryStore',
   research_btc_momentum: 'researchBtcMomentumMemoryStore',
   research_nifty200_52whigh: 'researchN20052whMemoryStore',
+  // confluence / confluence_flow (Bots A/B, this task): own tables, own ctx-key convention as every bot
+  // above - set by src/paper/bots/confluence/register.js and src/paper/bots/confluence_flow/register.js.
+  confluence: 'confluenceMemoryStore',
+  confluence_flow: 'confluenceFlowMemoryStore',
 };
 
 // Original -> mirror bot name, for the "overall status" section (requirement 5: original vs mirror per bot).
