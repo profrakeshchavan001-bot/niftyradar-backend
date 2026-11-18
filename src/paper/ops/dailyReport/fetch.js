@@ -33,10 +33,16 @@ const OWN_TABLE_BOTS = {
   research_usdinr_trend: 'researchUsdinrTrendMemoryStore',
   research_btc_momentum: 'researchBtcMomentumMemoryStore',
   research_nifty200_52whigh: 'researchN20052whMemoryStore',
-  // confluence / confluence_flow (Bots A/B, this task): own tables, own ctx-key convention as every bot
-  // above - set by src/paper/bots/confluence/register.js and src/paper/bots/confluence_flow/register.js.
+  // confluence / confluence_flow (Bots A/B, a different task): own tables, own ctx-key convention as
+  // every bot above - set by src/paper/bots/confluence/register.js and src/paper/bots/confluence_flow/register.js.
   confluence: 'confluenceMemoryStore',
   confluence_flow: 'confluenceFlowMemoryStore',
+  // nse-MIRROR / nse-REVERSE (Group 4, this task, src/paper/lib/nseOptionSide.js): own tables, same
+  // ctx-key convention as every bot above. NOT wired into MIRROR_OF/REVERSE_OF below, because 'nse' is
+  // not its own key in tradesByBot() (it is merged into the 'intraday' bucket together with the crypto
+  // market, a pre-existing convention this task did not touch) - their own report routes
+  // (/api/paper/nse-mirror-report, /api/paper/nse-reverse-report) and Telegram alerts are unaffected.
+  nse_mirror: 'nseMirrorMemoryStore', nse_reverse: 'nseReverseMemoryStore',
 };
 
 // Original -> mirror bot name, for the "overall status" section (requirement 5: original vs mirror per bot).
