@@ -105,25 +105,16 @@ test('replay NSE: exhaustion reversal -> CALL at the real option price -> target
   assert.equal(h.store._db.skips.filter((s) => s.symbol !== 'TESTSTK').length, 0);
 });
 
-test('replay NSE: no option price -> simulated (flagged) -> forced exit at 15:15', async () => {
+// Group 2 (2026-11): a real Dhan option price is REQUIRED to take an NSE trade - never a simulated
+// premium any more. With no real quote ever available, the setup is skipped every time it recurs, not
+// taken on a made-up number.
+test('replay NSE: no real option price -> entry skipped every time (never a simulated premium), reason "no real option price"', async () => {
   const h = nseHarness({ optionLtp: null });
   await h.runSession();
-  const trades = h.store._db.trades;
-  assert.equal(trades.length, 1);
-  const t = trades[0];
-  assert.equal(t.simulated_option, true);
-  assert.match(t.price_source, /simulated/);
-  assert.match(t.basis, /SIMULATED/);
-  // premium = 2.5% of 492 = 12.3; lot value 12.3 x 500 = 6150; 40,000 / 6150 = 6 lots = 3000 qty
-  assert.equal(t.entry_price, 12.3);
-  assert.equal(t.qty, 3000);
-  // by 15:15 forty-nine more candles closed (one fewer than before - the reversal now takes 3
-  // candles, not 2), +0.02 each: stock 492 + 49 x 0.02 = 492.98; option 12.3 + 0.5 x 0.98 = 12.79 (below target)
-  assert.equal(t.exit_reason, 'time_exit_15:15');
-  assert.equal(t.exit_underlying, 492.98);
-  assert.equal(t.exit_price, 12.79);
-  assert.equal(t.pnl_inr, 1470); // (12.79 - 12.3) x 3000
-  assert.equal(t.exit_time, new Date(ist(15, 15, 50)).toISOString());
+  assert.equal(h.store._db.trades.length, 0);
+  const skips = h.store._db.skips.filter((s) => s.symbol === 'TESTSTK' && s.reason === 'no real option price');
+  assert.ok(skips.length >= 1, 'expected at least one "no real option price" skip for TESTSTK');
+  assert.ok(skips.every((s) => s.patterns.includes('exhaustion_reversal')));
 });
 
 test('replay NSE: news today -> no trade, skip reason logged', async () => {
@@ -207,8 +198,14 @@ test('replay crypto: exhaustion reversal down -> SHORT -> stop at the level-base
   const c = store._db.trades[0];
   assert.equal(c.exit_reason, 'stop');
   assert.equal(c.exit_price, 103.12); // booked at the stop level, not the tick (103.2) that crossed it
-  // loss booked at the stop level: (103.12 - 102.18) x 333.3333 / 102.18 = 3.066484 USDT x 88 = Rs 269.85
-  assert.equal(c.pnl_inr, -269.85);
+  // Group 3a (2026-11): intraday now pays the same per-side fee + slippage model scalp_wide already
+  // uses. gross loss booked at the stop level: (103.12 - 102.18) x 3.2622170026750177 = 3.066484 USDT.
+  // entryVal = 102.18 x qty = 333.3333, exitVal = 103.12 x qty = 336.3883; cost = 0.1% x (333.3333 +
+  // 336.3883) + 0.03% x 333.3333 = 0.669721 + 0.1 = 0.769721 (rounds to 0.769733 - 6dp intermediate
+  // rounding in settle()); net = -3.066484 - 0.769733 = -3.836217 USDT x 88 = Rs -337.59.
+  assert.equal(c.gross_pnl_inr, -269.85); // unchanged: still the pre-cost figure, kept for comparison
+  assert.equal(c.cost_usdt, 0.769733);
+  assert.equal(c.pnl_inr, -337.59);
   assert.equal(c.fx_rate, 88);
 
   // end-of-day summary: no Telegram env -> stored in daily_summaries
@@ -220,9 +217,9 @@ test('replay crypto: exhaustion reversal down -> SHORT -> stop at the level-base
   assert.equal(saved.summary_date, '2026-11-13');
   assert.match(saved.body, /PAPER bot \(demo, no real money\)/);
   assert.match(saved.body, /BTCUSDT SHORT/);
-  assert.match(saved.body, /exit: stop · P&L Rs -270/); // -269.85 rounded for display
-  assert.match(saved.body, /Day total: 1 trades, 0 wins, P&L Rs -270/);
-  assert.match(saved.body, /exhaustion_reversal: 1 trades, win 0%, avg Rs -270 \(fewer than 20 trades, no conclusion\)/);
+  assert.match(saved.body, /exit: stop · P&L Rs -338/); // -337.59 rounded for display (net of fees, Group 3a)
+  assert.match(saved.body, /Day total: 1 trades, 0 wins, P&L Rs -338/);
+  assert.match(saved.body, /exhaustion_reversal: 1 trades, win 0%, avg Rs -338 \(fewer than 20 trades, no conclusion\)/);
   const w = await reporter.weekly();
   assert.match(w.text, /Too few trades, no conclusion/);
 });

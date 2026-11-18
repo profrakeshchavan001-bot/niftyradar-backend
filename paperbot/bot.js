@@ -217,10 +217,14 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       }
       const lot = nse.lotSize(s.symbol);
       if (!lot) { await skip('nse', s.symbol, 'lot size not known for this stock', a.extra); continue; }
+      // Group 2 (2026-11): a real Dhan option price is REQUIRED to take an NSE trade - never a
+      // simulated/Yahoo-derived premium. If the option chain has no quote right now (API error, no
+      // quote for this strike, stale/zero price - nse.optionQuote already returns null for all of
+      // those, never a guessed number), the trade is skipped, not taken on a made-up premium.
       const quote = await nse.optionQuote(s.symbol, dir);
-      const simulated = !quote;
-      const spot = quote ? quote.spot : a.ctx.price;
-      const premium = quote ? quote.ltp : P.round(spot * n.sim_premium_pct / 100, 2);
+      if (!quote) { await skip('nse', s.symbol, 'no real option price', a.extra); continue; }
+      const spot = quote.spot;
+      const premium = quote.ltp;
       const size = E.sizeNse({ capital: n.capital_inr, riskPct: n.risk_pct, stopPct: n.stop_pct, freeCash, premium, lot });
       if (!size) { await skip('nse', s.symbol, `one lot (${lot} x Rs ${premium}) is bigger than the 2% risk size or the free cash`, a.extra); continue; }
 
@@ -234,13 +238,13 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
         legacy_rf: s.legacyRf,
         r_detail: { ...s.r, traded: { direction: dir, r: rDir }, rRank: s.rRank, legacyRank: s.legacyRank, inLegacyTop: s.legacyRank != null && s.legacyRank <= n.top_n },
         direction: dir === 'up' ? 'CALL' : 'PUT',
-        instrument: quote ? `${s.symbol} ${quote.expiry} ${quote.strike} ${type}` : `${s.symbol} ATM ${type} (simulated)`,
-        simulated_option: simulated,
-        price_source: quote ? 'dhan_option_chain_ltp' : `simulated: premium ${n.sim_premium_pct}% of spot, delta ${n.sim_delta}`,
+        instrument: `${s.symbol} ${quote.expiry} ${quote.strike} ${type}`,
+        simulated_option: false,
+        price_source: 'dhan_option_chain_ltp',
         candle_source: source, data_source: dataSource || null, data_delay_sec: delaySec, qty: size.qty, entry_price: premium, entry_underlying: spot,
         // exit levels on the OPTION price, fixed at entry so the report shows what the bot was aiming for
         sl_price: P.round(premium * (1 - n.stop_pct / 100), 2), target_price: P.round(premium * (1 + n.target_pct / 100), 2),
-        basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: rDir, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated })
+        basis: E.basisSentence({ market: 'nse', symbol: s.symbol, score: rDir, direction: dir, patterns: a.decision.patterns, ctx: a.ctx, news: news.reason, simulated: false })
           + (isDelayed(dataSource) ? ` Data: free Yahoo feed, about ${Math.round(delaySec / 60)} min behind the market.` : ''),
         ...(jd ? tradeFields(jd) : {}),
       };
@@ -463,8 +467,14 @@ function createBot({ store, nse, crypto, now = Date.now, log = console.log, onCo
       }
       const fx = await crypto.usdtInr(c.usdt_inr_fallback);
       const pct = E.changePct(t.entry_price, exitPrice, short);
-      const pnlUsdt = (exitPrice - t.entry_price) * t.qty * (short ? -1 : 1);
-      await closeTrade(t, exitPrice, exitPrice, reason, pnlUsdt * fx.rate, pct, { fx_rate: fx.rate, fx_source: fx.source });
+      // Group 3a (2026-11): same per-side fee + slippage model scalp_wide already uses, via the ONE
+      // settle() intraday-MIRROR/intraday-REVERSE already call (paperbot/engine.js) - no longer a
+      // fee-less inline calc kept only here. The exit trigger (reason/exitPrice above) is unchanged.
+      const s = E.settle({ trade: t, exitPrice, cfg: c, fxRate: fx.rate });
+      await closeTrade(t, exitPrice, exitPrice, reason, s.pnl_inr, pct, {
+        fx_rate: fx.rate, fx_source: fx.source,
+        gross_pnl_usdt: s.gross_pnl_usdt, cost_usdt: s.cost_usdt, net_pnl_usdt: s.net_pnl_usdt, gross_pnl_inr: s.gross_pnl_inr,
+      });
       closed += 1;
     }
     // A/B only: what the old fixed +target% / -stop% rule would have done with the same entry. Never used for an exit.
