@@ -283,4 +283,6 @@ function register(ctx) {
   return { check };
 }
 
-module.exports = { name: 'telegram-alerts', schemaSql: path.join(__dirname, 'schema.sql'), register, SHARED_STORE_MARKETS, OWN_TABLE_BOTS, POLL_MS };
+// sendTelegram is also exported for reuse by server.js's Dhan-token-renewal failure alert (Group 1,
+// 2026-11) - the exact same sender, never a second copy of the same axios.post.
+module.exports = { name: 'telegram-alerts', schemaSql: path.join(__dirname, 'schema.sql'), register, SHARED_STORE_MARKETS, OWN_TABLE_BOTS, POLL_MS, sendTelegram };

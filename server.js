@@ -122,8 +122,62 @@ async function renewDhanToken() {
   }
 }
 
-// Every 6h - leaves 3 more attempts before a 24h token actually expires
-cron.schedule('17 */6 * * *', renewDhanToken, {
+// ============================================
+// Group 1 (2026-11): retry-with-backoff + a single daily Telegram alert when renewal is exhausted.
+//
+// Research finding, written down so the next person does not re-derive it: Dhan's published Data API
+// (https://dhanhq.co/docs) does NOT document a from-scratch, programmatic client-id + PIN + TOTP LOGIN
+// endpoint the way Zerodha Kite Connect's /session/token (checksum-based) or a bank's net-banking TOTP
+// flow do. The only renewal-shaped call Dhan documents is GET /v2/RenewToken (used by renewDhanToken()
+// above), and it only EXTENDS an access token that is still valid - it cannot create a session from
+// nothing once a token has actually expired. A human must generate a fresh 24h access token from the
+// Dhan web console (dashboard) when that happens. So this fix does the only two things that ARE possible
+// without a documented login API: (a) retries RenewToken itself with exponential backoff instead of
+// giving up on the first network hiccup, and (b) sends exactly one Telegram alert per day if every retry
+// still fails, so the owner knows to go paste a fresh token before the bot goes dark - never a second
+// alert for the same day's failures. No PIN/TOTP env var is read anywhere in this file, because no real
+// login call exists to use them on; `DHAN_CLIENT_ID`/`DHAN_ACCESS_TOKEN` (already documented in
+// .env.example) are the only credentials this flow actually needs. If the owner later confirms Dhan DOES
+// expose a genuine from-scratch login under a partner/business API not in the public docs, that call
+// drops straight into `loginFromScratch()` below (currently just the documented "not possible" marker) -
+// everything else here (retry loop, persistence, the once-a-day alert) stays unchanged.
+async function loginFromScratch() {
+  // Deliberately not implemented: see the comment above cron.schedule('17 */6 * * *', ...) for why. Call
+  // this instead of RenewToken only once a real endpoint exists; until then it is never called.
+  throw new Error('no documented Dhan client-id+PIN+TOTP login endpoint exists - renewDhanToken()/RenewToken is the only renewal this repo can do');
+}
+
+const RENEW_RETRY_DELAYS_MS = [30000, 120000, 300000]; // 30s, 2m, 5m - a few attempts, not a hot loop
+
+async function sendRenewFailureAlert(lastError) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chat = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chat) { console.error('⚠️  Dhan token renewal exhausted and TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID are not configured - no alert sent'); return; }
+  try {
+    // Reuses the exact same Telegram sender every trade alert already uses (src/paper/ops/telegramAlerts/
+    // register.js's sendTelegram) rather than a second copy of the same axios.post.
+    const { sendTelegram } = require('./src/paper/ops/telegramAlerts/register');
+    const text = `⚠️ Dhan token renewal failed after ${RENEW_RETRY_DELAYS_MS.length + 1} attempts today. Last error: ${typeof lastError === 'string' ? lastError : JSON.stringify(lastError)}. A fresh access token may need to be pasted into DHAN_ACCESS_TOKEN from the Dhan web console - no automatic from-scratch login exists (see the comment near loginFromScratch above).`;
+    await sendTelegram(axios, token, chat, text, console.log);
+  } catch (e) {
+    console.error('❌ Could not send the Dhan renewal-failure Telegram alert:', e.message);
+  }
+}
+
+// The retry-with-backoff + at-most-one-alert-per-day logic itself lives in src/lib/renewWithRetry.js
+// (every dependency injected, so it is unit-tested there with fakes - test/renewWithRetry.test.js)
+// rather than inline here, so it never needs a real clock/network/Telegram to test.
+const { createRenewRetrier } = require('./src/lib/renewWithRetry');
+const { renewWithRetry: renewDhanTokenWithRetry } = createRenewRetrier({
+  renewFn: renewDhanToken, sendAlert: sendRenewFailureAlert, delaysMs: RENEW_RETRY_DELAYS_MS,
+  now: () => new Date(), dateKeyOf: (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d),
+  log: (m) => console.log(`[dhan-renew] ${m}`),
+});
+
+// Every 6h - leaves 3 more attempts before a 24h token actually expires. Runs the retry-with-backoff
+// wrapper, not renewDhanToken() directly, so a single transient failure no longer waits a full 6h for
+// its next chance, and a day where every attempt fails sends exactly one Telegram alert (above).
+cron.schedule('17 */6 * * *', renewDhanTokenWithRetry, {
   timezone: 'Asia/Kolkata',
 });
 
@@ -146,7 +200,7 @@ app.get('/api/renew-token', async (req, res) => {
   if (!isValidRenewSecret(req.get('x-renew-secret') || req.query.key)) {
     return res.status(401).json({ ok: false, error: 'Unauthorized' });
   }
-  const result = await renewDhanToken();
+  const result = await renewDhanTokenWithRetry();
   res.status(result.ok ? 200 : 502).json(result);
 });
 
