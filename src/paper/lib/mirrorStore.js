@@ -32,12 +32,23 @@ function createMemoryMirrorStore() {
 // five identical in shape) declares these same columns `numeric`. `computeBotStats`
 // (src/paper/bots/leaderboard/stats.js) then does plain arithmetic on them (`+`, `-`), which on a STRING
 // either concatenates or silently produces NaN - never a thrown error, so the bug only ever showed up as
-// null/NaN in a report, never a crash. `id`, `original_trade_id` and `trigger_t` are `bigint`, not
-// `numeric` - left alone here on purpose (same convention as `paperbot/store.js`'s own `NUM_COLS`, which
-// also only lists columns actually used as numbers downstream; nothing in this codebase does strict `===`
-// on a mirror row's own id, so the bigint-as-string node-pg already returns is not itself a bug).
-const NUMERIC_COLUMNS = ['entry_price', 'qty', 'sl_price', 'target_price', 'rr',
-  'gross_pnl_usdt', 'cost_usdt', 'net_pnl_usdt', 'gross_pnl_inr', 'pnl_inr', 'fx_rate'];
+// null/NaN in a report, never a crash. `id`/`original_trade_id` are left as strings on purpose (same
+// convention as `paperbot/store.js`'s own `NUM_COLS`; nothing in this codebase does strict `===`/
+// arithmetic on a mirror row's own id). `trigger_t` is DIFFERENT and WAS the actual root cause of the
+// "scalp_wide_reverse: 15 open trades that never close" bug (Group 3b, 2026-11): it is `bigint`, also a
+// string from node-pg, and src/paper/scalp/engine.js's evaluateExit() (reused by src/paper/bots/
+// scalp_wide_reverse/register.js's own evaluateExitFn - every REVERSE/MIRROR monitor that reads from a
+// table built with this store) does ARITHMETIC on it directly: `c.t < trade.trigger_t + MIN`. With
+// trigger_t a string, `trigger_t + MIN` is STRING CONCATENATION ("1762000000000" + 300000 ->
+// "1762000000000300000"), and `<` then coerces that huge 19-digit string back to a number far bigger
+// than any real candle timestamp - so the comparison is true for every candle, `continue` fires every
+// time, and the loop never reaches a stop/target/time-stop check at all. paperbot/store.js's own
+// NUM_COLS already casts trigger_t for the main paper_trades table (which is why the ORIGINAL scalp_wide
+// bot was never affected) - this store just never got the same fix for the mirror/reverse tables built
+// on it. Fixed by casting it here too, the one place every mirror AND reverse store read already goes
+// through.
+const NUMERIC_COLUMNS = ['entry_price', 'qty', 'sl_price', 'target_price', 'rr', 'trigger_t',
+  'gross_pnl_usdt', 'cost_usdt', 'net_pnl_usdt', 'gross_pnl_inr', 'pnl_inr', 'fx_rate', 'net_after_fees_corrected'];
 
 // The actual cast now lives in src/paper/lib/numericCast.js (extracted so exhaustion_only/store.js and
 // trend_smc/store.js, which have the identical bug against their own `numeric` columns, reuse the same

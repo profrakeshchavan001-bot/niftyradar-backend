@@ -201,7 +201,23 @@ function botOnYahoo({ feedStopsAt = Infinity, fail = false, delayMs = 0 } = {}) 
   const log = (m) => logs.push(m);
   const yahoo = createYahooSource({ axios, log, now: () => clock.t, sleep: async () => {}, universe: ['TESTSTK'] });
   const nse = createNseSource({ axios, yahoo, log, now: () => clock.t, ...deadDhan().deps });
-  nse.optionQuote = async () => null; // Dhan option chain is gone too: the option price is simulated and flagged
+  // Group 2 (2026-11): a real Dhan option price is now REQUIRED to take any NSE trade, even when the
+  // STOCK candles themselves come from the free Yahoo fallback (Dhan quotes gone) - option pricing and
+  // equity-candle pricing are two independent feeds. So this fake stands in for a live Dhan option-chain
+  // answer (never null while the underlying has a closed candle), reusing the exact same delta-based
+  // premium model paperbot/engine.js's simOptionPrice uses, so every hand-worked number below is
+  // unchanged from before this fix - only simulated_option/price_source differ (false / real, not
+  // flagged), because this fake is standing in for a REAL quote, not a simulated fallback.
+  let optBase = null; // { entrySpot, entryPremium } - fixed the first time a quote is asked for
+  nse.optionQuote = async (symbol, dir, fixed) => {
+    const seen = Math.min(clock.t - delayMs, feedStopsAt);
+    const closed = replay.nse.candles.filter((k) => k.t + FIVE <= seen);
+    if (!closed.length) return null;
+    const spot = closed.at(-1).c;
+    if (!optBase) optBase = { entrySpot: spot, entryPremium: Math.round(spot * 2.5) / 100 };
+    const ltp = Math.max(0.05, Math.round((optBase.entryPremium + 0.5 * (spot - optBase.entrySpot) * (dir === 'up' ? 1 : -1)) * 100) / 100);
+    return { ltp, strike: fixed?.strike ?? 490, expiry: fixed?.expiry ?? '2026-11-20', spot };
+  };
   const bot = createBot({ store, nse, crypto: null, now: () => clock.t, log });
   async function runSession() {
     for (let m = 0; m <= 375; m++) {
@@ -227,7 +243,8 @@ test('bot on Yahoo candles: trade is marked data_source "yahoo_delayed" with the
   assert.equal(t.data_delay_sec, 20);
   assert.equal(t.r_factor, 3); // same real R factor as on Dhan candles (test/paperReplay.test.js)
   assert.match(t.score_source, /^r_factor_v2/);
-  assert.equal(t.simulated_option, true);
+  assert.equal(t.simulated_option, false); // Group 2 (2026-11): real option price required, even when the stock candles come from Yahoo
+  assert.equal(t.price_source, 'dhan_option_chain_ltp');
   assert.deepEqual([t.status, t.exit_reason], ['closed', 'time_exit_15:15']);
   assert.ok(h.logs.some((l) => /PAPER entry nse .*data_source yahoo_delayed, latest candle closed 20 s ago, quote lag 0 s, delay declared by the feed 0 min/.test(l)));
   // one 5m request per 5-minute window at most (75 windows), plus one 15m request in a window where the stock is analysed
@@ -248,8 +265,10 @@ test('end to end on a 15-minute-late Yahoo feed: R factor, pattern, entry, SL / 
   assert.ok(t.patterns.includes('exhaustion_reversal'));
   assert.equal(t.r_factor, 3); // same R factor as on live candles
   assert.equal(t.news_filter, 'no headline about this stock today');
-  // no option price on Yahoo: simulated and flagged. Premium = 2.5% of 492 = 12.3; 40,000 / (12.3 x 500) = 6 lots = 3000
-  assert.deepEqual([t.simulated_option, t.entry_price, t.qty, t.entry_underlying], [true, 12.3, 3000, 492]);
+  // Group 2 (2026-11): real Dhan option price required even though the STOCK candles come from Yahoo -
+  // the fake optionQuote above stands in for Dhan here. Premium = 2.5% of 492 = 12.3; 40,000 / (12.3 x 500) = 6 lots = 3000
+  assert.deepEqual([t.simulated_option, t.entry_price, t.qty, t.entry_underlying], [false, 12.3, 3000, 492]);
+  assert.equal(t.price_source, 'dhan_option_chain_ltp');
   // exit levels fixed at entry: stop 12.3 x 0.95 = 11.685, target 12.3 x 1.10 = 13.53
   assert.ok(Math.abs(t.sl_price - 11.685) <= 0.0051);
   assert.equal(t.target_price, 13.53);

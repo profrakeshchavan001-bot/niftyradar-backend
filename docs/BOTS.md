@@ -201,6 +201,40 @@ highest *combined* original+mirror+reverse net P&L. The daily 05:00 IST report (
 automatically the same way (`REVERSE_OF` in `fetch.js`) - a 3-way group in "OVERALL STATUS" for `intraday`/`scalp_wide`, still
 original/MIRROR-only for every other bot.
 
+## nse-MIRROR / nse-REVERSE (`src/paper/bots/nse_mirror/`, `src/paper/bots/nse_reverse/`, plugins; the shared logic lives in `src/paper/lib/nseOptionSide.js`)
+
+Added alongside the groups above (2026-11). `nse_scalp` is a reserved market key with no trade stream of its own anywhere in
+this repo today (nothing ever inserts a row with `market = 'nse_scalp'`), so there is one mirror/reverse pair here, covering
+`nse` only - not a second pair for `nse_scalp`.
+
+Every other MIRROR/REVERSE bot in this repo flips direction on the SAME price series (a stock or a crypto coin) - "swap the
+original's own two numbers" (target/stop) or "the same distance as the original's own stop" are well-defined on that one
+series. An `nse` trade's "opposite side" is a DIFFERENT option CONTRACT (CALL -> PUT, or back) with its OWN real premium -
+there is no single price to swap across two different contracts, so this pair does not reuse `buildMirrorEntry`/
+`buildReverseEntry` (`src/paper/lib/mirror.js`/`reverse.js`). Instead (documented divergence):
+
+- **nse-MIRROR** opens the opposite option type at the SAME strike/expiry as soon as `sync()` sees a new, REAL-priced
+  (`price_source: 'dhan_option_chain_ltp'`, never a `simulated_option` row - the whole point of Group 2's fix) `nse` trade not
+  mirrored yet, priced from a FRESH Dhan option-chain quote for that opposite leg (never derived/simulated from the original's
+  own premium). Target/stop apply the SAME `target_pct`/`stop_pct` the live `nse` config already uses, to the mirror's OWN
+  entry premium (a literal number-swap would be meaningless across two different contracts).
+- **nse-REVERSE** opens the SAME opposite option as the mirror, but with its own stop at the DISTANCE (in rupees) of the
+  original's own stop from the original's own entry, and target at 2x that distance on its own entry premium - reward:risk
+  exactly 2.0 by construction, same idea as every other REVERSE bot.
+- Both sides copy the original's own `qty` (same number of lots), and both run their OWN monitor - a fresh `nse.optionQuote`
+  each tick, checked with the exact same `E.evaluateExit()` (`paperbot/engine.js`) and force-exit-time rule
+  (`cfg.nse.force_exit_ist`) the main `nse` bot's own `nseMonitor` already uses, never a different exit rule. If the
+  force-exit time arrives with no real quote available, the trade stays open and is rechecked next tick rather than ever
+  being force-closed on a guessed price.
+- Own tables (`nse_mirror_trades`, `nse_reverse_trades`), own `_meta` table for the one-time "I am live now" Telegram message
+  (`src/paper/lib/liveAnnounce.js`, `src/paper/lib/nseSideStore.js`), own Telegram alerts (`formatEntry`/`formatExit`, labels
+  `nse-MIRROR`/`nse-REVERSE`), same `capital_inr` as the main `nse` bot. Switches: `PAPER_NSE_MIRROR_ENABLED` /
+  `PAPER_NSE_REVERSE_ENABLED` (default on, follow `PAPER_BOT_ENABLED`). Reports: `GET /api/paper/nse-mirror-report` /
+  `GET /api/paper/nse-reverse-report` (`?key=<PAPER_ADMIN_SECRET>`).
+- NOT wired into the daily 05:00 IST report's 3-way `MIRROR_OF`/`REVERSE_OF` grouping: `'nse'` is not its own key in that
+  report's `tradesByBot()` (it is merged into the `'intraday'` bucket together with the `crypto` market, a pre-existing
+  convention this task did not touch). Their own report routes and Telegram alerts are unaffected either way.
+
 ## Report
 
 `exhaustion_only`: `GET /api/paper/exhaustion-report?key=<PAPER_ADMIN_SECRET>`. `trend_smc`: `GET /api/paper/trend-smc-report`. Scalp and

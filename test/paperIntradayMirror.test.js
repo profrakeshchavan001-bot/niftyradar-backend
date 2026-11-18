@@ -86,9 +86,12 @@ test('sync: mirrors ONLY the crypto market, never nse/crypto_scalp/crypto_wide_s
   assert.equal(closed.length, 1);
   assert.equal(closed[0].exit_reason, 'stop'); // original's target -> mirror's stop
   // the mirror is SHORT and price rose to 110 (the original's target): a loss for the mirror, via settle()
-  // hand check: gross = (110-100)*2*(-1) = -20 USDT; pnl_inr = -20*88 = -1760
-  assert.equal(closed[0].net_pnl_usdt, -20);
-  assert.equal(closed[0].pnl_inr, -1760);
+  // hand check: gross = (110-100)*2*(-1) = -20 USDT. Group 3a (2026-11): intraday-MIRROR now pays
+  // scalp_wide's fee + slippage model too (via the same settle() the original intraday bot now also
+  // calls): entryVal = 200, exitVal = 220; cost = 0.1% x (200+220) + 0.03% x 200 = 0.42 + 0.06 = 0.48
+  // USDT; net = -20 - 0.48 = -20.48 USDT x 88 = Rs -1802.24
+  assert.equal(closed[0].net_pnl_usdt, -20.48);
+  assert.equal(closed[0].pnl_inr, -1802.24);
   // confirm this matches calling settle() directly on the mirror's own (already-inverted) row
   const direct = settle({ trade: { direction: 'SHORT', entry_price: 100, qty: 2 }, exitPrice: 110, cfg: {}, fxRate: 88 });
   assert.equal(closed[0].net_pnl_usdt, direct.net_pnl_usdt);

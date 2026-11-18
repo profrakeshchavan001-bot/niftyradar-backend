@@ -123,6 +123,11 @@ const OWN_TABLE_BOTS = {
   // only intraday and scalp_wide have one, as asked. Same capitalTotal as the original they reverse.
   intraday_reverse: { label: 'intraday-REVERSE', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'intradayReverseMemoryStore', capitalTotal: PAPERBOT_DEFAULTS.crypto.capital_usdt },
   scalp_wide_reverse: { label: 'scalp_wide-REVERSE', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpWideReverseMemoryStore', capitalTotal: SCALP_WIDE_DEFAULTS.capital_usdt },
+  // nse-MIRROR / nse-REVERSE (Group 4, this task, src/paper/lib/nseOptionSide.js): own table, nativeInr:
+  // true / costPct 0, same convention as the nse row above (already-rupee option premiums, no fee model
+  // in the live NSE bot's own P&L calc). Same capitalTotal as the main nse bot.
+  nse_mirror: { label: 'nse-MIRROR', nativeInr: true, costPct: 0, ctxKey: 'nseMirrorMemoryStore', capitalTotal: PAPERBOT_DEFAULTS.nse.capital_inr },
+  nse_reverse: { label: 'nse-REVERSE', nativeInr: true, costPct: 0, ctxKey: 'nseReverseMemoryStore', capitalTotal: PAPERBOT_DEFAULTS.nse.capital_inr },
   // research_* (CC2, this task): own tables, see the require() comment above for the nativeInr/costPct convention.
   research_usdinr_trend: { label: 'research_usdinr_trend', nativeInr: true, costPct: 0, ctxKey: 'researchUsdinrTrendMemoryStore', capitalTotal: RESEARCH_USDINR_TREND_DEFAULTS.capital_inr },
   research_btc_momentum: { label: 'research_btc_momentum', nativeInr: true, costPct: 0, ctxKey: 'researchBtcMomentumMemoryStore', capitalTotal: RESEARCH_BTC_MOMENTUM_DEFAULTS.capital_inr },
@@ -283,4 +288,6 @@ function register(ctx) {
   return { check };
 }
 
-module.exports = { name: 'telegram-alerts', schemaSql: path.join(__dirname, 'schema.sql'), register, SHARED_STORE_MARKETS, OWN_TABLE_BOTS, POLL_MS };
+// sendTelegram is also exported for reuse by server.js's Dhan-token-renewal failure alert (Group 1,
+// 2026-11) - the exact same sender, never a second copy of the same axios.post.
+module.exports = { name: 'telegram-alerts', schemaSql: path.join(__dirname, 'schema.sql'), register, SHARED_STORE_MARKETS, OWN_TABLE_BOTS, POLL_MS, sendTelegram };

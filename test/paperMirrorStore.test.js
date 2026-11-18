@@ -26,6 +26,7 @@ function pgStringRow(overrides = {}) {
     exit_price: '92.10', exit_time: new Date('2026-11-10T10:30:00Z'), exit_reason: 'target',
     gross_pnl_usdt: '21.00', cost_usdt: '0.58', net_pnl_usdt: '20.42',
     gross_pnl_inr: '1890.00', pnl_inr: '1837.80', fx_rate: '90.00', fx_source: 'coingecko',
+    net_after_fees_corrected: '1837.80', // Group 3d (2026-11): backfill-only column, same shape as pnl_inr when set
     created_at: new Date('2026-11-10T10:00:05Z'),
     ...overrides,
   };

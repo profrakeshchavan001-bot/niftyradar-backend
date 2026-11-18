@@ -202,8 +202,11 @@ test('bot: SHORT with level-based target and stop, breakeven, candle-accurate ta
   // THE TARGET LEVEL, not the tick that reached it - the whole point of CC2 round 2 item 1.
   t = await h.at(99);
   assert.deepEqual([t.status, t.exit_reason, t.exit_price], ['closed', 'target', 99.099]);
-  // P&L booked at the level, not the overshoot: (102.18 - 99.099) x 333.3333 / 102.18 = 10.050931 USDT x 88 = Rs 884.48
-  assert.equal(t.pnl_inr, 884.48);
+  // gross P&L booked at the level, not the overshoot: (102.18 - 99.099) x 333.3333 / 102.18 = 10.050890
+  // USDT (gross_pnl_inr 884.48). Group 3a (2026-11): intraday now pays scalp_wide's fee + slippage model
+  // too - entryVal/exitVal x qty, cost = 0.1% x (entryVal+exitVal) + 0.03% x entryVal = 0.756616 USDT;
+  // net = 10.050890 - 0.756616 = 9.294274 USDT x 88 = Rs 817.90
+  assert.equal(t.pnl_inr, 817.9);
   assert.equal(t.legacy_result, 'target');
 });
 
@@ -213,8 +216,10 @@ test('bot: stop exit booked at the stop level (not the overshoot tick), and the 
   // A doji at 103.2: above the level-based stop (103.12) but still under the old rule's stop (103.2018).
   let t = await h.at(103.2);
   assert.deepEqual([t.status, t.exit_reason, t.exit_price, t.legacy_result], ['closed', 'stop', 103.12, null]);
-  // loss booked at the stop level: (103.12 - 102.18) x 333.3333 / 102.18 = 3.066484 USDT x 88 = Rs 269.85
-  assert.equal(t.pnl_inr, -269.85);
+  // gross loss booked at the stop level: (103.12 - 102.18) x 333.3333 / 102.18 = 3.066484 USDT
+  // (gross_pnl_inr -269.85). Group 3a: cost = 0.1% x (entryVal+exitVal) + 0.03% x entryVal = 0.769733
+  // USDT; net = -3.066484 - 0.769733 = -3.836217 USDT x 88 = Rs -337.59
+  assert.equal(t.pnl_inr, -337.59);
   t = await h.at(103.3); // the closed trade is still followed for the comparison
   assert.equal(t.legacy_result, 'stop');
   const before = JSON.stringify(h.store._db.trades);
@@ -227,9 +232,12 @@ test('bot: breakeven stop booked exactly at the entry (zero P&L), and an undecid
   await h.bot.cryptoScan();
   await h.at(100.6); // breakeven; old target 100.1364 not reached
   // A doji at 102.2 (back above the entry): its high crosses the NEW stop (the entry, 102.18) and is
-  // booked exactly there, so the P&L is exactly zero - which is what "breakeven" is supposed to mean.
+  // booked exactly there, so the GROSS P&L is exactly zero - which is what "breakeven" means. Group 3a
+  // (2026-11): intraday now pays scalp_wide's fee + slippage model too, so a breakeven exit still costs
+  // something: entryVal = exitVal = 102.18 x 3.2622... = 333.3333; cost = 0.1% x (333.3333+333.3333) +
+  // 0.03% x 333.3333 = 0.666667 + 0.1 = 0.766667 USDT; net = 0 - 0.766667 = -0.766667 USDT x 88 = Rs -67.47
   let t = await h.at(102.2);
-  assert.deepEqual([t.status, t.exit_reason, t.exit_price, t.pnl_inr, t.legacy_result], ['closed', 'breakeven_stop', 102.18, 0, null]);
+  assert.deepEqual([t.status, t.exit_reason, t.exit_price, t.pnl_inr, t.legacy_result], ['closed', 'breakeven_stop', 102.18, -67.47, null]);
   t = await h.wait(48 * 3600000);
   assert.equal(t.legacy_result, 'undecided after 48 h');
 });
@@ -254,7 +262,9 @@ test('bot: a trade opened under the old fixed rule (no levels stored) still exit
   let t = await h.at(101.5);
   assert.equal(t.status, 'open');
   t = await h.at(102); // +2%
-  assert.deepEqual([t.id, t.status, t.exit_reason, t.pnl_inr], [id, 'closed', 'target', 176]); // 2 USDT x 88
+  // gross 2 USDT x 88 = Rs 176. Group 3a: entryVal = 100, exitVal = 102; cost = 0.1% x 202 + 0.03% x 100
+  // = 0.202 + 0.03 = 0.232 USDT; net = 2 - 0.232 = 1.768 USDT x 88 = Rs 155.58
+  assert.deepEqual([t.id, t.status, t.exit_reason, t.pnl_inr], [id, 'closed', 'target', 155.58]);
 });
 
 test('report: target and stop levels with their type on the page and on the chart', async () => {

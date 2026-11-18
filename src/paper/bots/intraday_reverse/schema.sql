@@ -36,3 +36,8 @@ CREATE TABLE IF NOT EXISTS intraday_reverse_trades (
 );
 CREATE INDEX IF NOT EXISTS intraday_reverse_trades_open_idx ON intraday_reverse_trades (symbol, status);
 CREATE UNIQUE INDEX IF NOT EXISTS intraday_reverse_trades_once_idx ON intraday_reverse_trades (original_trade_id);
+
+-- Group 3d (2026-11): same as paper_trades's own net_after_fees_corrected (sql/paper_bot.sql) - holds
+-- the corrected recomputation for a reverse trade closed BEFORE the Group 3a fee fix; never overwrites
+-- pnl_inr. Filled in by `node scripts/intradayFeeBackfill.js -- --apply`.
+ALTER TABLE intraday_reverse_trades ADD COLUMN IF NOT EXISTS net_after_fees_corrected numeric;
