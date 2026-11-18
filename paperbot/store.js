@@ -18,12 +18,14 @@ const TRADE_COLS = ['market', 'symbol', 'trade_date', 'status', 'r_factor', 'sco
   'stop_active', 'breakeven_time', 'target_type', 'stop_type', 'rr', 'legacy_target', 'legacy_stop', 'legacy_result',
   'strategy', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr', 'be_moved', // scalp: docs/SCALP.md
   'ema_cross', // EMA9/21 (5m) / EMA20/50 (15m,1h) crossover confirmation, src/paper/lib/emaCross.js
-  'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis']; // PARALLEL scorer, src/paper/decision/judge2.js - never a live decision
+  'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis', // PARALLEL scorer, src/paper/decision/judge2.js - never a live decision
+  'net_after_fees_corrected']; // Group 3d (2026-11): backfilled-only corrected recomputation for an intraday trade closed before the Group 3a fee fix - never overwrites pnl_inr, see sql/paper_bot.sql
 const JSON_COLS = new Set(['patterns', 'trigger_candles', 'trend_state', 'smc_tags', 'data', 'value', 'r_detail', 'judge_contributions', 'judge2_contributions', 'real_contributions', 'shadow_contributions']);
 const NUM_COLS = ['id', 'r_factor', 'trigger_t', 'qty', 'entry_price', 'entry_underlying', 'exit_price', 'exit_underlying',
   'pnl_inr', 'fx_rate', 'max_fav_pct', 'max_adv_pct', 'legacy_rf', 'judge_score', 'judge2_score', 'data_delay_sec', 'sl_price', 'target_price', 'stop_active', 'rr', 'legacy_target', 'legacy_stop', 'gross_pnl_usdt', 'net_pnl_usdt', 'cost_usdt', 'gross_pnl_inr',
   'stop_price', 'result_pct', // shadow tracking (paper_shadows)
-  'real_score', 'shadow_score']; // judge SMC shadow logging (paper_judge_shadows)
+  'real_score', 'shadow_score', // judge SMC shadow logging (paper_judge_shadows)
+  'net_after_fees_corrected'];
 const SKIP_COLS = ['market', 'symbol', 'skip_date', 'reason', 'r_factor', 'patterns', 'trend_state', 'data_source', 'data_delay_sec', 'ema_cross', 'smc_tags',
   'judge2_score', 'judge2_take', 'judge2_contributions', 'judge2_basis'];
 // Shadow tracking (CC2 round 2 item 4): a rejected setup followed to its own hypothetical stop/target.

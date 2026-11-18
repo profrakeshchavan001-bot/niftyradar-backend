@@ -205,3 +205,11 @@ CREATE INDEX IF NOT EXISTS paper_judge_shadows_market_date_idx ON paper_judge_sh
 -- CC3 round 3 (restart safety): a restart mid-cycle that re-scans the still-current candle must never double-enter a trade.
 -- NULL trigger_t (older rows, option trades that never set it) are not compared by a UNIQUE index, so this changes nothing for them.
 CREATE UNIQUE INDEX IF NOT EXISTS paper_trades_once_idx ON paper_trades (market, symbol, trigger_t);
+
+-- Group 3d (2026-11): intraday ('crypto' market) now pays the same fee + slippage model scalp_wide
+-- already uses (Group 3a). Every closed intraday trade stored BEFORE this fix has pnl_inr computed
+-- WITHOUT that cost - never overwritten (history stays exactly as it was). This column holds the
+-- corrected recomputation for those old rows, filled in once by `node scripts/intradayFeeBackfill.js
+-- -- --apply` (dry run by default) and left null for every trade closed after the fix, since those
+-- already have the correct number in pnl_inr/net_pnl_usdt/cost_usdt/gross_pnl_usdt directly.
+ALTER TABLE paper_trades ADD COLUMN IF NOT EXISTS net_after_fees_corrected numeric;

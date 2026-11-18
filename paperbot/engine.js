@@ -131,27 +131,41 @@ function evaluateExit({ entry, current, targetPct, stopPct, short = false, force
 
 const candleText = (k) => `O ${k.o} H ${k.h} L ${k.l} C ${k.c}`;
 
+// Group 3a fee model fix (2026-11): intraday previously charged NO fee/slippage at all - unlike scalp
+// and scalp_wide (src/paper/scalp/config.js SCALP_WIDE_DEFAULTS: 0.1% taker fee per side + 0.03%
+// slippage once per round trip, 0.23% total) and exhaustion_only/trend_smc, which both already use that
+// same model (docs/BOTS.md). intraday-MIRROR and intraday-REVERSE call this exact settle() too
+// (src/paper/lib/mirror.js's buildMirrorExitPatch, src/paper/bots/intraday_reverse/register.js), so this
+// one fix point also fixes both sides derived from intraday, per the task's "reuse existing settle()"
+// rule - never a second, separately-maintained formula. The entry/exit TRIGGERS (when and at what price
+// a trade opens or closes) are completely unchanged; only the stored P&L on a close now has a cost.
+const FEE_PCT_PER_SIDE = 0.1; // same as SCALP_WIDE_DEFAULTS.fee_pct_per_side
+const SLIPPAGE_PCT = 0.03; // same as SCALP_WIDE_DEFAULTS.slippage_pct
+
 // Gross/net P&L of a closed INTRADAY (the main crypto bot, "intraday" in telegramAlerts/register.js and
 // docs/BOTS.md) trade, in USDT and in rupees - pulled out of paperbot/bot.js's cryptoMonitor/closeTrade so
 // that a MIRROR bot (src/paper/bots/intraday_mirror/, src/paper/lib/mirror.js's buildMirrorExitPatch) has
 // a settle({ trade, exitPrice, cfg, fxRate }) to call for the intraday bot, matching every other bot's
 // shape (src/paper/scalp/engine.js's settle(), src/paper/bots/exhaustion_only/engine.js's settle()).
-// NEVER called by paperbot/bot.js itself - cryptoMonitor/closeTrade keep doing this arithmetic inline,
-// completely unchanged (CLAUDE.md: no trading-logic change). The real intraday bot applies NO fee or
-// slippage model (unlike scalp's settle(), which deducts cfg.fee_pct_per_side/cfg.slippage_pct) - this is
-// the EXACT booking paperbot/bot.js's cryptoMonitor already does:
-//   pnlUsdt = (exitPrice - entry) * qty * (short ? -1 : 1); pnl_inr = pnlUsdt * fx.rate
-// `cfg` is accepted only for shape parity with every other bot's settle() signature; it is not read here
-// because intraday has no cost model to apply.
+// paperbot/bot.js's cryptoMonitor now calls this too (Group 3a, above) rather than keeping its own copy
+// of the arithmetic inline. `cfg.fee_pct_per_side`/`cfg.slippage_pct` override the defaults above when a
+// caller's config has its own (none does today - intraday's own DEFAULTS.crypto has no fee fields yet),
+// so a future config change needs no second edit here.
 function settle({ trade, exitPrice, cfg, fxRate }) {
   const short = trade.direction === 'SHORT';
   const gross = (exitPrice - trade.entry_price) * trade.qty * (short ? -1 : 1);
+  const entryVal = trade.entry_price * trade.qty;
+  const exitVal = exitPrice * trade.qty;
+  const feePctPerSide = (cfg && cfg.fee_pct_per_side != null) ? cfg.fee_pct_per_side : FEE_PCT_PER_SIDE;
+  const slippagePct = (cfg && cfg.slippage_pct != null) ? cfg.slippage_pct : SLIPPAGE_PCT;
+  const cost = (feePctPerSide / 100) * (entryVal + exitVal) + (slippagePct / 100) * entryVal;
+  const net = gross - cost;
   return {
     gross_pnl_usdt: P.round(gross, 6),
-    cost_usdt: 0,
-    net_pnl_usdt: P.round(gross, 6),
+    cost_usdt: P.round(cost, 6),
+    net_pnl_usdt: P.round(net, 6),
     gross_pnl_inr: P.round(gross * fxRate, 2),
-    pnl_inr: P.round(gross * fxRate, 2),
+    pnl_inr: P.round(net * fxRate, 2),
   };
 }
 
@@ -168,4 +182,5 @@ function basisSentence({ market, symbol, score, direction, patterns, ctx, news, 
 module.exports = {
   median, momentumScore, closedOnly, aggregate, buildContext, decideEntry,
   sizeNse, sizeCrypto, simOptionPrice, changePct, evaluateExit, basisSentence, candleText, settle,
+  FEE_PCT_PER_SIDE, SLIPPAGE_PCT,
 };
