@@ -28,6 +28,11 @@ const OWN_TABLE_BOTS = {
   // REVERSE bots (this task): own table, same ctx-key convention as every mirror above - set by each
   // <bot>_reverse/register.js (src/paper/bots/intraday_reverse, scalp_wide_reverse).
   intraday_reverse: 'intradayReverseMemoryStore', scalp_wide_reverse: 'scalpWideReverseMemoryStore',
+  // research_* (CC2, this task): demo bots for the PASS-verdict research strategies
+  // (docs/RESEARCH-STRATEGIES-REPORT.md) - own tables, same ctx-key convention as every bot above.
+  research_usdinr_trend: 'researchUsdinrTrendMemoryStore',
+  research_btc_momentum: 'researchBtcMomentumMemoryStore',
+  research_nifty200_52whigh: 'researchN20052whMemoryStore',
 };
 
 // Original -> mirror bot name, for the "overall status" section (requirement 5: original vs mirror per bot).

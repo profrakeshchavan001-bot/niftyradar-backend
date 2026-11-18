@@ -1,0 +1,347 @@
+[
+  {
+    "strategy": "S1",
+    "label": "Nifty",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on both train and test",
+    "variant": "base",
+    "source": "yfinance",
+    "date_range": "2015-01-02..2026-11-17",
+    "train": {
+      "n_trades": 83,
+      "win_pct": 46.99,
+      "net_profit_inr": -48190.4,
+      "max_drawdown_inr": 84000.67,
+      "profit_factor": 0.739
+    },
+    "test": {
+      "n_trades": 34,
+      "win_pct": 47.06,
+      "net_profit_inr": -22117.49,
+      "max_drawdown_inr": 38450.86,
+      "profit_factor": 0.657
+    }
+  },
+  {
+    "strategy": "S1",
+    "label": "BankNifty",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on both train and test",
+    "variant": "vol-sizing",
+    "source": "yfinance",
+    "date_range": "2015-01-01..2026-11-17",
+    "train": {
+      "n_trades": 83,
+      "win_pct": 46.99,
+      "net_profit_inr": -77057.28,
+      "max_drawdown_inr": 131612.11,
+      "profit_factor": 0.701
+    },
+    "test": {
+      "n_trades": 34,
+      "win_pct": 47.06,
+      "net_profit_inr": -24776.28,
+      "max_drawdown_inr": 54732.81,
+      "profit_factor": 0.703
+    }
+  },
+  {
+    "strategy": "S1",
+    "label": "Gold",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on train period",
+    "variant": "base",
+    "source": "yfinance",
+    "date_range": "2015-01-02..2026-11-17",
+    "train": {
+      "n_trades": 83,
+      "win_pct": 46.99,
+      "net_profit_inr": -22301.78,
+      "max_drawdown_inr": 34637.73,
+      "profit_factor": 0.841
+    },
+    "test": {
+      "n_trades": 34,
+      "win_pct": 70.59,
+      "net_profit_inr": 65907.91,
+      "max_drawdown_inr": 28536.5,
+      "profit_factor": 2.466
+    }
+  },
+  {
+    "strategy": "S1",
+    "label": "Crude",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on test period (overfit to train)",
+    "variant": "vol-sizing",
+    "source": "yfinance",
+    "date_range": "2015-01-02..2026-11-17",
+    "train": {
+      "n_trades": 83,
+      "win_pct": 48.19,
+      "net_profit_inr": 5596.21,
+      "max_drawdown_inr": 70602.77,
+      "profit_factor": 1.016
+    },
+    "test": {
+      "n_trades": 34,
+      "win_pct": 52.94,
+      "net_profit_inr": -42362.9,
+      "max_drawdown_inr": 99184.67,
+      "profit_factor": 0.739
+    }
+  },
+  {
+    "strategy": "S1",
+    "label": "USDINR",
+    "verdict": "PASS",
+    "reason": "",
+    "variant": "base",
+    "source": "yfinance",
+    "date_range": "2015-01-01..2026-11-17",
+    "train": {
+      "n_trades": 83,
+      "win_pct": 55.42,
+      "net_profit_inr": 13019.17,
+      "max_drawdown_inr": 9017.44,
+      "profit_factor": 1.331
+    },
+    "test": {
+      "n_trades": 34,
+      "win_pct": 58.82,
+      "net_profit_inr": 7280.07,
+      "max_drawdown_inr": 3084.98,
+      "profit_factor": 1.734
+    }
+  },
+  {
+    "strategy": "S2",
+    "label": "BTC",
+    "verdict": "PASS",
+    "reason": "",
+    "variant": "vol-sizing",
+    "source": "yfinance",
+    "date_range": "2015-01-01..2026-11-17",
+    "train": {
+      "n_trades": 228,
+      "win_pct": 54.82,
+      "net_profit_inr": 472859.79,
+      "max_drawdown_inr": 110351.24,
+      "profit_factor": 1.801
+    },
+    "test": {
+      "n_trades": 103,
+      "win_pct": 44.66,
+      "net_profit_inr": 73612.82,
+      "max_drawdown_inr": 76199.28,
+      "profit_factor": 1.256
+    }
+  },
+  {
+    "strategy": "S3",
+    "label": "Nifty200-like (129 names)",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on test period (overfit to train)",
+    "variant": "base",
+    "source": "yfinance",
+    "date_range": "2015-01-01..today (per-symbol, see FETCH_LOG.txt)",
+    "train": {
+      "n_trades": 1980,
+      "win_pct": 53.08,
+      "net_profit_inr": 84560.05,
+      "max_drawdown_inr": 31998.98,
+      "profit_factor": 1.377
+    },
+    "test": {
+      "n_trades": 690,
+      "win_pct": 49.28,
+      "net_profit_inr": -9653.09,
+      "max_drawdown_inr": 35350.08,
+      "profit_factor": 0.892
+    }
+  },
+  {
+    "strategy": "S6",
+    "label": "Nifty200-like (129 names)",
+    "verdict": "PASS",
+    "reason": "",
+    "variant": "base",
+    "source": "yfinance",
+    "date_range": "2015-01-01..today (per-symbol, see FETCH_LOG.txt)",
+    "train": {
+      "n_trades": 2730,
+      "win_pct": 53.37,
+      "net_profit_inr": 101992.52,
+      "max_drawdown_inr": 25820.45,
+      "profit_factor": 1.382
+    },
+    "test": {
+      "n_trades": 1260,
+      "win_pct": 54.52,
+      "net_profit_inr": 41527.81,
+      "max_drawdown_inr": 21358.14,
+      "profit_factor": 1.368
+    }
+  },
+  {
+    "strategy": "S7",
+    "label": "Nifty",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on both train and test",
+    "variant": "base",
+    "source": "yfinance",
+    "date_range": "2015-01-02..2026-11-17",
+    "train": {
+      "n_trades": 1967,
+      "win_pct": 51.96,
+      "net_profit_inr": -47518.41,
+      "max_drawdown_inr": 75380.11,
+      "profit_factor": 0.886
+    },
+    "test": {
+      "n_trades": 954,
+      "win_pct": 40.67,
+      "net_profit_inr": -80659.5,
+      "max_drawdown_inr": 82796.44,
+      "profit_factor": 0.589
+    }
+  },
+  {
+    "strategy": "S9",
+    "label": "F&O pairs (4 pairs)",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on test period (overfit to train)",
+    "variant": "base",
+    "source": "yfinance",
+    "date_range": "2015-01-01..today (per-symbol, see FETCH_LOG.txt)",
+    "train": {
+      "n_trades": 194,
+      "win_pct": 64.95,
+      "net_profit_inr": 51325.89,
+      "max_drawdown_inr": 5267.15,
+      "profit_factor": 2.285
+    },
+    "test": {
+      "n_trades": 97,
+      "win_pct": 45.36,
+      "net_profit_inr": -1385.34,
+      "max_drawdown_inr": 7983.16,
+      "profit_factor": 0.942
+    }
+  },
+  {
+    "strategy": "S4",
+    "label": "Nifty",
+    "verdict": "LOW-DATA",
+    "reason": "only 13 test trades (< 30 required)",
+    "variant": "mood-filter",
+    "source": "yfinance",
+    "date_range": "2026-08-21..2026-11-18 (60 calendar days, 30m/5m yfinance limit)",
+    "train": {
+      "n_trades": 27,
+      "win_pct": 33.33,
+      "net_profit_inr": -578.09,
+      "max_drawdown_inr": 4672.23,
+      "profit_factor": 0.893
+    },
+    "test": {
+      "n_trades": 13,
+      "win_pct": 15.38,
+      "net_profit_inr": -1902.46,
+      "max_drawdown_inr": 2327.5,
+      "profit_factor": 0.462
+    }
+  },
+  {
+    "strategy": "S4",
+    "label": "BTC",
+    "verdict": "LOW-DATA",
+    "reason": "only 29 test trades (< 30 required)",
+    "variant": "mood-filter",
+    "source": "yfinance",
+    "date_range": "2026-09-20..2026-11-18 (60 calendar days, 30m/5m yfinance limit)",
+    "train": {
+      "n_trades": 40,
+      "win_pct": 22.5,
+      "net_profit_inr": -11083.63,
+      "max_drawdown_inr": 11599.24,
+      "profit_factor": 0.364
+    },
+    "test": {
+      "n_trades": 29,
+      "win_pct": 17.24,
+      "net_profit_inr": -7646.54,
+      "max_drawdown_inr": 9542.5,
+      "profit_factor": 0.593
+    }
+  },
+  {
+    "strategy": "S5",
+    "label": "Nifty",
+    "verdict": "LOW-DATA",
+    "reason": "only 24 test trades (< 30 required)",
+    "variant": "mood-filter+vol-sizing",
+    "source": "yfinance",
+    "date_range": "2026-08-21..2026-11-18 (60 calendar days, 30m/5m yfinance limit)",
+    "train": {
+      "n_trades": 35,
+      "win_pct": 20.0,
+      "net_profit_inr": -9155.67,
+      "max_drawdown_inr": 9212.83,
+      "profit_factor": 0.08
+    },
+    "test": {
+      "n_trades": 24,
+      "win_pct": 37.5,
+      "net_profit_inr": -1704.06,
+      "max_drawdown_inr": 1914.77,
+      "profit_factor": 0.493
+    }
+  },
+  {
+    "strategy": "S8",
+    "label": "Nifty",
+    "verdict": "LOW-DATA",
+    "reason": "only 23 test trades (< 30 required)",
+    "variant": "mood-filter+vol-sizing",
+    "source": "yfinance",
+    "date_range": "2026-08-21..2026-11-18 (60 calendar days, 30m/5m yfinance limit)",
+    "train": {
+      "n_trades": 35,
+      "win_pct": 0.0,
+      "net_profit_inr": -7408.88,
+      "max_drawdown_inr": 7408.88,
+      "profit_factor": 0.0
+    },
+    "test": {
+      "n_trades": 23,
+      "win_pct": 0.0,
+      "net_profit_inr": -2971.91,
+      "max_drawdown_inr": 2971.91,
+      "profit_factor": 0.0
+    }
+  },
+  {
+    "strategy": "S10",
+    "label": "F&O sample (4 of 60 stocks)",
+    "verdict": "FAIL",
+    "reason": "unprofitable after costs on both train and test",
+    "variant": "mood-filter",
+    "source": "yfinance",
+    "date_range": "60 calendar days (yfinance 5m limit); only 4/60 F&O stocks had 5-min history fetched, not a true top-20-by-volume rank",
+    "train": {
+      "n_trades": 119,
+      "win_pct": 21.01,
+      "net_profit_inr": -5588.4,
+      "max_drawdown_inr": 6590.71,
+      "profit_factor": 0.541
+    },
+    "test": {
+      "n_trades": 78,
+      "win_pct": 23.08,
+      "net_profit_inr": -4397.74,
+      "max_drawdown_inr": 5343.8,
+      "profit_factor": 0.482
+    }
+  }
+]

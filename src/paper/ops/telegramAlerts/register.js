@@ -54,6 +54,15 @@ const { CCY_WIDE_DEFAULTS } = require('../../lib/currencyConfig');
 // PROXY feed (src/paper/lib/yahooFutures.js) - see each bot's own register.js for that caveat.
 const { MCX_GOLD_DEFAULTS } = require('../../bots/mcx_gold/config');
 const { MCX_CRUDE_DEFAULTS } = require('../../bots/mcx_crude/config');
+// research_* (CC2 demo bots for the PASS-verdict research strategies, docs/RESEARCH-STRATEGIES-REPORT.md):
+// own tables, nativeInr: true (their own entry/exit prices and qty are already denominated against the
+// bot's Rs 1,00,000 capital directly - see each bot's own register.js), costPct 0 (no separate round-trip
+// cost model in the live demo; the backtest's own Indian cost model already ran once, in research/
+// strategies/costs.py, to decide PASS/FAIL - this live bot is a forward-paper-trading mirror of that
+// signal, not a second cost backtest).
+const { RESEARCH_USDINR_TREND_DEFAULTS } = require('../../bots/research_usdinr_trend/config');
+const { RESEARCH_BTC_MOMENTUM_DEFAULTS } = require('../../bots/research_btc_momentum/config');
+const { RESEARCH_N200_52WH_DEFAULTS } = require('../../bots/research_nifty200_52whigh/config');
 
 // nse_scalp has no capital config of its own anywhere in the repo (paperbot/config.js's DEFAULTS has no
 // nse_scalp section) - ASSUMED DEFAULT: it shares the main nse capital pool (DEFAULTS.nse.capital_inr),
@@ -114,6 +123,10 @@ const OWN_TABLE_BOTS = {
   // only intraday and scalp_wide have one, as asked. Same capitalTotal as the original they reverse.
   intraday_reverse: { label: 'intraday-REVERSE', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'intradayReverseMemoryStore', capitalTotal: PAPERBOT_DEFAULTS.crypto.capital_usdt },
   scalp_wide_reverse: { label: 'scalp_wide-REVERSE', nativeInr: false, costPct: DEFAULT_COST_PCT, ctxKey: 'scalpWideReverseMemoryStore', capitalTotal: SCALP_WIDE_DEFAULTS.capital_usdt },
+  // research_* (CC2, this task): own tables, see the require() comment above for the nativeInr/costPct convention.
+  research_usdinr_trend: { label: 'research_usdinr_trend', nativeInr: true, costPct: 0, ctxKey: 'researchUsdinrTrendMemoryStore', capitalTotal: RESEARCH_USDINR_TREND_DEFAULTS.capital_inr },
+  research_btc_momentum: { label: 'research_btc_momentum', nativeInr: true, costPct: 0, ctxKey: 'researchBtcMomentumMemoryStore', capitalTotal: RESEARCH_BTC_MOMENTUM_DEFAULTS.capital_inr },
+  research_nifty200_52whigh: { label: 'research_nifty200_52whigh', nativeInr: true, costPct: 0, ctxKey: 'researchN20052whMemoryStore', capitalTotal: RESEARCH_N200_52WH_DEFAULTS.capital_inr },
 };
 
 const POLL_MS = 20000;

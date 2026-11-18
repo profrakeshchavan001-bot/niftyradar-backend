@@ -1,0 +1,213 @@
+[2026-11-18T14:13:01.014473Z] === fetch_data.py run start ===
+[2026-11-18T14:13:02.153385Z] fetched ^NSEI 1d: 2923 rows, 2015-01-02 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/IDX_NSEI_1d.parquet
+[2026-11-18T14:13:02.364727Z] fetched ^NSEBANK 1d: 2928 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/IDX_NSEBANK_1d.parquet
+[2026-11-18T14:13:02.532603Z] fetched GC=F 1d: 2987 rows, 2015-01-02 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/GC_F_1d.parquet
+[2026-11-18T14:13:02.700593Z] fetched CL=F 1d: 2987 rows, 2015-01-02 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/CL_F_1d.parquet
+[2026-11-18T14:13:02.888005Z] fetched USDINR=X 1d: 3091 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/USDINR_X_1d.parquet
+[2026-11-18T14:13:03.062524Z] fetched BTC-USD 1d: 4339 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BTC-USD_1d.parquet
+[2026-11-18T14:13:03.263188Z] fetched RELIANCE.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/RELIANCE.NS_1d.parquet
+[2026-11-18T14:13:03.501100Z] fetched TCS.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TCS.NS_1d.parquet
+[2026-11-18T14:13:03.718793Z] fetched HDFCBANK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HDFCBANK.NS_1d.parquet
+[2026-11-18T14:13:03.936277Z] fetched ICICIBANK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ICICIBANK.NS_1d.parquet
+[2026-11-18T14:13:04.223038Z] fetched INFY.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/INFY.NS_1d.parquet
+[2026-11-18T14:13:04.474709Z] fetched ITC.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ITC.NS_1d.parquet
+[2026-11-18T14:13:04.657935Z] fetched SBIN.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SBIN.NS_1d.parquet
+[2026-11-18T14:13:04.856597Z] fetched BHARTIARTL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BHARTIARTL.NS_1d.parquet
+[2026-11-18T14:13:05.111372Z] fetched LT.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/LT.NS_1d.parquet
+[2026-11-18T14:13:05.312701Z] fetched HINDUNILVR.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HINDUNILVR.NS_1d.parquet
+[2026-11-18T14:13:05.545821Z] fetched KOTAKBANK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/KOTAKBANK.NS_1d.parquet
+[2026-11-18T14:13:05.785189Z] fetched AXISBANK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/AXISBANK.NS_1d.parquet
+[2026-11-18T14:13:06.019806Z] fetched BAJFINANCE.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BAJFINANCE.NS_1d.parquet
+[2026-11-18T14:13:06.245961Z] fetched ASIANPAINT.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ASIANPAINT.NS_1d.parquet
+[2026-11-18T14:13:06.440882Z] fetched MARUTI.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/MARUTI.NS_1d.parquet
+[2026-11-18T14:13:06.722745Z] fetched SUNPHARMA.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SUNPHARMA.NS_1d.parquet
+[2026-11-18T14:13:06.951074Z] fetched TITAN.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TITAN.NS_1d.parquet
+[2026-11-18T14:13:07.161199Z] fetched ULTRACEMCO.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ULTRACEMCO.NS_1d.parquet
+[2026-11-18T14:13:07.939445Z] BLOCKED: empty response for TATAMOTORS.NS 1d (2015-01-01..2026-11-18)
+[2026-11-18T14:13:08.203113Z] fetched WIPRO.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/WIPRO.NS_1d.parquet
+[2026-11-18T14:13:08.415794Z] fetched NESTLEIND.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/NESTLEIND.NS_1d.parquet
+[2026-11-18T14:13:08.621994Z] fetched ONGC.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ONGC.NS_1d.parquet
+[2026-11-18T14:13:08.855444Z] fetched NTPC.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/NTPC.NS_1d.parquet
+[2026-11-18T14:13:09.133428Z] fetched ADANIENT.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ADANIENT.NS_1d.parquet
+[2026-11-18T14:13:09.331597Z] fetched ADANIPORTS.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ADANIPORTS.NS_1d.parquet
+[2026-11-18T14:13:09.539141Z] fetched POWERGRID.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/POWERGRID.NS_1d.parquet
+[2026-11-18T14:13:09.730710Z] fetched M&M.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/M&M.NS_1d.parquet
+[2026-11-18T14:13:09.976249Z] fetched HCLTECH.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HCLTECH.NS_1d.parquet
+[2026-11-18T14:13:10.267848Z] fetched TATASTEEL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TATASTEEL.NS_1d.parquet
+[2026-11-18T14:13:10.517550Z] fetched JSWSTEEL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/JSWSTEEL.NS_1d.parquet
+[2026-11-18T14:13:10.712763Z] fetched TECHM.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TECHM.NS_1d.parquet
+[2026-11-18T14:13:10.952661Z] fetched GRASIM.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/GRASIM.NS_1d.parquet
+[2026-11-18T14:13:11.267071Z] fetched DRREDDY.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/DRREDDY.NS_1d.parquet
+[2026-11-18T14:13:11.496365Z] fetched CIPLA.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/CIPLA.NS_1d.parquet
+[2026-11-18T14:13:11.676337Z] fetched COALINDIA.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/COALINDIA.NS_1d.parquet
+[2026-11-18T14:13:11.879027Z] fetched BAJAJFINSV.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BAJAJFINSV.NS_1d.parquet
+[2026-11-18T14:13:12.106346Z] fetched BRITANNIA.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BRITANNIA.NS_1d.parquet
+[2026-11-18T14:13:12.350943Z] fetched EICHERMOT.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/EICHERMOT.NS_1d.parquet
+[2026-11-18T14:13:12.553818Z] fetched HEROMOTOCO.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HEROMOTOCO.NS_1d.parquet
+[2026-11-18T14:13:12.751562Z] fetched DIVISLAB.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/DIVISLAB.NS_1d.parquet
+[2026-11-18T14:13:12.947127Z] fetched APOLLOHOSP.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/APOLLOHOSP.NS_1d.parquet
+[2026-11-18T14:13:13.159245Z] fetched BPCL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BPCL.NS_1d.parquet
+[2026-11-18T14:13:13.387175Z] fetched HINDALCO.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HINDALCO.NS_1d.parquet
+[2026-11-18T14:13:13.576610Z] fetched INDUSINDBK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/INDUSINDBK.NS_1d.parquet
+[2026-11-18T14:13:13.731015Z] fetched SBILIFE.NS 1d: 2254 rows, 2017-10-03 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SBILIFE.NS_1d.parquet
+[2026-11-18T14:13:13.887961Z] fetched HDFCLIFE.NS 1d: 2222 rows, 2017-11-17 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HDFCLIFE.NS_1d.parquet
+[2026-11-18T14:13:14.095049Z] fetched TATACONSUM.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TATACONSUM.NS_1d.parquet
+[2026-11-18T14:13:14.272836Z] fetched BAJAJ-AUTO.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BAJAJ-AUTO.NS_1d.parquet
+[2026-11-18T14:13:14.474092Z] fetched UPL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/UPL.NS_1d.parquet
+[2026-11-18T14:13:14.687174Z] fetched SHRIRAMFIN.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SHRIRAMFIN.NS_1d.parquet
+[2026-11-18T14:13:14.909994Z] fetched BANKBARODA.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BANKBARODA.NS_1d.parquet
+[2026-11-18T14:13:15.111223Z] fetched PNB.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PNB.NS_1d.parquet
+[2026-11-18T14:13:15.346665Z] fetched CANBK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/CANBK.NS_1d.parquet
+[2026-11-18T14:13:15.551613Z] fetched BEL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BEL.NS_1d.parquet
+[2026-11-18T14:13:15.748689Z] fetched HAL.NS 1d: 2132 rows, 2018-04-02 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HAL.NS_1d.parquet
+[2026-11-18T14:13:15.923781Z] fetched TRENT.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TRENT.NS_1d.parquet
+[2026-11-18T14:13:16.175508Z] fetched DLF.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/DLF.NS_1d.parquet
+[2026-11-18T14:13:16.388673Z] fetched VEDL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/VEDL.NS_1d.parquet
+[2026-11-18T14:13:16.582032Z] fetched TATAPOWER.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TATAPOWER.NS_1d.parquet
+[2026-11-18T14:13:16.768833Z] fetched IRCTC.NS 1d: 1757 rows, 2019-10-14 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/IRCTC.NS_1d.parquet
+[2026-11-18T14:13:17.765457Z] BLOCKED: empty response for LTIM.NS 1d (2015-01-01..2026-11-18)
+[2026-11-18T14:13:17.991650Z] fetched DABUR.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/DABUR.NS_1d.parquet
+[2026-11-18T14:13:18.205850Z] fetched GODREJCP.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/GODREJCP.NS_1d.parquet
+[2026-11-18T14:13:18.440431Z] fetched PIDILITIND.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PIDILITIND.NS_1d.parquet
+[2026-11-18T14:13:18.637574Z] fetched SIEMENS.NS 1d: 2931 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SIEMENS.NS_1d.parquet
+[2026-11-18T14:13:18.832712Z] fetched ABB.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ABB.NS_1d.parquet
+[2026-11-18T14:13:19.036831Z] fetched HAVELLS.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/HAVELLS.NS_1d.parquet
+[2026-11-18T14:13:19.292798Z] fetched VOLTAS.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/VOLTAS.NS_1d.parquet
+[2026-11-18T14:13:19.495792Z] fetched CROMPTON.NS 1d: 2598 rows, 2016-05-13 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/CROMPTON.NS_1d.parquet
+[2026-11-18T14:13:19.704158Z] fetched AMBUJACEM.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/AMBUJACEM.NS_1d.parquet
+[2026-11-18T14:13:19.975817Z] fetched SHREECEM.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SHREECEM.NS_1d.parquet
+[2026-11-18T14:13:20.231552Z] fetched ACC.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ACC.NS_1d.parquet
+[2026-11-18T14:13:20.441251Z] fetched GODREJPROP.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/GODREJPROP.NS_1d.parquet
+[2026-11-18T14:13:20.682987Z] fetched OBEROIRLTY.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/OBEROIRLTY.NS_1d.parquet
+[2026-11-18T14:13:20.930380Z] fetched PRESTIGE.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PRESTIGE.NS_1d.parquet
+[2026-11-18T14:13:21.190185Z] fetched LUPIN.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/LUPIN.NS_1d.parquet
+[2026-11-18T14:13:21.421631Z] fetched ZYDUSLIFE.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ZYDUSLIFE.NS_1d.parquet
+[2026-11-18T14:13:21.656120Z] fetched AUROPHARMA.NS 1d: 2931 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/AUROPHARMA.NS_1d.parquet
+[2026-11-18T14:13:21.912147Z] fetched TORNTPHARM.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TORNTPHARM.NS_1d.parquet
+[2026-11-18T14:13:22.135840Z] fetched ALKEM.NS 1d: 2691 rows, 2015-12-23 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ALKEM.NS_1d.parquet
+[2026-11-18T14:13:22.401054Z] fetched MPHASIS.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/MPHASIS.NS_1d.parquet
+[2026-11-18T14:13:22.588813Z] fetched PERSISTENT.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PERSISTENT.NS_1d.parquet
+[2026-11-18T14:13:22.825384Z] fetched COFORGE.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/COFORGE.NS_1d.parquet
+[2026-11-18T14:13:23.053954Z] fetched LTTS.NS 1d: 2507 rows, 2016-09-23 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/LTTS.NS_1d.parquet
+[2026-11-18T14:13:23.254142Z] fetched PAGEIND.NS 1d: 2931 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PAGEIND.NS_1d.parquet
+[2026-11-18T14:13:23.449328Z] fetched COLPAL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/COLPAL.NS_1d.parquet
+[2026-11-18T14:13:23.655082Z] fetched MARICO.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/MARICO.NS_1d.parquet
+[2026-11-18T14:13:23.841566Z] fetched UBL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/UBL.NS_1d.parquet
+[2026-11-18T14:13:24.074434Z] fetched BERGEPAINT.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BERGEPAINT.NS_1d.parquet
+[2026-11-18T14:13:24.182099Z] fetched ICICIPRULI.NS 1d: 84 rows, 2026-07-17 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ICICIPRULI.NS_1d.parquet
+[2026-11-18T14:13:24.419376Z] fetched ICICIGI.NS 1d: 2257 rows, 2017-09-27 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ICICIGI.NS_1d.parquet
+[2026-11-18T14:13:24.854416Z] fetched CHOLAFIN.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/CHOLAFIN.NS_1d.parquet
+[2026-11-18T14:13:25.062129Z] fetched MUTHOOTFIN.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/MUTHOOTFIN.NS_1d.parquet
+[2026-11-18T14:13:25.306431Z] fetched PFC.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PFC.NS_1d.parquet
+[2026-11-18T14:13:25.535561Z] fetched RECLTD.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/RECLTD.NS_1d.parquet
+[2026-11-18T14:13:25.767841Z] fetched IRFC.NS 1d: 1433 rows, 2021-01-29 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/IRFC.NS_1d.parquet
+[2026-11-18T14:13:25.971128Z] fetched GAIL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/GAIL.NS_1d.parquet
+[2026-11-18T14:13:26.203996Z] fetched IOC.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/IOC.NS_1d.parquet
+[2026-11-18T14:13:26.657469Z] fetched PETRONET.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PETRONET.NS_1d.parquet
+[2026-11-18T14:13:26.930584Z] fetched NMDC.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/NMDC.NS_1d.parquet
+[2026-11-18T14:13:27.133642Z] fetched SAIL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SAIL.NS_1d.parquet
+[2026-11-18T14:13:27.341693Z] fetched JINDALSTEL.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/JINDALSTEL.NS_1d.parquet
+[2026-11-18T14:13:27.553970Z] fetched ASHOKLEY.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ASHOKLEY.NS_1d.parquet
+[2026-11-18T14:13:27.757282Z] fetched TVSMOTOR.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TVSMOTOR.NS_1d.parquet
+[2026-11-18T14:13:27.922458Z] fetched BOSCHLTD.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BOSCHLTD.NS_1d.parquet
+[2026-11-18T14:13:28.140337Z] fetched MOTHERSON.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/MOTHERSON.NS_1d.parquet
+[2026-11-18T14:13:28.373076Z] fetched BHARATFORG.NS 1d: 2931 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BHARATFORG.NS_1d.parquet
+[2026-11-18T14:13:28.568505Z] fetched SRF.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/SRF.NS_1d.parquet
+[2026-11-18T14:13:28.796323Z] fetched PIIND.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PIIND.NS_1d.parquet
+[2026-11-18T14:13:29.031587Z] fetched DEEPAKNTR.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/DEEPAKNTR.NS_1d.parquet
+[2026-11-18T14:13:29.239639Z] fetched AUBANK.NS 1d: 2311 rows, 2017-07-11 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/AUBANK.NS_1d.parquet
+[2026-11-18T14:13:29.420047Z] fetched BANDHANBNK.NS 1d: 2134 rows, 2018-03-27 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/BANDHANBNK.NS_1d.parquet
+[2026-11-18T14:13:29.624367Z] fetched FEDERALBNK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/FEDERALBNK.NS_1d.parquet
+[2026-11-18T14:13:29.807831Z] fetched IDFCFIRSTB.NS 1d: 2722 rows, 2015-11-06 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/IDFCFIRSTB.NS_1d.parquet
+[2026-11-18T14:13:30.010972Z] fetched YESBANK.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/YESBANK.NS_1d.parquet
+[2026-11-18T14:13:30.284052Z] BLOCKED: empty response for ZOMATO.NS 1d (2015-01-01..2026-11-18)
+[2026-11-18T14:13:30.428738Z] fetched NYKAA.NS 1d: 1241 rows, 2021-11-10 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/NYKAA.NS_1d.parquet
+[2026-11-18T14:13:30.589048Z] fetched POLYCAB.NS 1d: 1875 rows, 2019-04-16 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/POLYCAB.NS_1d.parquet
+[2026-11-18T14:13:30.782090Z] fetched DIXON.NS 1d: 2264 rows, 2017-09-18 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/DIXON.NS_1d.parquet
+[2026-11-18T14:13:30.929846Z] fetched ABCAPITAL.NS 1d: 2275 rows, 2017-09-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ABCAPITAL.NS_1d.parquet
+[2026-11-18T14:13:31.113373Z] fetched LICHSGFIN.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/LICHSGFIN.NS_1d.parquet
+[2026-11-18T14:13:31.311487Z] fetched INDIGO.NS 1d: 2720 rows, 2015-11-10 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/INDIGO.NS_1d.parquet
+[2026-11-18T14:13:31.527716Z] fetched CONCOR.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/CONCOR.NS_1d.parquet
+[2026-11-18T14:13:31.851007Z] BLOCKED: empty response for GMRINFRA.NS 1d (2015-01-01..2026-11-18)
+[2026-11-18T14:13:32.022098Z] fetched ADANIGREEN.NS 1d: 2078 rows, 2018-06-18 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ADANIGREEN.NS_1d.parquet
+[2026-11-18T14:13:32.181884Z] fetched ADANIPOWER.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ADANIPOWER.NS_1d.parquet
+[2026-11-18T14:13:32.374638Z] fetched ADANIENSOL.NS 1d: 2788 rows, 2015-07-31 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/ADANIENSOL.NS_1d.parquet
+[2026-11-18T14:13:32.575160Z] fetched JSWENERGY.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/JSWENERGY.NS_1d.parquet
+[2026-11-18T14:13:32.788463Z] fetched TATACOMM.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/TATACOMM.NS_1d.parquet
+[2026-11-18T14:13:33.028526Z] fetched IDEA.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/IDEA.NS_1d.parquet
+[2026-11-18T14:13:33.207156Z] fetched INDUSTOWER.NS 1d: 2932 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/INDUSTOWER.NS_1d.parquet
+[2026-11-18T14:13:33.359185Z] fetched LODHA.NS 1d: 1381 rows, 2021-04-19 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/LODHA.NS_1d.parquet
+[2026-11-18T14:13:33.655312Z] fetched PHOENIXLTD.NS 1d: 2931 rows, 2015-01-01 00:00:00..2026-11-17 00:00:00 -> /home/user/niftyradar-backend/data/research_cache/PHOENIXLTD.NS_1d.parquet
+[2026-11-18T14:13:33.655571Z] cache hit: RELIANCE.NS 1d -> /home/user/niftyradar-backend/data/research_cache/RELIANCE.NS_1d.parquet
+[2026-11-18T14:13:33.672226Z] cache hit: TCS.NS 1d -> /home/user/niftyradar-backend/data/research_cache/TCS.NS_1d.parquet
+[2026-11-18T14:13:33.675402Z] cache hit: HDFCBANK.NS 1d -> /home/user/niftyradar-backend/data/research_cache/HDFCBANK.NS_1d.parquet
+[2026-11-18T14:13:33.678411Z] cache hit: ICICIBANK.NS 1d -> /home/user/niftyradar-backend/data/research_cache/ICICIBANK.NS_1d.parquet
+[2026-11-18T14:13:33.681955Z] cache hit: INFY.NS 1d -> /home/user/niftyradar-backend/data/research_cache/INFY.NS_1d.parquet
+[2026-11-18T14:13:33.684478Z] cache hit: ITC.NS 1d -> /home/user/niftyradar-backend/data/research_cache/ITC.NS_1d.parquet
+[2026-11-18T14:13:33.687622Z] cache hit: SBIN.NS 1d -> /home/user/niftyradar-backend/data/research_cache/SBIN.NS_1d.parquet
+[2026-11-18T14:13:33.690024Z] cache hit: BHARTIARTL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BHARTIARTL.NS_1d.parquet
+[2026-11-18T14:13:33.692501Z] cache hit: LT.NS 1d -> /home/user/niftyradar-backend/data/research_cache/LT.NS_1d.parquet
+[2026-11-18T14:13:33.695565Z] cache hit: HINDUNILVR.NS 1d -> /home/user/niftyradar-backend/data/research_cache/HINDUNILVR.NS_1d.parquet
+[2026-11-18T14:13:33.698435Z] cache hit: KOTAKBANK.NS 1d -> /home/user/niftyradar-backend/data/research_cache/KOTAKBANK.NS_1d.parquet
+[2026-11-18T14:13:33.701111Z] cache hit: AXISBANK.NS 1d -> /home/user/niftyradar-backend/data/research_cache/AXISBANK.NS_1d.parquet
+[2026-11-18T14:13:33.703693Z] cache hit: BAJFINANCE.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BAJFINANCE.NS_1d.parquet
+[2026-11-18T14:13:33.706398Z] cache hit: ASIANPAINT.NS 1d -> /home/user/niftyradar-backend/data/research_cache/ASIANPAINT.NS_1d.parquet
+[2026-11-18T14:13:33.708592Z] cache hit: MARUTI.NS 1d -> /home/user/niftyradar-backend/data/research_cache/MARUTI.NS_1d.parquet
+[2026-11-18T14:13:33.711088Z] cache hit: SUNPHARMA.NS 1d -> /home/user/niftyradar-backend/data/research_cache/SUNPHARMA.NS_1d.parquet
+[2026-11-18T14:13:33.713535Z] cache hit: TITAN.NS 1d -> /home/user/niftyradar-backend/data/research_cache/TITAN.NS_1d.parquet
+[2026-11-18T14:13:33.716201Z] cache hit: ULTRACEMCO.NS 1d -> /home/user/niftyradar-backend/data/research_cache/ULTRACEMCO.NS_1d.parquet
+[2026-11-18T14:13:33.979799Z] BLOCKED: empty response for TATAMOTORS.NS 1d (2015-01-01..2026-11-18)
+[2026-11-18T14:13:33.980039Z] cache hit: WIPRO.NS 1d -> /home/user/niftyradar-backend/data/research_cache/WIPRO.NS_1d.parquet
+[2026-11-18T14:13:33.984030Z] cache hit: NESTLEIND.NS 1d -> /home/user/niftyradar-backend/data/research_cache/NESTLEIND.NS_1d.parquet
+[2026-11-18T14:13:33.987256Z] cache hit: ONGC.NS 1d -> /home/user/niftyradar-backend/data/research_cache/ONGC.NS_1d.parquet
+[2026-11-18T14:13:33.990187Z] cache hit: NTPC.NS 1d -> /home/user/niftyradar-backend/data/research_cache/NTPC.NS_1d.parquet
+[2026-11-18T14:13:33.993036Z] cache hit: ADANIENT.NS 1d -> /home/user/niftyradar-backend/data/research_cache/ADANIENT.NS_1d.parquet
+[2026-11-18T14:13:33.995764Z] cache hit: ADANIPORTS.NS 1d -> /home/user/niftyradar-backend/data/research_cache/ADANIPORTS.NS_1d.parquet
+[2026-11-18T14:13:33.998499Z] cache hit: POWERGRID.NS 1d -> /home/user/niftyradar-backend/data/research_cache/POWERGRID.NS_1d.parquet
+[2026-11-18T14:13:34.001412Z] cache hit: M&M.NS 1d -> /home/user/niftyradar-backend/data/research_cache/M&M.NS_1d.parquet
+[2026-11-18T14:13:34.004273Z] cache hit: HCLTECH.NS 1d -> /home/user/niftyradar-backend/data/research_cache/HCLTECH.NS_1d.parquet
+[2026-11-18T14:13:34.007084Z] cache hit: TATASTEEL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/TATASTEEL.NS_1d.parquet
+[2026-11-18T14:13:34.010102Z] cache hit: JSWSTEEL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/JSWSTEEL.NS_1d.parquet
+[2026-11-18T14:13:34.013530Z] cache hit: TECHM.NS 1d -> /home/user/niftyradar-backend/data/research_cache/TECHM.NS_1d.parquet
+[2026-11-18T14:13:34.017078Z] cache hit: GRASIM.NS 1d -> /home/user/niftyradar-backend/data/research_cache/GRASIM.NS_1d.parquet
+[2026-11-18T14:13:34.020417Z] cache hit: DRREDDY.NS 1d -> /home/user/niftyradar-backend/data/research_cache/DRREDDY.NS_1d.parquet
+[2026-11-18T14:13:34.023658Z] cache hit: CIPLA.NS 1d -> /home/user/niftyradar-backend/data/research_cache/CIPLA.NS_1d.parquet
+[2026-11-18T14:13:34.027365Z] cache hit: COALINDIA.NS 1d -> /home/user/niftyradar-backend/data/research_cache/COALINDIA.NS_1d.parquet
+[2026-11-18T14:13:34.031253Z] cache hit: BAJAJFINSV.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BAJAJFINSV.NS_1d.parquet
+[2026-11-18T14:13:34.034557Z] cache hit: BRITANNIA.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BRITANNIA.NS_1d.parquet
+[2026-11-18T14:13:34.037992Z] cache hit: EICHERMOT.NS 1d -> /home/user/niftyradar-backend/data/research_cache/EICHERMOT.NS_1d.parquet
+[2026-11-18T14:13:34.041298Z] cache hit: HEROMOTOCO.NS 1d -> /home/user/niftyradar-backend/data/research_cache/HEROMOTOCO.NS_1d.parquet
+[2026-11-18T14:13:34.044778Z] cache hit: DIVISLAB.NS 1d -> /home/user/niftyradar-backend/data/research_cache/DIVISLAB.NS_1d.parquet
+[2026-11-18T14:13:34.048098Z] cache hit: APOLLOHOSP.NS 1d -> /home/user/niftyradar-backend/data/research_cache/APOLLOHOSP.NS_1d.parquet
+[2026-11-18T14:13:34.051422Z] cache hit: BPCL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BPCL.NS_1d.parquet
+[2026-11-18T14:13:34.054780Z] cache hit: HINDALCO.NS 1d -> /home/user/niftyradar-backend/data/research_cache/HINDALCO.NS_1d.parquet
+[2026-11-18T14:13:34.058138Z] cache hit: INDUSINDBK.NS 1d -> /home/user/niftyradar-backend/data/research_cache/INDUSINDBK.NS_1d.parquet
+[2026-11-18T14:13:34.061515Z] cache hit: SBILIFE.NS 1d -> /home/user/niftyradar-backend/data/research_cache/SBILIFE.NS_1d.parquet
+[2026-11-18T14:13:34.065582Z] cache hit: HDFCLIFE.NS 1d -> /home/user/niftyradar-backend/data/research_cache/HDFCLIFE.NS_1d.parquet
+[2026-11-18T14:13:34.069718Z] cache hit: TATACONSUM.NS 1d -> /home/user/niftyradar-backend/data/research_cache/TATACONSUM.NS_1d.parquet
+[2026-11-18T14:13:34.073186Z] cache hit: BAJAJ-AUTO.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BAJAJ-AUTO.NS_1d.parquet
+[2026-11-18T14:13:34.076499Z] cache hit: UPL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/UPL.NS_1d.parquet
+[2026-11-18T14:13:34.079814Z] cache hit: SHRIRAMFIN.NS 1d -> /home/user/niftyradar-backend/data/research_cache/SHRIRAMFIN.NS_1d.parquet
+[2026-11-18T14:13:34.083122Z] cache hit: BANKBARODA.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BANKBARODA.NS_1d.parquet
+[2026-11-18T14:13:34.086194Z] cache hit: PNB.NS 1d -> /home/user/niftyradar-backend/data/research_cache/PNB.NS_1d.parquet
+[2026-11-18T14:13:34.090331Z] cache hit: CANBK.NS 1d -> /home/user/niftyradar-backend/data/research_cache/CANBK.NS_1d.parquet
+[2026-11-18T14:13:34.093577Z] cache hit: BEL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/BEL.NS_1d.parquet
+[2026-11-18T14:13:34.097027Z] cache hit: HAL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/HAL.NS_1d.parquet
+[2026-11-18T14:13:34.100299Z] cache hit: TRENT.NS 1d -> /home/user/niftyradar-backend/data/research_cache/TRENT.NS_1d.parquet
+[2026-11-18T14:13:34.103777Z] cache hit: DLF.NS 1d -> /home/user/niftyradar-backend/data/research_cache/DLF.NS_1d.parquet
+[2026-11-18T14:13:34.107115Z] cache hit: VEDL.NS 1d -> /home/user/niftyradar-backend/data/research_cache/VEDL.NS_1d.parquet
+[2026-11-18T14:13:34.110453Z] cache hit: TATAPOWER.NS 1d -> /home/user/niftyradar-backend/data/research_cache/TATAPOWER.NS_1d.parquet
+[2026-11-18T14:13:34.113976Z] cache hit: IRCTC.NS 1d -> /home/user/niftyradar-backend/data/research_cache/IRCTC.NS_1d.parquet
+[2026-11-18T14:13:34.331779Z] fetched ^NSEI 30m: 780 bars, 60 distinct days, 2026-08-21 09:00:00+05:30..2026-11-18 15:00:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/IDX_NSEI_30m.parquet
+[2026-11-18T14:13:34.543090Z] fetched ^NSEI 5m: 4496 bars, 60 distinct days, 2026-08-21 09:15:00+05:30..2026-11-18 15:25:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/IDX_NSEI_5m.parquet
+[2026-11-18T14:13:34.682241Z] fetched RELIANCE.NS 30m: 780 bars, 60 distinct days, 2026-08-21 09:00:00+05:30..2026-11-18 15:00:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/RELIANCE.NS_30m.parquet
+[2026-11-18T14:13:34.880313Z] fetched RELIANCE.NS 5m: 4398 bars, 60 distinct days, 2026-08-21 09:15:00+05:30..2026-11-18 15:25:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/RELIANCE.NS_5m.parquet
+[2026-11-18T14:13:35.041780Z] fetched HDFCBANK.NS 30m: 780 bars, 60 distinct days, 2026-08-21 09:00:00+05:30..2026-11-18 15:00:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/HDFCBANK.NS_30m.parquet
+[2026-11-18T14:13:35.198551Z] fetched HDFCBANK.NS 5m: 4397 bars, 60 distinct days, 2026-08-21 09:15:00+05:30..2026-11-18 15:25:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/HDFCBANK.NS_5m.parquet
+[2026-11-18T14:13:35.328333Z] fetched ICICIBANK.NS 30m: 780 bars, 60 distinct days, 2026-08-21 09:00:00+05:30..2026-11-18 15:00:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/ICICIBANK.NS_30m.parquet
+[2026-11-18T14:13:35.521140Z] fetched ICICIBANK.NS 5m: 4384 bars, 60 distinct days, 2026-08-21 09:15:00+05:30..2026-11-18 15:25:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/ICICIBANK.NS_5m.parquet
+[2026-11-18T14:13:35.656599Z] fetched TCS.NS 30m: 780 bars, 60 distinct days, 2026-08-21 09:00:00+05:30..2026-11-18 15:00:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/TCS.NS_30m.parquet
+[2026-11-18T14:13:35.867849Z] fetched TCS.NS 5m: 4386 bars, 60 distinct days, 2026-08-21 09:15:00+05:30..2026-11-18 15:25:00+05:30 -> /home/user/niftyradar-backend/data/research_cache/TCS.NS_5m.parquet
+[2026-11-18T14:13:36.185775Z] fetched BTC-USD 30m: 2861 bars, 60 distinct days, 2026-09-20 00:00:00+00:00..2026-11-18 14:00:00+00:00 -> /home/user/niftyradar-backend/data/research_cache/BTC-USD_30m.parquet
+[2026-11-18T14:13:36.484238Z] fetched BTC-USD 5m: 17163 bars, 60 distinct days, 2026-09-20 00:00:00+00:00..2026-11-18 14:10:00+00:00 -> /home/user/niftyradar-backend/data/research_cache/BTC-USD_5m.parquet
+[2026-11-18T14:13:36.484767Z] === fetch_data.py run end ===
