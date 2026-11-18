@@ -275,3 +275,19 @@ test('crypto heartbeat: scanning but no trade for 12h+ is DEGRADED with the top 
   assert.ok(h.degraded.some((d) => /crypto crypto: no trade for 14h/.test(d))); // 14 >= 12
   assert.ok(!h.degraded.some((d) => /crypto_scalp: no trade/.test(d))); // 1h < 12
 });
+
+test('MCX feed: a failing Yahoo feed shows DEGRADED with the last error; a recovered one is ok', async () => {
+  const { registerMcxFeed } = require('../src/paper/ops/health');
+  const now = Date.UTC(2026, 10, 18, 5, 0);
+  const tracker = createHealthTracker({ now: () => now });
+  for (const name of JOB_NAMES) tracker.recordRun(name, true);
+  const stats = { ok: 3, failures: 2, lastError: 'Yahoo 5m candles for GC=F failed: HTTP 429', lastSuccessAt: now - 600000, lastErrorAt: now - 60000 };
+  registerMcxFeed('mcx_gold_test', stats);
+  const args = { tracker, store: createMemoryStore(), state: { enabled: true, ready: true, holidays: [] }, now, env: { TELEGRAM_BOT_TOKEN: 'x', TELEGRAM_CHAT_ID: 'y' } };
+  let h = await buildHealth(args);
+  assert.equal(h.mcxFeeds.mcx_gold_test.status, 'failing'); // error (now-1min) is newer than last success (now-10min)
+  assert.ok(h.degraded.some((d) => /mcx_gold_test price feed failing .*HTTP 429/.test(d)));
+  stats.lastSuccessAt = now; // recovered
+  h = await buildHealth(args);
+  assert.equal(h.mcxFeeds.mcx_gold_test.status, 'ok');
+});

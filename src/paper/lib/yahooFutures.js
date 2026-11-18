@@ -102,7 +102,7 @@ function createYahooFuturesSource({ axios, symbol, unit, log = console.log, now 
       } catch (e) {
         stats.failures += 1;
         const error = `Yahoo ${interval} candles for ${ySymbol} failed: ${e.response?.status ? `HTTP ${e.response.status}` : e.message}`;
-        stats.lastError = error;
+        stats.lastError = error; stats.lastErrorAt = now();
         cache.set(key, { error, fetchedAt: now() });
         throw new Error(error);
       }

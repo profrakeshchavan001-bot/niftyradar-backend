@@ -51,6 +51,7 @@ module.exports = {
 
     const cfgNow = await loadMcxGoldConfig(mainStore);
     const source = createYahooFuturesSource({ axios: require('axios'), symbol: cfgNow.yahoo_symbol, unit: goldUsdOzToInrPerGram, log, fxFallback: cfgNow.usdinr_fallback });
+    require('../../ops/health').registerMcxFeed('mcx_gold', source.stats);
     const bot = createMcxBot({ label: 'mcx_gold', symbol: SYMBOL, lotKey: 'lot_size_grams', store, source, loadCfg: () => loadMcxGoldConfig(mainStore), log });
 
     const scanFn = guarded('mcx_gold scan', track('mcxGoldScan', bot.scan), log);

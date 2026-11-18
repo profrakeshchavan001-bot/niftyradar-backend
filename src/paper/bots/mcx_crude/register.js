@@ -49,6 +49,7 @@ module.exports = {
 
     const cfgNow = await loadMcxCrudeConfig(mainStore);
     const source = createYahooFuturesSource({ axios: require('axios'), symbol: cfgNow.yahoo_symbol, unit: crudeUsdBblToInrPerBbl, log, fxFallback: cfgNow.usdinr_fallback });
+    require('../../ops/health').registerMcxFeed('mcx_crude', source.stats);
     const bot = createMcxBot({ label: 'mcx_crude', symbol: SYMBOL, lotKey: 'lot_size_barrels', store, source, loadCfg: () => loadMcxCrudeConfig(mainStore), log });
 
     const scanFn = guarded('mcx_crude scan', track('mcxCrudeScan', bot.scan), log);
